@@ -38,6 +38,104 @@ latexmk -c                                # remove intermediates
 
 `sw_unit_test_spec.pdf` is committed as a preview of the example; rebuild it whenever the template or example content changes.
 
+## Using it for a project
+
+The template is used as its own repository (the *upstream*). A project gets **one copy of it, with one branch per unit**:
+
+```
+upstream (this template)  ──merge──▶  main  ──merge──▶  unit/<unit-name>   (one branch per unit)
+  template + worked example            template +         template + project-wide
+                                       project-wide       + unit content + its PDF
+                                       content, no PDF
+```
+
+- **`main`** — the template plus everything that is the same for all units of the project: `\Company`, `\ProjectName`, approver, common references and terms, test approach, test environment. It never holds a unit's content.
+- **`unit/<unit-name>`** — one long-lived branch per unit, created from `main`. `<unit-name>` is the unit's `\UnitName` (e.g. `unit/setpoint_ctrl`). Holds the unit's content and its built `sw_unit_test_spec.pdf`. Unit branches are never merged back into `main` or into each other.
+- Changes flow one way only: **upstream → `main` → `unit/*`**. Template fixes go to upstream (not edited in the copy), project-wide edits go to `main`, unit edits go to the unit branch.
+
+**Outside the code repository.** Keep the spec repository separate from the unit's source code, not as a folder or submodule in it. The spec is a work product with its own versions, tags and releases (`\DocVersion`, `<unit>-v<version>`, review and approval). Its life cycle differs from the code's: a spec is often baselined before the code exists, and a code release does not imply a new spec version. To link the two, reference the code baseline under test in the spec (`\UnitBaseline`, `\SourceFiles`, a `\Reference` to the code repository and tag), never the other way round.
+
+**A private copy, not a GitHub fork.** A fork of a public repository is public. For project work, create an empty **private** repository (e.g. `<project>-unit-test-specs`) and push the template into it, keeping upstream as a second remote.
+
+### 1. Set up the project repository (once)
+
+```sh
+git clone <template-url> <project>-unit-test-specs && cd <project>-unit-test-specs
+git remote rename origin upstream
+git remote add origin <url of the new private repo>
+```
+
+On `main`, replace the worked example in **every** `content/*.tex` with the project-wide content and empty or placeholder content for the unit-specific files. The document still builds, with placeholders. Then remove the example PDF and push:
+
+```sh
+git rm sw_unit_test_spec.pdf          # the example's preview; unit branches carry their own PDF
+latexmk -pdf sw_unit_test_spec.tex    # check: builds, 0 warnings (PDF stays untracked on main)
+git commit -am "Project setup: project-wide content"
+git push -u origin main
+```
+
+Touch every content file here. A content file left unchanged would silently take later changes to the upstream example.
+
+### 2. Start a unit
+
+```sh
+git switch main && git pull
+git switch -c unit/setpoint_ctrl
+# fill content/*.tex for the unit, in this order:
+#   metadata (UnitName, baseline, …) → requirements → unit → design
+#   → approach/environment (unit specifics) → testcases → results (after execution)
+latexmk -pdf sw_unit_test_spec.tex
+git add content/ sw_unit_test_spec.pdf && git commit -m "setpoint_ctrl: initial spec"
+git push -u origin unit/setpoint_ctrl
+```
+
+Commit the rebuilt PDF with every content change on the unit branch, so reviewers can read the branch without building it. For a review, compare the content against the last baseline: `git diff setpoint_ctrl-v1.0 -- content/` (see step 5).
+
+### 3. Project-wide change (e.g. a new tool version)
+
+Edit on `main`, commit, then bring it into each unit branch:
+
+```sh
+git switch unit/setpoint_ctrl && git merge main
+latexmk -pdf sw_unit_test_spec.tex && git commit -am "setpoint_ctrl: rebuild after merge of main"
+```
+
+A conflict only occurs when the unit branch changed the same lines. Resolve it as usual.
+
+### 4. Take over template updates from upstream
+
+```sh
+git switch main && git fetch upstream && git merge upstream/main
+```
+
+Expect two kinds of conflicts, both resolved the same way every time:
+
+| Conflict | Why | Resolve |
+|---|---|---|
+| `content/*.tex` | upstream changed its worked example; the project has its own content | keep ours: `git checkout --ours -- content/` |
+| `sw_unit_test_spec.pdf` (modify/delete) | upstream rebuilt its example PDF; `main` has none | `git rm sw_unit_test_spec.pdf` |
+
+```sh
+git checkout --ours -- content/ && git rm -q --ignore-unmatch sw_unit_test_spec.pdf
+git add content/ && git commit -m "Merge template update from upstream"
+git push
+```
+
+`suts.cls`, `latexmkrc` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `sw_unit_test_spec.tex` and to *new* files in `content/`: a new content file arrives with example text. Replace that text on `main`. Then merge `main` into every unit branch as in step 3, and rebuild and commit each unit's PDF.
+
+### 5. Baseline a unit's spec
+
+Set `\DocVersion` and `\DocStatus` in `metadata.tex` and add a `\Revision` row. Rebuild and commit, then tag on the unit branch:
+
+```sh
+git tag -a setpoint_ctrl-v1.0 -m "setpoint_ctrl unit test spec v1.0"   # tag version = \DocVersion
+git push origin setpoint_ctrl-v1.0
+```
+
+The tagged commit, with its PDF, is the released document. File the PDF in the project's document management if required. Never move a tag; fix forward with a new version.
+
+**Template from sw-dev-pub.** Until the template has its own repository, `git subtree split --prefix=projects/sw-unit-test-spec -b sw-unit-test-spec` in a sw-dev-pub clone produces a branch with the template's history, ready to push as upstream. The split is deterministic, so later splits continue the same history and step 4 keeps working.
+
 ## Writing content — the rules
 
 - Replace the text inside `{…}`. Empty lines inside an argument start a new paragraph.
@@ -168,7 +266,7 @@ Consistency checks, shown in red in the PDF: a requirement in `\Verifies` that i
 
 ## Customizing
 
-In `sw_unit_test_spec.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecRequirements`, `\SpecUnitUnderTest`, `\SpecTestApproach`, `\SpecTestEnvironment`, `\SpecTestCases`, `\SpecTraceability`, `\SpecResults`), load your own packages, and add own sections (`\section{…}` + `\input{content/my_extra}`). One spec per unit: copy the project folder, or keep several content folders and point `\LoadContent{…}` at one. Class options go to `article` (`\documentclass[10pt]{suts}`).
+In `sw_unit_test_spec.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecRequirements`, `\SpecUnitUnderTest`, `\SpecTestApproach`, `\SpecTestEnvironment`, `\SpecTestCases`, `\SpecTraceability`, `\SpecResults`), load your own packages, and add own sections (`\section{…}` + `\input{content/my_extra}`). One spec per unit: one branch per unit in a project copy (see *Using it for a project*). For a quick local use without git, keep several content folders and point `\LoadContent{…}` at one. Class options go to `article` (`\documentclass[10pt]{suts}`).
 
 ## Test
 
