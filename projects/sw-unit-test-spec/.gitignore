@@ -1,0 +1,13 @@
+# built PDF (build it yourself, see README) — no build output in git
+*.pdf
+
+# LaTeX intermediates
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.ltc
+*.out
+*.synctex.gz
+*.toc
+*.xdv
