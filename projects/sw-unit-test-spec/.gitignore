@@ -1,5 +1,4 @@
-# built PDF (build it yourself, see README) — no build output in git
-*.pdf
+# sw_unit_test_spec.pdf IS tracked (preview of the example, see README)
 
 # LaTeX intermediates
 *.aux
