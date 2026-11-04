@@ -21,7 +21,8 @@ sw-dev-pub/
 
 | Project | What | Owner | Status |
 |---|---|---|---|
-| _(none yet)_ | | | |
+| [`cbor/`](cbor/) | CBOR codec twins: C++17 single header + MATLAB/Octave, RFC 8746 typed arrays, cbor2 interop check | swdevos | stable, tested |
+| [`matlab-json-config/`](matlab-json-config/) | Typed JSON config pattern for MATLAB (validated class properties from `jsondecode`) | swdevos | example, untested (MATLAB only) |
 
 Keep this table current when you add, rename or retire a project.
 
