@@ -48,6 +48,20 @@ jobs:
           project="${tag%-v*}"
           version="${tag##*-v}"
           test -d "projects/$project" || { echo "::error::no projects/$project for tag $tag"; exit 1; }
+          # A CMake project version, if declared, must match the tag.
+          cm="projects/$project/CMakeLists.txt"
+          if [ -f "$cm" ]; then
+            cmv=$(sed -n 's/^[[:space:]]*VERSION[[:space:]]\+\([0-9][0-9.]*\).*/\1/p' "$cm" | head -1)
+            if [ -n "$cmv" ] && [ "$cmv" != "$version" ]; then
+              echo "::error::$cm declares VERSION $cmv but tag is $tag"; exit 1
+            fi
+          fi
+          prev=$(git describe --tags --abbrev=0 --match "$project-v*" "$tag^" 2>/dev/null || true)
+          {
+            echo "Standalone tarball of \`projects/$project\` at \`$tag\` — unpacks to \`$project/\`, see \`$project/README.md\`."
+            echo
+            echo "Changes${prev:+ since $prev}:"
+            git log --format='- %s (%h)' ${prev:+$prev..}"$tag" -- "projects/$project"
+          } > notes.md
           tools/make-project-tars.sh -r "$tag" -s "-$version" -o out "$project"
-          gh release create "$tag" out/* --title "$project $version" \
-            --notes "Standalone tarball of projects/$project at $tag. Unpacks to $project/. See $project/README.md."
+          gh release create "$tag" out/* --title "$project $version" --notes-file notes.md

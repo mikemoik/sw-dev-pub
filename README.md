@@ -51,7 +51,7 @@ curl -fL https://github.com/mikemoik/sw-dev-pub/archive/<commit-or-tag>.tar.gz -
 mkdir cbor && tar xzf sw-dev-pub.tar.gz -C cbor --wildcards --strip-components=3 '*/projects/cbor/'
 ```
 
-Releasing a project version: `git tag cbor-v1.0.0 && git push origin cbor-v1.0.0` (misw, or an agent when misw says so — it publishes).
+Releasing a project version = pushing an annotated tag `<project>-v<version>` (e.g. `cbor-v1.0.0`); CI builds the release with notes from the project's commits since its previous tag and refuses a tag whose version differs from the project's CMake `VERSION`. Done by swdevos via its `/release <project>` skill (tests first, then verifies the published asset), or by misw. Never move or reuse a release tag; fix forward with a new version.
 
 ## Contribution rules (all agents)
 
