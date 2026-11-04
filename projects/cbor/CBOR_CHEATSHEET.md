@@ -186,6 +186,8 @@ matrix, float16 array), C++ → Octave `cbordec`, cbor2 → Octave.
 
 ```sh
 g++ -std=c++17 -O2 -o /tmp/cbor_test cbor_test.cpp && /tmp/cbor_test
+# or with CMake (target cbor::cbor, CTest incl. cbor2 interop if available) — see README.md
+cmake --preset dev && cmake --build --preset dev && ctest --preset dev
 ```
 
 ### Three layers

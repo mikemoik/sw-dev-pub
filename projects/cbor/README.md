@@ -8,6 +8,7 @@ CBOR codec twins for compact sensor/logger streams: the same RFC 8949 subset in 
 
 | File | What |
 |---|---|
+| `CMakeLists.txt`, `CMakePresets.json`, `cmake/` | CMake build: header-only target `cbor::cbor`, CTest suite, install + `find_package(cbor)` package config. |
 | `cbor.hpp` | C++17 single header: `cbor::Writer`, `cbor::Value`, `cbor::Reader`; typed arrays (little-endian), tag 1040 matrices, tag 55799 self-describe header. No dependencies. |
 | `cborenc.m` / `cbordec.m` | MATLAB/Octave encoder (literal class → major-type mapping) and generic decoder (indefinite lengths, chunked strings, typed arrays, CBOR sequences). |
 | `cbor_test.cpp` / `cbor_test.m` | Test suites; `cbor_test --write/--read FILE` for interop. |
@@ -16,6 +17,20 @@ CBOR codec twins for compact sensor/logger streams: the same RFC 8949 subset in 
 | `CBOR_CHEATSHEET.md` | Usage, type mapping, stream layout, gotchas. Start here. |
 
 ## Build & test (from this directory)
+
+### C++ with CMake (≥ 3.21)
+
+```sh
+cmake --preset dev && cmake --build --preset dev && ctest --preset dev
+# or without presets:
+cmake -S . -B build && cmake --build build && ctest --test-dir build
+```
+
+CTest runs `cbor.unit` (the 184-assertion suite) and a C++ write → read stream round trip. If the configured Python 3 can `import cbor2`, three interop tests against cbor2 are added (C++ → cbor2, cbor2 → C++); point CMake at the venv with `-DPython3_EXECUTABLE=$PWD/.venv/bin/python` (see below).
+
+Options (default `ON` when this is the top-level project, `OFF` when pulled in by a consumer): `CBOR_BUILD_TESTS`, `CBOR_INSTALL`.
+
+### Without CMake
 
 ```sh
 # C++ (g++ or clang++, C++17)
@@ -35,4 +50,30 @@ uv venv .venv && uv pip install -p .venv/bin/python cbor2     # or: python3 -m v
 
 ## Use
 
-C++: copy `cbor.hpp` into your project (or add this dir to the include path) and `#include "cbor.hpp"`. MATLAB: put this dir on the path (`addpath`). Details in `CBOR_CHEATSHEET.md`.
+### C++
+
+Link the target `cbor::cbor` (header-only, sets C++17) and `#include "cbor.hpp"`. Three ways to get it:
+
+```cmake
+# 1. vendored copy / git submodule
+add_subdirectory(third_party/cbor)
+
+# 2. FetchContent (straight from this repo)
+include(FetchContent)
+FetchContent_Declare(cbor
+    GIT_REPOSITORY https://github.com/mikemoik/sw-dev-pub.git
+    GIT_TAG        main            # pin a commit for reproducible builds
+    SOURCE_SUBDIR  projects/cbor)
+FetchContent_MakeAvailable(cbor)
+
+# 3. installed package:  cmake --install build --prefix <prefix>,  then
+find_package(cbor 1.0 REQUIRED CONFIG)   # CMAKE_PREFIX_PATH=<prefix>
+
+target_link_libraries(app PRIVATE cbor::cbor)
+```
+
+Or skip CMake entirely: copy `cbor.hpp` into your tree.
+
+### MATLAB / Octave
+
+Put this dir on the path (`addpath`). Details in `CBOR_CHEATSHEET.md`.
