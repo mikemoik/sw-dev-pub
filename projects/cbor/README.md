@@ -66,6 +66,15 @@ FetchContent_Declare(cbor
     SOURCE_SUBDIR  projects/cbor)
 FetchContent_MakeAvailable(cbor)
 
+# 2b. FetchContent without git (plain HTTPS download, pinned + hash-checked)
+FetchContent_Declare(cbor
+    URL      https://github.com/mikemoik/sw-dev-pub/releases/download/cbor-v1.0.0/cbor-1.0.0.tar.gz
+    URL_HASH SHA256=<from cbor-1.0.0.tar.gz.sha256>
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+#    or the whole-repo archive of a commit:  URL https://github.com/mikemoik/sw-dev-pub/archive/<sha>.tar.gz
+#    plus  SOURCE_SUBDIR projects/cbor
+FetchContent_MakeAvailable(cbor)
+
 # 3. installed package:  cmake --install build --prefix <prefix>,  then
 find_package(cbor 1.0 REQUIRED CONFIG)   # CMAKE_PREFIX_PATH=<prefix>
 

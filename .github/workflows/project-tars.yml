@@ -1,0 +1,53 @@
+# Per-project tarballs as GitHub Release assets (nothing binary is committed).
+#
+#  - push to main      -> rolling pre-release "snapshot": <project>.tar.gz for every
+#                         project at the newest main commit (stable URLs, always latest)
+#  - push tag <project>-v<version>  (e.g. cbor-v1.0.0)
+#                      -> release "<project> <version>" with <project>-<version>.tar.gz
+name: project-tars
+
+on:
+  push:
+    branches: [main]
+    tags: ['*-v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: project-tars-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tars:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Snapshot of main
+        if: github.ref_type == 'branch'
+        run: |
+          tools/make-project-tars.sh -o out
+          git tag -f snapshot
+          git push -f origin refs/tags/snapshot
+          if ! gh release view snapshot >/dev/null 2>&1; then
+            gh release create snapshot --prerelease --title "snapshot (main)" \
+              --notes "Per-project tarballs of the newest main commit; replaced on every push. Pin a versioned release (<project>-v<version>) for reproducible builds."
+          fi
+          gh release edit snapshot --target "$GITHUB_SHA"
+          gh release upload snapshot out/* --clobber
+
+      - name: Versioned project release
+        if: github.ref_type == 'tag'
+        run: |
+          tag="$GITHUB_REF_NAME"               # e.g. cbor-v1.0.0
+          project="${tag%-v*}"
+          version="${tag##*-v}"
+          test -d "projects/$project" || { echo "::error::no projects/$project for tag $tag"; exit 1; }
+          tools/make-project-tars.sh -r "$tag" -s "-$version" -o out "$project"
+          gh release create "$tag" out/* --title "$project $version" \
+            --notes "Standalone tarball of projects/$project at $tag. Unpacks to $project/. See $project/README.md."

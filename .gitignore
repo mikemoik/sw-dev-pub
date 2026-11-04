@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# per-project tarballs built by tools/make-project-tars.sh (published as release assets, never committed)
+project-tars/
