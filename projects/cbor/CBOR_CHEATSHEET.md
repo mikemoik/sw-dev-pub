@@ -179,8 +179,9 @@ Prints a summary; errors if anything failed.
 
 ## C++ — `cbor.hpp`
 
-Status: **verified** (2026-09-10): `cbor_test.cpp` passes 184/184 under GCC 16.1
-and clang (C++17, `-Wall -Wextra -pedantic`, ASan+UBSan), and the three-way
+Status: **verified** (1.1.0, 2026-11-04): `cbor_test.cpp` passes 215/215 under
+GCC 16.2 and clang (C++17, `-Wall -Wextra -pedantic`, ASan+UBSan — 1.0.0 had a
+UBSan hit in `diag()` for u64 typed arrays > 2⁶³, fixed in 1.1.0). Earlier (2026-09-10) the three-way
 interop passed: C++ → cbor2, cbor2 → C++ (LE + BE typed arrays, tag 1040
 matrix, float16 array), C++ → Octave `cbordec`, cbor2 → Octave.
 
@@ -198,7 +199,7 @@ cmake --preset dev && cmake --build --preset dev && ctest --preset dev
 | `cbor::Value` | generic tree: null/undefined/bool/int/float/bytes/text/array/map/tagged/simple/typed/ndarray | headers, config, anything you build or inspect by key |
 | `cbor::Reader` | `Reader r(buf); while (!r.done()) Value v = r.next();` | reading a CBOR sequence (RFC 8742) |
 
-Free functions: `encode(Value) -> bytes`, `decode(bytes[, pos&])`, `decode_all(bytes)`,
+Free functions: `to_value(x)` / `from_value<T>(v)` (structs, see below), `encode(Value) -> bytes`, `decode(bytes[, pos&])`, `decode_all(bytes)`,
 `diag(Value)` (RFC 8949 diagnostic notation, typed arrays as `u32[1, 2]`, ND as
 `f32[2x3][...]`). Float suffixes are RFC 8949 encoding indicators, **not** byte
 counts: `_1` = float16 (3 B), `_2` = float32 (5 B), `_3` = float64 (9 B) — so a
@@ -242,7 +243,7 @@ Differences from the MATLAB encoder, on purpose:
 
 | CBOR | `Value` type | accessor |
 |---|---|---|
-| int in int64 range | `Int` | `as_int64()`, `as_uint64()`, `as_double()` |
+| int in int64 range | `Int` | `as<T>()` (range-checked to T), `as_int64()`, `as_uint64()`, `as_double()` |
 | int > 2⁶³−1 | `Uint` | `as_uint64()`; `as_int64()` throws `range` |
 | int < −2⁶³ | error `range` | (same as MATLAB) |
 | float16/32/64 | `Float` with `float_width()` 2/4/8 | `as_double()`; width is part of equality |
@@ -261,6 +262,15 @@ Differences from the MATLAB encoder, on purpose:
 Malformed input throws `cbor::error` with `.id` ∈ {`eof`, `break`, `reserved`,
 `chunk`, `typedarray`, `multidim`, `range`, `depth`}; wrong-type accessors throw
 `type`. Nesting is capped at 512 (`Reader::max_depth`).
+
+### Structs (1.1.0)
+
+`CBOR_FIELDS(T, m1, m2, …)` or a hand-written `cbor_fields(const T*)` returning
+`std::make_tuple(cbor::field("key", &T::member), …)` — next to the struct, same
+namespace. Then `cbor::to_value(x)` → map, `cbor::from_value<T>(v)` → struct,
+checked (`as<T>()` per scalar, path in the error message). Optional members:
+`std::optional<T>`, omitted when empty. Unknown keys ignored. Full table:
+`README.md`, section "Structs ↔ CBOR".
 
 ### Logger, C++ side
 

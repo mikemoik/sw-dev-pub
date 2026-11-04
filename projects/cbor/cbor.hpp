@@ -11,6 +11,9 @@
 //   cbor::Value v = cbor::decode(b);            // tag 55799 unwrapped
 //   v["dev"].as_text();                         // "imu0"
 //
+// Structs: describe a struct once (cbor_fields() or CBOR_FIELDS), then
+//   cbor::to_value(s) / cbor::from_value<S>(v) -- see "Structs <-> CBOR maps".
+//
 // Three layers:
 //   cbor::Writer  -- low-level streaming emitter (heads, typed arrays, indefinite
 //                    containers), appends to a std::vector<uint8_t>.
@@ -50,14 +53,19 @@
 #ifndef CBOR_HPP_INCLUDED
 #define CBOR_HPP_INCLUDED
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
+#include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -336,6 +344,45 @@ public:
         throw error("type", std::string("expected number, got ") + type_name(t_));
     }
     int float_width() const { need(Type::Float); return width_; }   // 2, 4, 8
+
+    // Checked conversion to a C++ scalar: the target type decides.
+    //   integer T : CBOR int whose value fits T, else error "range"
+    //               (a float is a "type" error -- no silent truncation)
+    //   float/double: any number; finite values beyond the float range -> "range"
+    //   bool, std::string: exact CBOR type (as_bool / as_text)
+    template <class T>
+    T as() const {
+        if constexpr (std::is_same_v<T, bool>) {
+            return as_bool();
+        } else if constexpr (std::is_integral_v<T>) {
+            if (t_ == Type::Int) {
+                if constexpr (std::is_signed_v<T>) {
+                    if (i_ < static_cast<int64_t>(std::numeric_limits<T>::min()) ||
+                        i_ > static_cast<int64_t>(std::numeric_limits<T>::max()))
+                        throw error("range", std::to_string(i_) + " does not fit " + int_name<T>());
+                } else {
+                    if (i_ < 0 || static_cast<uint64_t>(i_) > std::numeric_limits<T>::max())
+                        throw error("range", std::to_string(i_) + " does not fit " + int_name<T>());
+                }
+                return static_cast<T>(i_);
+            }
+            if (t_ == Type::Uint) {
+                if (u_ > static_cast<uint64_t>(std::numeric_limits<T>::max()))
+                    throw error("range", std::to_string(u_) + " does not fit " + int_name<T>());
+                return static_cast<T>(u_);
+            }
+            throw error("type", std::string("expected int, got ") + type_name(t_));
+        } else if constexpr (std::is_floating_point_v<T>) {
+            double d = as_double();
+            if (std::isfinite(d) && std::fabs(d) > static_cast<double>(std::numeric_limits<T>::max()))
+                throw error("range", std::to_string(d) + " does not fit float");
+            return static_cast<T>(d);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return as_text();
+        } else {
+            static_assert(std::is_arithmetic_v<T>, "as<T>: T must be bool, an integer, a float type or std::string");
+        }
+    }
     const std::string& as_text() const { need(Type::Text); return s_; }
     const std::vector<uint8_t>& as_bytes() const { need(Type::Bytes); return raw_; }
     const Array& as_array() const { need(Type::Array); return kids_; }
@@ -446,6 +493,10 @@ private:
     friend class Reader;
     friend std::string diag(const Value&);
 
+    template <class T>
+    static std::string int_name() {
+        return std::string(std::is_signed_v<T> ? "int" : "uint") + std::to_string(8 * sizeof(T));
+    }
     void need(Type t) const {
         if (t_ != t)
             throw error("type", std::string("expected ") + type_name(t) + ", got " + type_name(t_));
@@ -460,6 +511,14 @@ private:
         elem_ = elem_of<T>();
         raw_.resize(n * sizeof(T));
         if (n) std::memcpy(raw_.data(), p, n * sizeof(T));
+    }
+    std::string elem_int_string(size_t k) const {   // integer element, exact (no double detour)
+        const uint8_t* p = raw_.data() + k * elem_width(elem_);
+        switch (elem_) {
+            case Elem::u64: { uint64_t v; std::memcpy(&v, p, 8); return std::to_string(v); }
+            case Elem::i64: { int64_t v;  std::memcpy(&v, p, 8); return std::to_string(v); }
+            default:        return std::to_string(static_cast<int64_t>(elem_as_double(k)));  // <= 32 bit: exact
+        }
     }
     double elem_as_double(size_t k) const {
         const uint8_t* p = raw_.data() + k * elem_width(elem_);
@@ -937,8 +996,8 @@ inline std::string diag(const Value& v) {
             for (size_t k = 0; k < v.count(); ++k) {
                 if (k) s += ", ";
                 if (k == 16) { s += "... (" + std::to_string(v.count()) + ")"; break; }
-                double d = v.elem_as_double(k);
-                s += (v.elem_ == Elem::f32 || v.elem_ == Elem::f64) ? num(d) : std::to_string(int64_t(d));
+                s += (v.elem_ == Elem::f32 || v.elem_ == Elem::f64) ? num(v.elem_as_double(k))
+                                                                    : v.elem_int_string(k);
             }
             return s + "]";
         }
@@ -946,6 +1005,265 @@ inline std::string diag(const Value& v) {
     return "?";
 }
 
+
+// ---------------------------------------------------------------------------
+// Structs <-> CBOR maps (C++17, no macros required)
+//
+// Describe a struct once, as a table of (key, member pointer), in a free
+// function cbor_fields(const T*) next to the struct (same namespace -- found
+// by argument-dependent lookup):
+//
+//   struct Sample { uint32_t id; std::string name; float temperature; };
+//   inline auto cbor_fields(const Sample*) {
+//       return std::make_tuple(cbor::field("id",   &Sample::id),
+//                              cbor::field("name", &Sample::name),
+//                              cbor::field("temp", &Sample::temperature));
+//   }
+//   // or, key = member name:   CBOR_FIELDS(Sample, id, name, temperature)
+//
+//   cbor::Value v = cbor::to_value(s);              // -> map {"id":..,"name":..,"temp":..}
+//   Sample s2     = cbor::from_value<Sample>(v);    // checked, see below
+//
+// Member types handled (recursively):
+//   bool, integers, float, double      -> as Value(x); read back with as<T>() (range-checked)
+//   enum                               -> its underlying integer
+//   std::string                        -> text
+//   std::vector<uint8_t>               -> byte string
+//   std::vector<T> / std::array<T,N>, T numeric -> RFC 8746 typed array (exact element
+//                                         type on read; a plain CBOR array of numbers is
+//                                         also accepted, element by element, checked)
+//   std::vector<T> / std::array<T,N>, other T   -> CBOR array
+//   std::optional<T>                   -> key omitted when empty; missing key or null -> nullopt
+//   any struct with cbor_fields        -> nested map
+//   cbor::Value                        -> passed through as is
+// Reading: unknown keys are ignored (forward compatible); a missing key for a
+// non-optional member, a wrong CBOR type or an out-of-range number throws
+// cbor::error ("range"/"type") whose message names the path, e.g.
+// "cbor:range: raw[2]: 70000 does not fit int16". std::array needs exactly N
+// elements. The struct must be default-constructible.
+
+template <class C, class M>
+struct field_t {
+    const char* key;
+    M C::*member;
+};
+template <class C, class M>
+constexpr field_t<C, M> field(const char* key, M C::*member) { return {key, member}; }
+
+namespace detail {
+
+template <class T> struct is_vector : std::false_type {};
+template <class T, class A> struct is_vector<std::vector<T, A>> : std::true_type {};
+template <class T> struct is_std_array : std::false_type {};
+template <class T, size_t N> struct is_std_array<std::array<T, N>> : std::true_type {};
+template <class T> struct is_optional : std::false_type {};
+template <class T> struct is_optional<std::optional<T>> : std::true_type {};
+
+// ADL probe: does cbor_fields(const T*) exist?
+template <class T, class = void> struct has_fields : std::false_type {};
+template <class T>
+struct has_fields<T, std::void_t<decltype(cbor_fields(static_cast<const T*>(nullptr)))>>
+    : std::true_type {};
+
+[[noreturn]] inline void rethrow_at(const error& e, const std::string& where) {
+    std::string msg = e.what();
+    const std::string head = "cbor:" + e.id + ": ";
+    if (msg.compare(0, head.size(), head) == 0) msg.erase(0, head.size());
+    const bool nested = !msg.empty() && (msg[0] == '[' || msg[0] == '.');
+    throw error(e.id, where + (nested ? "" : ": ") + msg);
+}
+
+}  // namespace detail
+
+template <class T> Value to_value(const T& x);
+template <class T> T from_value(const Value& v);
+
+namespace detail {
+
+template <class T>
+Value to_value_impl(const T& x) {
+    if constexpr (std::is_same_v<T, Value>) {
+        return x;
+    } else if constexpr (has_fields<T>::value) {
+        Value m = Value::map({});
+        std::apply([&](const auto&... f) {
+            auto put = [&](const auto& fd) {
+                const auto& mem = x.*(fd.member);
+                using M = std::decay_t<decltype(mem)>;
+                if constexpr (is_optional<M>::value) {
+                    if (mem) m.set(fd.key, to_value(*mem));
+                } else {
+                    m.set(fd.key, to_value(mem));
+                }
+            };
+            (put(f), ...);
+        }, cbor_fields(static_cast<const T*>(nullptr)));
+        return m;
+    } else if constexpr (std::is_enum_v<T>) {
+        return Value(static_cast<std::underlying_type_t<T>>(x));
+    } else if constexpr (std::is_arithmetic_v<T>) {
+        return Value(x);
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        return Value(x);
+    } else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
+        return Value(x);
+    } else if constexpr (is_vector<T>::value || is_std_array<T>::value) {
+        using E = typename T::value_type;
+        if constexpr (is_typed_elem_v<E>) {
+            return Value::typed(x.data(), x.size());
+        } else {
+            Value::Array a;
+            a.reserve(x.size());
+            for (const auto& e : x) a.push_back(to_value(e));
+            return Value(std::move(a));
+        }
+    } else if constexpr (is_optional<T>::value) {
+        return x ? to_value(*x) : Value();
+    } else {
+        static_assert(sizeof(T) == 0,
+                      "cbor::to_value: unsupported type -- give it cbor_fields(const T*) or CBOR_FIELDS");
+    }
+}
+
+// numeric sequence from a typed array (exact element type) or a plain array (checked per element)
+template <class E, class Out>
+void numbers_into(const Value& v, Out& out, size_t n_fixed) {
+    if (v.is_typed()) {
+        std::vector<E> d = v.typed<E>();
+        if (n_fixed && d.size() != n_fixed)
+            throw error("range", std::to_string(d.size()) + " elements, expected " + std::to_string(n_fixed));
+        if constexpr (is_vector<Out>::value) out.assign(d.begin(), d.end());
+        else std::copy(d.begin(), d.end(), out.begin());
+        return;
+    }
+    const auto& a = v.as_array();
+    if (n_fixed && a.size() != n_fixed)
+        throw error("range", std::to_string(a.size()) + " elements, expected " + std::to_string(n_fixed));
+    if constexpr (is_vector<Out>::value) out.resize(a.size());
+    for (size_t k = 0; k < a.size(); ++k) {
+        try { out[k] = a[k].as<E>(); }
+        catch (const error& e) { rethrow_at(e, "[" + std::to_string(k) + "]"); }
+    }
+}
+
+template <class T>
+T from_value_impl(const Value& v) {
+    if constexpr (std::is_same_v<T, Value>) {
+        return v;
+    } else if constexpr (has_fields<T>::value) {
+        static_assert(std::is_default_constructible_v<T>, "cbor::from_value: struct must be default-constructible");
+        T x{};
+        if (!v.is_map()) throw error("type", std::string("expected map, got ") + type_name(v.type()));
+        std::apply([&](const auto&... f) {
+            auto get = [&](const auto& fd) {
+                auto& mem = x.*(fd.member);
+                using M = std::decay_t<decltype(mem)>;
+                const Value* item = v.find(fd.key);
+                try {
+                    if constexpr (is_optional<M>::value) {
+                        if (item && !item->is_null()) mem = from_value<typename M::value_type>(*item);
+                        else mem.reset();
+                    } else {
+                        if (!item) throw error("range", "missing key");
+                        mem = from_value<M>(*item);
+                    }
+                } catch (const error& e) {
+                    rethrow_at(e, std::string(".") + fd.key);
+                }
+            };
+            (get(f), ...);
+        }, cbor_fields(static_cast<const T*>(nullptr)));
+        return x;
+    } else if constexpr (std::is_enum_v<T>) {
+        return static_cast<T>(v.as<std::underlying_type_t<T>>());
+    } else if constexpr (std::is_arithmetic_v<T> || std::is_same_v<T, std::string>) {
+        return v.as<T>();
+    } else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
+        if (v.is_bytes()) return v.as_bytes();
+        T out;
+        numbers_into<uint8_t>(v, out, 0);
+        return out;
+    } else if constexpr (is_vector<T>::value || is_std_array<T>::value) {
+        using E = typename T::value_type;
+        T out{};
+        size_t n_fixed = 0;
+        if constexpr (is_std_array<T>::value) n_fixed = std::tuple_size_v<T>;
+        if constexpr (is_typed_elem_v<E>) {
+            numbers_into<E>(v, out, n_fixed);
+        } else {
+            const auto& a = v.as_array();
+            if (n_fixed && a.size() != n_fixed)
+                throw error("range", std::to_string(a.size()) + " elements, expected " + std::to_string(n_fixed));
+            if constexpr (is_vector<T>::value) out.resize(a.size());
+            for (size_t k = 0; k < a.size(); ++k) {
+                try { out[k] = from_value<E>(a[k]); }
+                catch (const error& e) { rethrow_at(e, "[" + std::to_string(k) + "]"); }
+            }
+        }
+        return out;
+    } else if constexpr (is_optional<T>::value) {
+        if (v.is_null()) return std::nullopt;
+        return from_value<typename T::value_type>(v);
+    } else {
+        static_assert(sizeof(T) == 0,
+                      "cbor::from_value: unsupported type -- give it cbor_fields(const T*) or CBOR_FIELDS");
+    }
+}
+
+}  // namespace detail
+
+// C++ value -> generic Value (structs with cbor_fields become maps)
+template <class T> Value to_value(const T& x) { return detail::to_value_impl<T>(x); }
+// generic Value -> C++ value, checked (throws cbor::error with the failing path)
+template <class T> T from_value(const Value& v) { return detail::from_value_impl<T>(v); }
+
 }  // namespace cbor
+
+
+// CBOR_FIELDS(Type, member, ...): defines cbor_fields(const Type*) with key = member name.
+// Put it next to the struct, in the struct's namespace (or global scope). Up to 32 members.
+#define CBOR_DETAIL_EXPAND(x) x
+#define CBOR_DETAIL_F(T, m) ::cbor::field(#m, &T::m)
+#define CBOR_DETAIL_FE_1(T, m) CBOR_DETAIL_F(T, m)
+#define CBOR_DETAIL_FE_2(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_1(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_3(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_2(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_4(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_3(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_5(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_4(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_6(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_5(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_7(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_6(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_8(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_7(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_9(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_8(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_10(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_9(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_11(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_10(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_12(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_11(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_13(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_12(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_14(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_13(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_15(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_14(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_16(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_15(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_17(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_16(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_18(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_17(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_19(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_18(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_20(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_19(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_21(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_20(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_22(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_21(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_23(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_22(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_24(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_23(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_25(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_24(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_26(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_25(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_27(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_26(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_28(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_27(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_29(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_28(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_30(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_29(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_31(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_30(T, __VA_ARGS__))
+#define CBOR_DETAIL_FE_32(T, m, ...) CBOR_DETAIL_F(T, m), CBOR_DETAIL_EXPAND(CBOR_DETAIL_FE_31(T, __VA_ARGS__))
+#define CBOR_DETAIL_NARG_(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, N, ...) N
+#define CBOR_DETAIL_NARG(...) CBOR_DETAIL_EXPAND(CBOR_DETAIL_NARG_(__VA_ARGS__, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0))
+#define CBOR_DETAIL_CAT_(a, b) a##b
+#define CBOR_DETAIL_CAT(a, b) CBOR_DETAIL_CAT_(a, b)
+#define CBOR_FIELDS(Type, ...)                                                        \
+    [[maybe_unused]] inline auto cbor_fields(const Type*) {                            \
+        return std::make_tuple(CBOR_DETAIL_EXPAND(CBOR_DETAIL_CAT(CBOR_DETAIL_FE_,      \
+            CBOR_DETAIL_NARG(Type, __VA_ARGS__))(Type, __VA_ARGS__)));                \
+    }
 
 #endif  // CBOR_HPP_INCLUDED

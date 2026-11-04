@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(cbor
-    VERSION 1.0.0
+    VERSION 1.1.0
     DESCRIPTION "C++17 single-header CBOR codec with RFC 8746 typed arrays"
     LANGUAGES CXX)
 

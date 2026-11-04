@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -94,6 +95,52 @@ static Bytes logger_stream() {
         w.array(2).typed(t).typed(ax);
     }
     return w.buf;
+}
+
+// ---- structs for the to_value / from_value tests ------------------------------
+namespace demo {
+enum class Mode : uint8_t { idle = 0, run = 3 };
+struct Pos { double x = 0, y = 0; };
+CBOR_FIELDS(Pos, x, y)                                   // macro form, key = member name
+struct Sample {                                          // hand-written table, own keys
+    uint32_t id = 0;
+    std::string name;
+    float temperature = 0;
+    std::vector<int16_t> raw;
+    Mode mode = Mode::idle;
+    std::optional<std::string> note;
+    std::array<float, 3> acc{};
+    std::vector<Pos> path;
+    std::optional<Pos> home;
+    std::vector<uint8_t> blob;
+    bool ok = false;
+    cbor::Value extra;
+};
+inline auto cbor_fields(const Sample*) {
+    return std::make_tuple(
+        cbor::field("id", &Sample::id), cbor::field("name", &Sample::name),
+        cbor::field("temp", &Sample::temperature), cbor::field("raw", &Sample::raw),
+        cbor::field("mode", &Sample::mode), cbor::field("note", &Sample::note),
+        cbor::field("acc", &Sample::acc), cbor::field("path", &Sample::path),
+        cbor::field("home", &Sample::home), cbor::field("blob", &Sample::blob),
+        cbor::field("ok", &Sample::ok), cbor::field("extra", &Sample::extra));
+}
+bool operator==(const Pos& a, const Pos& b) { return a.x == b.x && a.y == b.y; }
+bool operator==(const Sample& a, const Sample& b) {
+    return a.id == b.id && a.name == b.name && a.temperature == b.temperature && a.raw == b.raw &&
+           a.mode == b.mode && a.note == b.note && a.acc == b.acc && a.path == b.path &&
+           a.home == b.home && a.blob == b.blob && a.ok == b.ok && a.extra == b.extra;
+}
+}  // namespace demo
+
+// f() must throw cbor::error with this id and a message containing `part`
+template <class F>
+static void xchk(F f, const std::string& id, const std::string& part, const std::string& label) {
+    try { f(); ok(false, label + ": no error"); }
+    catch (const cbor::error& e) {
+        ok(e.id == id && std::string(e.what()).find(part) != std::string::npos,
+           label + " (got " + e.what() + ")");
+    }
 }
 
 static int run_tests() {
@@ -353,6 +400,74 @@ static int run_tests() {
         int good = 0;
         try { while (!rc.done()) { rc.next(); ++good; } ok(false, "truncated stream must throw"); }
         catch (const cbor::error& e) { ok(e.id == "eof" && good == 3, "truncated block -> eof after 3 items"); }
+    }
+
+    // ---- 12. checked scalar conversion as<T>() ----------------------------
+    std::puts("as<T> ...");
+    {
+        ok(Value(200).as<uint8_t>() == 200 && Value(-128).as<int8_t>() == -128, "as int edges in range");
+        ok(Value(uint64_t(UINT64_MAX)).as<uint64_t>() == UINT64_MAX, "as uint64 max (Uint)");
+        ok(Value(INT64_MIN).as<int64_t>() == INT64_MIN, "as int64 min");
+        xchk([] { Value(256).as<uint8_t>(); }, "range", "does not fit uint8", "256 -> uint8");
+        xchk([] { Value(-1).as<uint32_t>(); }, "range", "does not fit uint32", "-1 -> uint32");
+        xchk([] { Value(-129).as<int8_t>(); }, "range", "does not fit int8", "-129 -> int8");
+        xchk([] { Value(uint64_t(1) << 63).as<int64_t>(); }, "range", "int64", "2^63 -> int64");
+        xchk([] { Value(1.0).as<int>(); }, "type", "expected int", "float -> int is a type error");
+        xchk([] { Value("x").as<double>(); }, "type", "expected number", "text -> double");
+        ok(Value(21.5f).as<float>() == 21.5f && Value(7).as<double>() == 7.0, "as float/double, int -> double");
+        xchk([] { Value(1e300).as<float>(); }, "range", "does not fit float", "1e300 -> float");
+        ok(std::isinf(Value(INFINITY).as<float>()) && std::isnan(Value(NAN).as<float>()), "inf/nan -> float pass");
+        ok(Value(true).as<bool>() && Value("s").as<std::string>() == "s", "as bool/string");
+        xchk([] { Value(1).as<bool>(); }, "type", "expected bool", "int -> bool");
+        ok(cbor::diag(tv<uint64_t>({UINT64_MAX, 9007199254740993ull})) == "u64[18446744073709551615, 9007199254740993]" &&
+           cbor::diag(tv<int64_t>({INT64_MIN})) == "i64[-9223372036854775808]",
+           "diag prints 64-bit typed-array elements exactly");
+    }
+
+    // ---- 13. structs <-> maps (cbor_fields / CBOR_FIELDS) ----------------
+    std::puts("structs ...");
+    {
+        using demo::Sample; using demo::Pos;
+        Sample s;
+        s.id = 42; s.name = "imu0"; s.temperature = 21.5f; s.raw = {-3, 0, 7, 1024};
+        s.mode = demo::Mode::run; s.acc = {1.f, 2.f, 3.f}; s.path = {{1, 2}, {3, 4}};
+        s.home = Pos{9, 8}; s.blob = {1, 2, 255}; s.ok = true; s.extra = Value::array({1, "two"});
+        Value v = cbor::to_value(s);
+        ok(v.is_map() && v.size() == 11 && !v.contains("note"), "to_value: map, empty optional omitted");
+        ok(v["id"] == Value(42) && v["temp"].float_width() == 4 && v["raw"].elem() == cbor::Elem::i16 &&
+           v["acc"].elem() == cbor::Elem::f32 && v["blob"].is_bytes() && v["mode"] == Value(3),
+           "to_value: wire types (int, f32, i16[], f32[], bytes, enum)");
+        ok(v["path"][1]["y"] == Value(4.0) && v["home"]["x"] == Value(9.0), "to_value: nested (CBOR_FIELDS)");
+        Sample back = cbor::from_value<Sample>(cbor::decode(cbor::encode(v)));
+        ok(back == s, "struct round trip through bytes");
+        s.note = "hi"; s.home.reset();
+        Sample b2 = cbor::from_value<Sample>(cbor::decode(cbor::encode(cbor::to_value(s))));
+        ok(b2 == s && b2.note == "hi" && !b2.home, "optional set / reset round trip");
+
+        Value w = cbor::to_value(s);
+        w.set("unknown", 1);                                          // forward compatible
+        w.set("home", Value());                                       // null -> nullopt
+        w.set("raw", Value::array({1, -2}));                          // plain array accepted
+        w.set("blob", Value::array({7}));
+        w.set("temp", 21);                                            // int into float member
+        Sample b3 = cbor::from_value<Sample>(w);
+        ok(!b3.home && b3.raw == std::vector<int16_t>{1, -2} && b3.blob == std::vector<uint8_t>{7} &&
+           b3.temperature == 21.f, "lenient reads: unknown key, null, plain arrays, int -> float");
+
+        auto with = [&](const char* key, Value x) { Value m = cbor::to_value(s); m.set(key, std::move(x)); return m; };
+        xchk([&] { cbor::from_value<Sample>(with("id", uint64_t(5000000000))); }, "range", ".id: 5000000000 does not fit uint32", "path .id range");
+        xchk([&] { cbor::from_value<Sample>(with("raw", Value::array({1, 70000}))); }, "range", ".raw[1]: 70000 does not fit int16", "path .raw[1]");
+        xchk([&] { cbor::from_value<Sample>(with("raw", std::vector<int32_t>{1})); }, "type", ".raw: typed array is i32", "typed array exact elem");
+        xchk([&] { cbor::from_value<Sample>(with("acc", std::vector<float>{1, 2})); }, "range", ".acc: 2 elements, expected 3", "std::array size");
+        xchk([&] { cbor::from_value<Sample>(with("path", Value::array({Value::map({{"x", 1.0}, {"y", "no"}})}))); }, "type", ".path[0].y: expected number", "nested path");
+        xchk([&] { cbor::from_value<Sample>(with("home", 5)); }, "type", ".home: expected map", "nested not a map");
+        Value missing = cbor::to_value(s); missing.as_map().erase(missing.as_map().begin());
+        xchk([&] { cbor::from_value<Sample>(missing); }, "range", ".id: missing key", "missing key");
+        xchk([&] { cbor::from_value<Sample>(Value::array({})); }, "type", "expected map", "top level not a map");
+        // top-level containers of structs, scalars
+        std::vector<Pos> ps{{1, 2}, {3, 4}};
+        ok(cbor::from_value<std::vector<Pos>>(cbor::decode(cbor::encode(cbor::to_value(ps)))) == ps, "vector<struct> round trip");
+        ok(cbor::from_value<int16_t>(cbor::to_value(int16_t(-5))) == -5, "scalar to/from_value");
     }
 
     std::printf("\n%d passed, %d failed\n", n_pass, n_fail);
