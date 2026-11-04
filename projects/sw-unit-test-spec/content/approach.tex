@@ -1,0 +1,29 @@
+% Test approach.
+
+% {method}{yes / no}{remark}
+\VerificationMethod{Requirements-based test}{yes}{}
+\VerificationMethod{Interface test}{yes}{}
+\VerificationMethod{Fault injection test}{yes}{NvM failures}
+\VerificationMethod{Resource usage evaluation}{no}{done at integration level}
+\VerificationMethod{Back-to-back test (model vs.\ code)}{no}{no model}
+
+% one line per technique
+\DerivationTechnique{analysis of requirements and detailed design}
+\DerivationTechnique{equivalence class partitioning of inputs and states}
+\DerivationTechnique{boundary value analysis (min, max, max+1)}
+\DerivationTechnique{error guessing}
+
+% {metric}{target}{justification if not met} -- plain numbers get a % sign
+\Coverage{Statement}{100}{review of uncovered lines}
+\Coverage{Branch}{100}{review of uncovered branches}
+\Coverage{MC/DC}{n.a.}{not required for ASIL B}
+
+\EntryCriterion{Unit source is baselined (\TheBaseline) and compiles without warnings.}
+\EntryCriterion{Requirements \DocRef{srs} and design \DocRef{design} are reviewed.}
+\ExitCriterion{All test cases executed; all passed or deviations accepted.}
+\ExitCriterion{Coverage targets reached or gaps justified.}
+
+\PassFailCriteria{
+  A test case passes if every step yields the expected result and no
+  unexpected side effect (assertion, sanitizer report, timeout) occurs.
+}

@@ -1,0 +1,23 @@
+% Document and unit data. Just replace the text inside the braces.
+% Underscores may be typed as is (unit_name). Escape only: \& \% \# \$
+\DocID{SUTS-SPC-001}
+\DocVersion{0.2}
+\DocStatus{In Review}          % Draft / In Review / Released
+% \DocDate{2026-11-04}         % default: today
+\ProjectName{Example Heater Controller}
+\Company{Example Corp / Software Engineering}
+
+\Author{Jane Doe}
+\Reviewer{John Roe}
+\Approver{Alex Poe}
+
+\UnitName{setpoint_ctrl}
+\UnitBaseline{git: 3f2a9c1 (tag v1.4.0)}
+\IntegrityLevel{ASIL B}        % QM / ASIL A--D / SIL n / n.a.
+\SourceFiles{src/setpoint_ctrl.c, include/setpoint_ctrl.h}
+\Language{C99, MISRA C:2012}
+\DesignReference{\DocRef{design}, section 4.2}
+
+% One line per document version: {version}{date}{author}{change}
+\Revision{0.1}{2026-10-20}{Jane Doe}{Initial draft}
+\Revision{0.2}{2026-11-04}{Jane Doe}{Fault injection test case added after review}

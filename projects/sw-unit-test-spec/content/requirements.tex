@@ -1,0 +1,10 @@
+% Requirements allocated to the unit: {ID}{short description}
+% The traceability table finds the test cases automatically (\Verifies in testcases.tex).
+\Requirement{SWR-0101}{Default state after initialisation}
+\Requirement{SWR-0102}{Read persistent setpoint at start-up}
+\Requirement{SWR-0110}{Setpoint range 0..100}
+\Requirement{SWR-0120}{NvM failure handling}
+\Requirement{SWR-0130}{Setpoint ramp limit}
+
+% Requirements without a unit test: {ID}{rationale / where verified instead}
+\NotUnitTested{SWR-0130}{Timing behaviour, verified in integration test ITS-SPC-007}

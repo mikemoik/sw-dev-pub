@@ -1,0 +1,28 @@
+% Introduction. Plain text; empty lines start a new paragraph.
+
+% Optional: replace the default purpose text.
+% \Purpose{This document ...}
+
+\Scope{
+  In scope: the public API of \TheUnit\ (initialisation, setpoint handling,
+  state query) in its series configuration.
+
+  Out of scope: the NvM driver and the timer HAL (tested in their own units),
+  integration with the heater power stage (integration test).
+}
+
+% {key}{document}{version} -- numbered [R1], [R2], ... in this order.
+% Cite them anywhere with \DocRef{key}.
+\Reference{srs}{Software Requirements Specification, SRS-SPC-001}{1.3}
+\Reference{design}{Software Detailed Design of setpoint_ctrl, SDD-SPC-004}{1.1}
+\Reference{misra}{MISRA C:2012 Guidelines}{2019}
+\Reference{plan}{Software Verification Plan, SVP-PRJ-002}{2.0}
+\Reference{29119}{ISO/IEC/IEEE 29119-3 -- Test documentation}{2021}
+\Reference{aspice}{Automotive SPICE PAM -- SWE.4 Software Unit Verification}{4.0}
+\Reference{26262}{ISO 26262-6 -- Clause 9, Software unit verification}{2018}
+
+% {term}{definition}
+\Term{UUT}{Unit Under Test}
+\Term{TC}{Test Case}
+\Term{MC/DC}{Modified Condition / Decision Coverage}
+\Term{NvM}{Non-volatile Memory manager}

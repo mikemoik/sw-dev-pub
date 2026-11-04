@@ -1,0 +1,52 @@
+% Test cases. \TestGroup starts a sub-heading. Inside a TestCase all fields
+% are optional and can be in any order; they are always printed in the same order.
+%   \Objective  \Verifies{REQ, REQ}  \Method  \Priority  \Preconditions
+%   \InputData{free text}  \InputValue{name}{value}{class}  (one per value)
+%   \Step{action}{expected result}  (one per step)  \Postconditions  \Implementation
+
+\TestGroup{Nominal Behaviour}
+
+\begin{TestCase}{TC-SPC-001}{Initialisation sets default state}
+  \Objective{SetpointCtrl_Init() sets all internal state to the documented defaults.}
+  \Verifies{SWR-0101, SWR-0102}
+  \Method{Requirements-based}
+  \Priority{High}
+  \Preconditions{Unit not initialised; NvM mock returns E_OK with setpoint 42.}
+  \InputData{none}
+  \Step{Call SetpointCtrl_Init().}{Returns E_OK.}
+  \Step{Call SetpointCtrl_GetState().}{Returns IDLE.}
+  \Step{Check the NvM mock call log.}{NvM_ReadBlock() called exactly once.}
+  \Postconditions{Unit in IDLE, setpoint = 42.}
+  \Implementation{test/setpoint_ctrl_test.cpp: InitTest.SetsDefaults}
+\end{TestCase}
+
+\TestGroup{Boundary Values}
+
+\begin{TestCase}{TC-SPC-002}{Setpoint accepted at upper limit}
+  \Objective{Range check of the setpoint at its upper bound.}
+  \Verifies{SWR-0110}
+  \Method{Boundary value analysis}
+  \Priority{High}
+  \Preconditions{Unit initialised (TC-SPC-001).}
+  \InputValue{sp}{100}{max (valid)}
+  \InputValue{sp}{101}{max+1 (invalid)}
+  \Step{SetpointCtrl_Set(100)}{Returns E_OK; setpoint = 100.}
+  \Step{SetpointCtrl_Set(101)}{Returns E_NOT_OK; setpoint unchanged (100).}
+  \Postconditions{Setpoint = 100.}
+  \Implementation{test/setpoint_ctrl_test.cpp: RangeTest.UpperLimit}
+\end{TestCase}
+
+\TestGroup{Error Handling and Fault Injection}
+
+\begin{TestCase}{TC-SPC-003}{NvM read failure falls back to defaults}
+  \Objective{Defined behaviour when the persistent setpoint cannot be read.}
+  \Verifies{SWR-0120}
+  \Method{Fault injection; error guessing}
+  \Priority{Medium}
+  \Preconditions{NvM mock configured to return E_NOT_OK.}
+  \Step{Call SetpointCtrl_Init().}{Returns E_OK.}
+  \Step{Call SetpointCtrl_GetState().}{Returns DEGRADED.}
+  \Step{Check the Dem mock.}{Event DEM_E_NVM_READ reported once.}
+  \Postconditions{Unit degraded, default setpoint 20.}
+  \Implementation{test/setpoint_ctrl_test.cpp: NvmTest.ReadFailure}
+\end{TestCase}
