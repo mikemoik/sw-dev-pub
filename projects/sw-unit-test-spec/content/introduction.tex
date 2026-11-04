@@ -21,6 +21,13 @@
 \Reference{aspice}{Automotive SPICE PAM -- SWE.4 Software Unit Verification}{4.0}
 \Reference{26262}{ISO 26262-6 -- Clause 9, Software unit verification}{2018}
 
+% Stakeholders and use cases (optional; usually taken over from the SRS).
+% {use case}{actor, actor} -- actors are collected automatically.
+\UseCaseNote{System-level use cases the unit contributes to, from \DocRef{srs}.}
+\UseCase{Set cabin temperature}{Vehicle occupant}
+\UseCase{Restore setpoint after restart}{Vehicle occupant}
+\UseCase{Read controller state}{Service technician, Diagnostic tester}
+
 % {term}{definition}
 \Term{UUT}{Unit Under Test}
 \Term{TC}{Test Case}

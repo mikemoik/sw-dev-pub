@@ -2,7 +2,7 @@
 
 LaTeX template for a **Software Unit Test Specification**. Structure follows ISO/IEC/IEEE 29119-3 (test design / test case specification) and covers the work products expected by Automotive SPICE SWE.4 (software unit verification) and ISO 26262-6 clause 9 (software unit verification). Drop the safety-specific parts if they don't apply. The template addresses those clauses; it does not make a project compliant — content, reviews and evidence remain the project's job.
 
-**Content is separated from the template:** you write only data and plain text into `content/*.tex` — no tables, no `&`/`\\`, no environments except `TestCase` — plus optional `FreeText` blocks for anything else (see *Free text*). All layout lives in `suts.cls`. Traceability tables, the uncovered-requirements list, test case count, reference numbers and the list of test cases are generated.
+**Content is separated from the template:** you write only data and plain text into `content/*.tex` — no tables, no `&`/`\\`, no environments except `TestCase` — plus optional `FreeText` blocks for anything else (see *Free text*). All layout lives in `suts.cls`. Traceability tables, the uncovered-requirements list, test case count, reference numbers, the list of test cases and three UML diagrams (see *Diagrams*) are generated.
 
 **Owner:** swdevos · **Status:** stable, builds clean (TeX Live 2026) · **License:** MIT (repo root)
 
@@ -26,7 +26,7 @@ The `content/` files ship with a small worked example (unit `setpoint_ctrl`) —
 
 ## Build
 
-Needs a TeX distribution with `latexmk` and the packages `tcolorbox`, `xltabular`, `enumitem`, `fancyhdr`, `lastpage`, `underscore`, `microtype`, `fancyvrb` (TeX Live: `texlive-latexextra` or equivalent).
+Needs a TeX distribution with `latexmk` and the packages `tcolorbox`, `xltabular`, `enumitem`, `fancyhdr`, `lastpage`, `underscore`, `microtype`, `fancyvrb`, `tikz` (pgf), `adjustbox` (TeX Live: `texlive-latexextra` or equivalent).
 
 ```sh
 latexmk -pdf sw_unit_test_spec.tex        # -> sw_unit_test_spec.pdf
@@ -44,6 +44,18 @@ The PDF is not committed (build output); build it from the sources.
 - Anything left out shows up as a grey `⟨placeholder⟩` or `none` — the document always builds. Missing files in `content/` are skipped.
 - Formatting is optional and up to you: `\textbf{…}`, `\emph{…}`, `\code{…}` (typewriter, for identifiers and command lines), lists etc. work in the text arguments.
 - Values for use in your own text: `\TheUnit`, `\TheBaseline`, `\TheIntegrityLevel`; cite a reference with `\DocRef{key}` → `[R2]`.
+
+## Diagrams
+
+Generated with TikZ from the data you already enter — nothing to draw. Each diagram (and its subsection) only appears when its data exists.
+
+| Diagram | Where | Built from |
+|---|---|---|
+| **Use cases** — actors (stick figures), use cases inside the `«system»` boundary (= `\ProjectName`) | 1.x *Stakeholders and Use Cases*, after Scope | `\UseCase{use case}{actor, actor}` (+ optional `\UseCaseNote{text}`) in `introduction.tex`. System-level context, usually taken over from the SRS — leave it out if not wanted. |
+| **Context** — the unit's neighbours: callers → `«unit»` → used components, arrows labelled with the interfaces used | 2.x *Context*, after Functional Description | `\Caller{component}{interfaces it calls}` + `\Dependency[component]{…}` in `unit.tex` |
+| **Test harness** — test driver → `«UUT»` → test doubles (`«mock»`, `«stub»`, … from *replaced by*) | top of 4 *Test Environment* | `\Interface` names + `\Dependency` entries — no extra input |
+
+`\Dependency[NvM]{NvM_ReadBlock()}…` and `\Dependency[NvM]{NvM_WriteBlock()}…` share one `NvM` box; without `[component]` each function gets its own box. For any other diagram (sequence, state machine, own TikZ or an included image) use a `FreeText` block.
 
 ## Free text
 
@@ -86,9 +98,11 @@ Start the block with `\subsection{…}` if it should get its own heading. Not al
 | | `\Scope{text}` | scope |
 | | `\Reference{key}{document}{version}` | row `[Rn]`, numbered in order; cite with `\DocRef{key}` |
 | | `\Term{term}{definition}` | terms table row |
+| | `\UseCase{use case}{actor, actor}` `\UseCaseNote{text}` | use case diagram (actors collected automatically) |
 | unit | `\FunctionalDescription{text}` | functional description |
 | | `\Interface{name}{direction}{type / range}{description}` | interfaces table row |
-| | `\Dependency{name}{replaced by}{behaviour in test}` | stubs/mocks table row |
+| | `\Dependency[component]{name}{replaced by}{behaviour in test}` | stubs/mocks table row; `[component]` (optional) groups functions in the diagrams |
+| | `\Caller{component}{interfaces it calls}` | caller box in the context diagram |
 | approach | `\VerificationMethod{method}{yes/no}{remark}` | methods table row with ☒ / ☐ |
 | | `\DerivationTechnique{text}` | list item |
 | | `\Coverage{metric}{target}{justification if not met}` | coverage targets row (`100` → `100 %`) |

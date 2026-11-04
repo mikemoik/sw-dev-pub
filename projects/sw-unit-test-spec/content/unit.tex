@@ -11,9 +11,17 @@
 \Interface{SetpointCtrl_Set(sp)}{in}{uint8, [0, 100]}{Sets a new setpoint, returns E_OK / E_NOT_OK}
 \Interface{SetpointCtrl_GetState()}{out}{enum}{IDLE / DEGRADED}
 
-% {dependency}{replaced by}{behaviour in test}
-\Dependency{NvM_ReadBlock()}{Mock}{Returns a configurable value, records calls}
-\Dependency{Dem_ReportError()}{Mock}{Records reported events}
+% [component]{dependency}{replaced by}{behaviour in test}
+% [component] is optional: functions of one component share a box in the diagrams.
+\Dependency[NvM]{NvM_ReadBlock()}{Mock}{Returns a configurable value, records calls}
+\Dependency[NvM]{NvM_WriteBlock()}{Mock}{Records written data}
+\Dependency[Dem]{Dem_ReportError()}{Mock}{Records reported events}
+
+% Who uses the unit: {component}{interfaces it calls}
+% Callers + dependencies give the context diagram; dependencies + interfaces
+% give the test harness diagram in the Test Environment chapter.
+\Caller{HeaterApp}{SetpointCtrl_Init(), SetpointCtrl_Set()}
+\Caller{DiagService}{SetpointCtrl_GetState()}
 
 % Free text: any LaTeX, printed at the end of this chapter (Unit Under Test).
 % Write \end{FreeText} on its own line.

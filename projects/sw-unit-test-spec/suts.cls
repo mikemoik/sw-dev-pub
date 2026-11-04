@@ -35,6 +35,9 @@
 \RequirePackage{lastpage}
 \RequirePackage{amssymb}
 \RequirePackage[most]{tcolorbox}
+\RequirePackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,shapes.geometric}
+\RequirePackage[export]{adjustbox}      % diagrams shrink to the text width if needed
 \RequirePackage{fancyvrb}               % FreeText: body copied verbatim to a file
 \RequirePackage[hidelinks]{hyperref}
 
@@ -120,7 +123,7 @@
 %  Input commands: introduction  (content/introduction.tex)
 % =============================================================================
 \clist_map_inline:nn
-  { Purpose, Scope, FunctionalDescription, PassFailCriteria,
+  { Purpose, Scope, UseCaseNote, FunctionalDescription, PassFailCriteria,
     ToolQualification, ResultsNote }
   {
     \exp_args:Nc \NewDocumentCommand {#1} { +m }
@@ -152,11 +155,150 @@
 %  Input commands: unit under test  (content/unit.tex)
 % =============================================================================
 % \Interface{name}{direction}{type / range}{description}
+\seq_new:N \g__suts_ifnames_seq
 \NewDocumentCommand \Interface { m m m +m }
-  { \__suts_add:nn { interfaces } { \texttt{#1} & #2 & #3 & #4 \\ } }
-% \Dependency{name}{replaced by}{behaviour in test}
-\NewDocumentCommand \Dependency { m m +m }
-  { \__suts_add:nn { dependencies } { \texttt{#1} & #2 & #3 \\ } }
+  {
+    \__suts_add:nn { interfaces } { \texttt{#1} & #2 & #3 & #4 \\ }
+    \seq_gput_right:Nn \g__suts_ifnames_seq {#1}
+  }
+% \Dependency[component]{name}{replaced by}{behaviour in test}
+%   [component] groups functions into one box in the diagrams (default: the name)
+\seq_new:N \g__suts_depcomp_seq            % components, in order
+\prop_new:N \g__suts_depfun_prop           % component -> functions
+\prop_new:N \g__suts_depdbl_prop           % component -> replaced by
+\NewDocumentCommand \Dependency { o m m +m }
+  {
+    \__suts_add:nn { dependencies } { \texttt{#2} & #3 & #4 \\ }
+    \tl_set:Nx \l_tmpb_tl { \IfNoValueTF {#1} { \exp_not:n {#2} } { \exp_not:n {#1} } }
+    \seq_if_in:NVF \g__suts_depcomp_seq \l_tmpb_tl
+      {
+        \seq_gput_right:NV \g__suts_depcomp_seq \l_tmpb_tl
+        \prop_gput:NVn \g__suts_depdbl_prop \l_tmpb_tl {#3}
+      }
+    \prop_get:NVNTF \g__suts_depfun_prop \l_tmpb_tl \l_tmpa_tl
+      { \tl_put_right:Nn \l_tmpa_tl { ,~#2 } }
+      { \tl_set:Nn \l_tmpa_tl {#2} }
+    \prop_gput:NVV \g__suts_depfun_prop \l_tmpb_tl \l_tmpa_tl
+  }
+% \Caller{component}{interfaces it uses}   -- left side of the context diagram
+\seq_new:N \g__suts_callers_seq
+\NewDocumentCommand \Caller { m m }
+  { \seq_gput_right:Nn \g__suts_callers_seq { {#1} {#2} } }
+
+% ---------------------------------------------------------------- diagrams ---
+% Generic block diagram: left boxes -> centre box -> right boxes.
+% Items of the side seqs: {name}{stereotype}{arrow label}{style}
+\seq_new:N \l__suts_left_seq
+\seq_new:N \l__suts_right_seq
+\dim_new:N \l__suts_step_dim
+\dim_set:Nn \l__suts_step_dim { 1.7cm }
+\cs_new:Npn \__suts_y:nnn #1#2#3   % y of item #2 of #3, spacing #1
+  { \fp_to_dim:n { #1 * (#3 + 1 - 2 * #2) / 2 } }
+\cs_new:Npn \__suts_y:nn #1#2 { \__suts_y:nnn { \l__suts_step_dim } {#1} {#2} }
+\cs_new_protected:Npn \__suts_side:nnnnnnn #1#2#3#4#5#6#7
+  % #1 L/R  #2 index  #3 count  #4 name  #5 stereotype  #6 label  #7 style
+  {
+    \node [ suts/#7 ] (#1#2) at ( \str_if_eq:nnTF {#1} {L} { -7.4cm } { 7.4cm } , \__suts_y:nn {#2} {#3} )
+      {
+        \tl_if_empty:nF {#5}
+          { {\scriptsize\guillemotleft \text_lowercase:n {#5} \guillemotright} \\ }
+        \textbf{#4}
+      } ;
+    \clist_set:Nn \l_tmpa_clist {#6}   % one interface per line
+    \str_if_eq:nnTF {#1} {L}
+      { \draw [ suts/use ] (#1#2.east) -- (#1#2.east -| U.west) node [ suts/lbl ] { \clist_use:Nn \l_tmpa_clist { \\ } } ; }
+      { \draw [ suts/use ] (#1#2.west -| U.east) -- (#1#2.west) node [ suts/lbl ] { \clist_use:Nn \l_tmpa_clist { \\ } } ; }
+  }
+\cs_new_protected:Npn \__suts_block_diagram:nnn #1#2#3
+  % #1 centre stereotype  #2 centre name  #3 centre style
+  {
+    \int_set:Nn \l_tmpa_int
+      { \int_max:nn { 1 } { \int_max:nn { \seq_count:N \l__suts_left_seq } { \seq_count:N \l__suts_right_seq } } }
+    \begin{center}
+    \begin{adjustbox}{max~width=\linewidth}
+    \begin{tikzpicture}
+      \node [ suts/#3 , minimum~height = \dim_eval:n { \l__suts_step_dim * \l_tmpa_int - 0.3cm } ] (U) at (0,0)
+        { {\scriptsize\guillemotleft#1\guillemotright} \\ \textbf{#2} } ;
+      \seq_map_indexed_inline:Nn \l__suts_left_seq
+        { \__suts_side:nnnnnnn {L} {##1} { \seq_count:N \l__suts_left_seq } ##2 }
+      \seq_map_indexed_inline:Nn \l__suts_right_seq
+        { \__suts_side:nnnnnnn {R} {##1} { \seq_count:N \l__suts_right_seq } ##2 }
+    \end{tikzpicture}
+    \end{adjustbox}
+    \end{center}
+  }
+\cs_new_protected:Npn \__suts_right_from_deps:n #1   % #1: true = show test doubles
+  {
+    \seq_clear:N \l__suts_right_seq
+    \seq_map_inline:Nn \g__suts_depcomp_seq
+      {
+        \prop_get:NnN \g__suts_depfun_prop {##1} \l_tmpa_tl
+        \prop_get:NnN \g__suts_depdbl_prop {##1} \l_tmpb_tl
+        \bool_if:nTF {#1}
+          { \seq_put_right:Nx \l__suts_right_seq { {##1} { \exp_not:V \l_tmpb_tl } { \exp_not:V \l_tmpa_tl } {double} } }
+          { \seq_put_right:Nx \l__suts_right_seq { {##1} {component} { \exp_not:V \l_tmpa_tl } {comp} } }
+      }
+  }
+\cs_new_protected:Npn \__suts_add_caller:nn #1#2
+  { \seq_put_right:Nn \l__suts_left_seq { {#1} {component} {#2} {comp} } }
+% context: callers -> unit -> dependencies
+\cs_new_protected:Npn \__suts_context_diagram:
+  {
+    \seq_clear:N \l__suts_left_seq
+    \seq_map_inline:Nn \g__suts_callers_seq { \__suts_add_caller:nn ##1 }
+    \__suts_right_from_deps:n { \c_false_bool }
+    \__suts_block_diagram:nnn { unit } { \__suts_meta:n { UnitName } } { unit }
+  }
+% harness: test driver -> UUT -> test doubles
+\cs_new_protected:Npn \__suts_harness_diagram:
+  {
+    \seq_clear:N \l__suts_left_seq
+    \seq_put_right:Nx \l__suts_left_seq
+      { {Test~driver} {test} { \seq_use:Nn \g__suts_ifnames_seq { ,~ } } {driver} }
+    \__suts_right_from_deps:n { \c_true_bool }
+    \__suts_block_diagram:nnn { UUT } { \__suts_meta:n { UnitName } } { unit }
+  }
+
+% use cases: \UseCase{use case}{actor, actor}
+\seq_new:N \g__suts_usecases_seq
+\seq_new:N \g__suts_actors_seq
+\NewDocumentCommand \UseCase { m m }
+  {
+    \seq_gput_right:Nn \g__suts_usecases_seq { {#1} {#2} }
+    \clist_set:Nn \l_tmpa_clist {#2}
+    \clist_map_inline:Nn \l_tmpa_clist
+      { \seq_if_in:NnF \g__suts_actors_seq {##1} { \seq_gput_right:Nn \g__suts_actors_seq {##1} } }
+  }
+\cs_new_protected:Npn \__suts_usecase_diagram:
+  {
+    \int_set:Nn \l_tmpa_int { \seq_count:N \g__suts_usecases_seq }
+    \int_set:Nn \l_tmpb_int { \seq_count:N \g__suts_actors_seq }
+    \begin{center}
+    \begin{adjustbox}{max~width=\linewidth}
+    \begin{tikzpicture}
+      \seq_map_indexed_inline:Nn \g__suts_actors_seq
+        {
+          \pic (A##1) at ( -4.5cm , \__suts_y:nnn { 2.4cm } {##1} { \l_tmpb_int } ) {suts@actor={##2}} ;
+        }
+      \seq_map_indexed_inline:Nn \g__suts_usecases_seq
+        { \__suts_usecase:nnnn {##1} { \l_tmpa_int } ##2 }
+      \node [ suts/boundary , fit = { (UC1) (UClast) } ] (B) {} ;
+      \node [ anchor = south , font = \small , align = center ] at (B.north)
+        { {\scriptsize\guillemotleft system\guillemotright} \\ \textbf{ \__suts_meta:n { ProjectName } } } ;
+    \end{tikzpicture}
+    \end{adjustbox}
+    \end{center}
+  }
+\cs_new_protected:Npn \__suts_usecase:nnnn #1#2#3#4   % index count name actors
+  {
+    \node [ suts/usecase , alias = UClast ] (UC#1) at ( 3cm , \__suts_y:nnn { 1.5cm } {#1} {#2} ) {#3} ;
+    \clist_set:Nn \l_tmpa_clist {#4}
+    \clist_map_inline:Nn \l_tmpa_clist
+      {
+        \seq_map_indexed_inline:Nn \g__suts_actors_seq
+          { \str_if_eq:nnT {##1} {####2} { \draw [ suts/assoc ] (A####1-body) -- (UC#1) ; } }
+      }
+  }
 
 % =============================================================================
 %  Input commands: test approach  (content/approach.tex)
@@ -488,6 +630,12 @@
       }
     \subsection{Scope}
     \__suts_text:nn { Scope } { \ph{Scope} }
+    \seq_if_empty:NF \g__suts_usecases_seq
+      {
+        \subsection{Stakeholders~and~Use~Cases}
+        \__suts_text:nn { UseCaseNote } { }
+        \__suts_usecase_diagram:
+      }
     \subsection{References}
     \begin{xltabular}{\linewidth}{@{}l Y l@{}}
       \toprule
@@ -521,6 +669,14 @@
     \end{tabularx}
     \subsection{Functional~Description}
     \__suts_text:nn { FunctionalDescription } { \ph{FunctionalDescription} }
+    \bool_lazy_and:nnF
+      { \seq_if_empty_p:N \g__suts_callers_seq }
+      { \seq_if_empty_p:N \g__suts_depcomp_seq }
+      {
+        \subsection{Context}
+        Neighbours~of~\TheUnit{}:~callers~(left)~and~used~components~(right).
+        \__suts_context_diagram:
+      }
     \subsection{Interfaces}
     \begin{xltabular}{\linewidth}{@{}L{4.2cm} l L{2.6cm} Y@{}}
       \toprule
@@ -575,6 +731,11 @@
 \NewDocumentCommand \SpecTestEnvironment {}
   {
     \section{Test~Environment}
+    \seq_if_empty:NF \g__suts_depcomp_seq
+      {
+        Test~harness:~the~test~driver~calls~the~interfaces~of~the~UUT;~its~dependencies~are~replaced~by~test~doubles.
+        \__suts_harness_diagram:
+      }
     \begin{xltabular}{\linewidth}{@{}L{4.2cm} Y l@{}}
       \toprule
       \textbf{Item} & \textbf{Description} & \textbf{Version} \\ \midrule
@@ -674,4 +835,30 @@
     \__suts_free:n { results }
   }
 \ExplSyntaxOff
+
+% ------------------------------------------------------------ diagram styles ---
+\colorlet{sutsunit}{accent!12}
+\colorlet{sutsdouble}{orange!15}
+\tikzset{
+  suts/box/.style   = {draw=accent, rectangle, align=center, font=\small,
+                       text width=2.9cm, minimum height=1.1cm, inner sep=3pt,
+                       execute at begin node={\lefthyphenmin=62 }}, % no word hyphenation, breaks after _ stay
+  suts/comp/.style  = {suts/box, fill=white},
+  suts/driver/.style= {suts/box, fill=sutsdouble},
+  suts/double/.style= {suts/box, fill=sutsdouble, dashed},
+  suts/unit/.style  = {suts/box, fill=sutsunit, very thick, text width=3.4cm},
+  suts/use/.style   = {-{Stealth[open]}, dashed, accent},
+  suts/lbl/.style   = {midway, above, font=\scriptsize\ttfamily, align=center},
+  suts/usecase/.style = {draw=accent, ellipse, fill=sutsunit, align=center,
+                       font=\small, text width=3.6cm, inner sep=1pt, minimum height=1.1cm},
+  suts/boundary/.style= {draw=accent, rectangle, inner sep=8pt},
+  suts/assoc/.style = {accent},
+  suts@actor/.pic   = {
+    \draw[accent, thick] (0,0.45) circle (0.15)
+      (0,0.3) -- (0,-0.1) (-0.25,0.15) -- (0.25,0.15)
+      (0,-0.1) -- (-0.2,-0.45) (0,-0.1) -- (0.2,-0.45);
+    \coordinate (-body) at (0.3,0.1);
+    \node[below, font=\small, align=center, text width=2.6cm] at (0,-0.5) {#1};
+  },
+}
 \endinput
