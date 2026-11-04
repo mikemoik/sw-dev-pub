@@ -13,6 +13,7 @@ project(cbor
 include(GNUInstallDirs)
 
 option(CBOR_BUILD_TESTS "Build the cbor test suite" ${PROJECT_IS_TOP_LEVEL})
+option(CBOR_BUILD_EXAMPLES "Build the cbor examples (run as tests)" ${PROJECT_IS_TOP_LEVEL})
 option(CBOR_INSTALL "Generate the cbor install/export rules" ${PROJECT_IS_TOP_LEVEL})
 
 # --- library: header-only INTERFACE target --------------------------------------------
@@ -64,6 +65,14 @@ if(CBOR_BUILD_TESTS)
         else()
             message(STATUS "cbor: cbor2 not importable by ${Python3_EXECUTABLE} — interop tests skipped")
         endif()
+    endif()
+endif()
+
+# --- examples -----------------------------------------------------------------------------
+if(CBOR_BUILD_EXAMPLES)
+    add_subdirectory(examples/struct_roundtrip)
+    if(CBOR_BUILD_TESTS)
+        add_test(NAME cbor.example_struct_roundtrip COMMAND struct_roundtrip)
     endif()
 endif()
 

@@ -199,8 +199,10 @@ cmake --preset dev && cmake --build --preset dev && ctest --preset dev
 | `cbor::Reader` | `Reader r(buf); while (!r.done()) Value v = r.next();` | reading a CBOR sequence (RFC 8742) |
 
 Free functions: `encode(Value) -> bytes`, `decode(bytes[, pos&])`, `decode_all(bytes)`,
-`diag(Value)` (RFC 8949 diagnostic notation, floats suffixed `_1/_2/_3` for
-f16/f32/f64, typed arrays as `u32[1, 2]`, ND as `f32[2x3][...]`).
+`diag(Value)` (RFC 8949 diagnostic notation, typed arrays as `u32[1, 2]`, ND as
+`f32[2x3][...]`). Float suffixes are RFC 8949 encoding indicators, **not** byte
+counts: `_1` = float16 (3 B), `_2` = float32 (5 B), `_3` = float64 (9 B) — so a
+C++ `float` prints as `21.5_2`.
 
 ### Encoding: C++ → CBOR (the C++ type decides, nothing is guessed)
 
@@ -209,9 +211,9 @@ f16/f32/f64, typed arrays as `u32[1, 2]`, ND as `f32[2x3][...]`).
 | `nullptr` / `Value()` | null `f6` | `[]` |
 | `bool` | `f4`/`f5` | logical |
 | any integer type | major 0/1, shortest head | `intN`/`uintN` scalar |
-| `float` | float32 `fa` | `single` |
-| `double` | float64 `fb` | `double` |
-| `cbor::f16{x}` | float16 `f9`, ties-to-even | `struct('cbor_f16', x)` |
+| `float` | float32 `fa` (5 B, diag `_2`) | `single` |
+| `double` | float64 `fb` (9 B, diag `_3`) | `double` |
+| `cbor::f16{x}` | float16 `f9` (3 B, diag `_1`), ties-to-even | `struct('cbor_f16', x)` |
 | `const char*`, `std::string`, `string_view` | text (UTF-8 passed through, not validated) | char |
 | `std::vector<uint8_t>` | byte string | `uint8` row |
 | `std::vector<T>` numeric (T ≠ uint8) | typed array, LE tag + bytes | numeric vector |
