@@ -1,2 +1,2 @@
 # latexmk -c / -C also remove the FreeText helper files (<jobname>.free-*.tex)
-$clean_ext .= ' free-*.tex';
+$clean_ext .= ' free-*.tex ltc';

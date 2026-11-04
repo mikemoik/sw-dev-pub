@@ -1,0 +1,91 @@
+% Design view of the unit -- three free-text sections of the Unit Under Test
+% chapter. Any LaTeX works inside (subsubsections, formulas, tables, TikZ,
+% verbatim). Write each \end{...} on its own line; a missing block shows a
+% placeholder. Blocks of the same kind are printed in order.
+%
+%   \begin{IntendedBehavior}      -> 2.x Intended Behavior (after Functional Description)
+%   \begin{InternalArchitecture}  -> 2.x Internal Architecture (after Dependencies)
+%   \begin{AlgorithmDescription}  -> 2.x Algorithm Description (after Internal Architecture)
+
+\begin{IntendedBehavior}
+The unit has two operating states. Transitions happen only in
+\texttt{SetpointCtrl\_Init()}; set requests never change the state.
+
+\begin{center}
+\begin{tikzpicture}[>=Stealth, node distance=1.2cm and 3.2cm,
+    st/.style={draw=accent, rounded corners, fill=accent!10, minimum width=2.6cm,
+               minimum height=0.9cm, font=\small\bfseries}]
+  \node[circle, fill=accent, inner sep=2.5pt] (start) {};
+  \node[st, right=1.6cm of start] (init) {INIT};
+  \node[st, above right=0.3cm and 3.2cm of init] (idle) {IDLE};
+  \node[st, below right=0.3cm and 3.2cm of init] (deg) {DEGRADED};
+  \draw[->] (start) -- (init);
+  \draw[->] (init) -- node[pos=0.4, above, sloped, font=\scriptsize] {NvM read E\_OK} (idle);
+  \draw[->] (init) -- node[pos=0.4, below, sloped, font=\scriptsize] {NvM read E\_NOT\_OK} (deg);
+\end{tikzpicture}
+\end{center}
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{State} & \textbf{Setpoint} & \textbf{Diagnosis} \\ \midrule
+  IDLE     & last stored value (NvM)  & -- \\
+  DEGRADED & default $sp_0 = 20$      & \texttt{DEM\_E\_NVM\_READ} reported once \\
+  \bottomrule
+\end{tabular}
+\end{center}
+In both states $0 \le sp \le 100$ holds at all times.
+\end{IntendedBehavior}
+
+\begin{InternalArchitecture}
+The unit consists of four internal parts; only the API functions are visible
+outside \texttt{setpoint\_ctrl.c}.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.6cm and 1.0cm,
+    blk/.style={draw=accent, fill=white, minimum width=3.2cm, minimum height=0.9cm,
+                font=\small, align=center}]
+  \node[blk, fill=accent!10] (api) {API\\\scriptsize SetpointCtrl\_*()};
+  \node[blk, right=of api] (rc) {Range check};
+  \node[blk, right=of rc] (ramp) {Ramp limiter};
+  \node[blk, below=of rc] (pers) {Persistence\\\scriptsize NvM access};
+  \node[blk, below=of ramp] (sm) {State machine};
+  \draw[->, >=Stealth] (api) -- (rc);
+  \draw[->, >=Stealth] (rc) -- (ramp);
+  \draw[->, >=Stealth] (api.south) |- (pers.west);
+  \draw[->, >=Stealth] (pers) -- (sm);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+  \item \textbf{Range check} -- static function \texttt{sp\_valid()}, implements \eqref{eq:range}.
+  \item \textbf{Ramp limiter} -- \texttt{ramp\_step()}, called from \texttt{SetpointCtrl\_Main()}.
+  \item \textbf{Persistence} -- wraps \texttt{NvM\_ReadBlock()} / \texttt{NvM\_WriteBlock()}.
+  \item \textbf{State machine} -- static \texttt{state}, see Intended Behavior.
+\end{itemize}
+\end{InternalArchitecture}
+
+\begin{AlgorithmDescription}
+\subsubsection{Range Limitation}
+A requested setpoint $sp_{\mathrm{req}}$ is accepted only inside the valid range:
+\begin{equation}
+  sp_k =
+  \begin{cases}
+    sp_{\mathrm{req}} & \text{if } 0 \le sp_{\mathrm{req}} \le 100,\\
+    sp_{k-1}          & \text{otherwise (request rejected, \texttt{E\_NOT\_OK})}.
+  \end{cases}
+  \label{eq:range}
+\end{equation}
+
+\subsubsection{Ramp Limitation}
+The effective setpoint follows the accepted one with at most
+$\Delta_{\max} = 2\,\mathrm{K/s}$, sampled every $T_s = 10\,\mathrm{ms}$:
+\begin{align}
+  \Delta_k     &= \operatorname{clamp}\!\left(sp_k - sp^{\mathrm{eff}}_{k-1},\; -\Delta_{\max} T_s,\; \Delta_{\max} T_s\right), \label{eq:ramp-step}\\
+  sp^{\mathrm{eff}}_k &= sp^{\mathrm{eff}}_{k-1} + \Delta_k . \label{eq:ramp}
+\end{align}
+A step from 20 to 100 therefore takes $\lceil 80 / (\Delta_{\max} T_s) \rceil = 4000$
+cycles ($40\,\mathrm{s}$). Equation \eqref{eq:range} defines the expected results of
+TC-SPC-002; the ramp \eqref{eq:ramp-step}--\eqref{eq:ramp} (SWR-0130) is verified
+in integration test.
+\end{AlgorithmDescription}

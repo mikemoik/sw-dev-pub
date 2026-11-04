@@ -39,6 +39,7 @@
 \RequirePackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,calc,shapes.geometric}
 \RequirePackage[export]{adjustbox}      % diagrams shrink to the text width if needed
+\RequirePackage{needspace}              % keep headings with their tables
 \RequirePackage{fancyvrb}               % FreeText: body copied verbatim to a file
 \RequirePackage[hidelinks]{hyperref}
 
@@ -332,17 +333,61 @@
 % =============================================================================
 %  Input commands: requirements  (content/requirements.tex)
 % =============================================================================
-% \Requirement{ID}{short description}
+% \StakeholderRequirement{ID}{functional | non-functional}{text}{source}
+% \InternalRequirement{ID}{functional | non-functional}{text}{derived from: ID, ID}
 % \NotUnitTested{ID}{rationale / where it is verified instead}
 \seq_new:N \g__suts_req_seq
 \prop_new:N \g__suts_reqdesc_prop
+\prop_new:N \g__suts_reqlevel_prop       % S (stakeholder) / I (internal)
+\prop_new:N \g__suts_reqkind_prop        % F / NF
+\prop_new:N \g__suts_reqsrc_prop         % source (S) or parent IDs (I)
+\prop_new:N \g__suts_reqchild_prop       % parent -> internal children
 \prop_new:N \g__suts_reqtc_prop          % requirement -> linked test cases
 \prop_new:N \g__suts_reqnot_prop         % requirement -> rationale
-\NewDocumentCommand \Requirement { m +m }
+\str_new:N \l__suts_kind_str
+\tl_new:N \l__suts_kindv_tl
+\cs_generate_variant:Nn \str_case:nnF { V }
+\cs_new_protected:Npn \__suts_req_add:nnnnn #1#2#3#4#5   % level ID kind text src
   {
-    \seq_gput_right:Nn \g__suts_req_seq {#1}
-    \prop_gput:Nnn \g__suts_reqdesc_prop {#1} {#2}
+    \prop_if_in:NnT \g__suts_reqdesc_prop {#2}
+      { \msg_warning:nnn { suts } { duplicate-req } {#2} }
+    \seq_gput_right:Nn \g__suts_req_seq {#2}
+    \prop_gput:Nnn \g__suts_reqdesc_prop {#2} {#4}
+    \prop_gput:Nnn \g__suts_reqlevel_prop {#2} {#1}
+    \prop_gput:Nnn \g__suts_reqsrc_prop {#2} {#5}
+    \str_set:Nx \l__suts_kind_str { \str_casefold:n {#3} }
+    \str_case:VnF \l__suts_kind_str
+      {
+        {functional}     { \tl_set:Nn \l__suts_kindv_tl {F} }
+        {f}              { \tl_set:Nn \l__suts_kindv_tl {F} }
+        {non-functional} { \tl_set:Nn \l__suts_kindv_tl {NF} }
+        {nonfunctional}  { \tl_set:Nn \l__suts_kindv_tl {NF} }
+        {nf}             { \tl_set:Nn \l__suts_kindv_tl {NF} }
+      }
+      {   % unknown kind: warn, list it as functional
+        \msg_warning:nnnn { suts } { bad-kind } {#2} {#3}
+        \tl_set:Nn \l__suts_kindv_tl {F}
+      }
+    \prop_gput:NnV \g__suts_reqkind_prop {#2} \l__suts_kindv_tl
+    \str_if_eq:nnT {#1} {I}
+      {
+        \clist_set:Nn \l_tmpa_clist {#5}
+        \clist_map_inline:Nn \l_tmpa_clist
+          {
+            \prop_get:NnNTF \g__suts_reqchild_prop {##1} \l_tmpa_tl
+              { \tl_put_right:Nn \l_tmpa_tl { , #2 } }
+              { \tl_set:Nn \l_tmpa_tl {#2} }
+            \prop_gput:NnV \g__suts_reqchild_prop {##1} \l_tmpa_tl
+          }
+      }
   }
+\msg_new:nnn { suts } { duplicate-req } { Requirement~#1~declared~twice. }
+\msg_new:nnn { suts } { bad-kind }
+  { Requirement~#1:~kind~'#2'~is~neither~'functional'~nor~'non-functional';~listed~as~functional. }
+\NewDocumentCommand \StakeholderRequirement { m m +m +m }
+  { \__suts_req_add:nnnnn {S} {#1} {#2} {#3} {#4} }
+\NewDocumentCommand \InternalRequirement { m m +m m }
+  { \__suts_req_add:nnnnn {I} {#1} {#2} {#3} {#4} }
 \NewDocumentCommand \NotUnitTested { m +m }
   { \prop_gput:Nnn \g__suts_reqnot_prop {#1} {#2} }
 
@@ -487,31 +532,60 @@
 \tl_gset:Nn \g__suts_chapter_tl { inplace }
 \int_new:N \g__suts_free_int
 \tl_new:N \g__suts_free_file_tl
-\newenvironment{FreeText}
+\cs_new_protected:Npn \__suts_free_begin:n #1   % #1: target name
   {
     \int_gincr:N \g__suts_free_int
     \tl_gset:Nx \g__suts_free_file_tl
-      { \c_sys_jobname_str .free- \g__suts_chapter_tl - \int_use:N \g__suts_free_int .tex }
+      { \c_sys_jobname_str .free- #1 - \int_use:N \g__suts_free_int .tex }
     \VerbatimEnvironment
     \begin{VerbatimOut}{\g__suts_free_file_tl}
   }
+\cs_generate_variant:Nn \__suts_free_begin:n { V }
+\cs_new_protected:Npn \__suts_free_register:n #1
+  {
+    \seq_if_exist:cF { g__suts_free_#1_seq } { \seq_new:c { g__suts_free_#1_seq } }
+    \seq_gput_right:cV { g__suts_free_#1_seq } \g__suts_free_file_tl
+  }
+\newenvironment{FreeText}
+  { \__suts_free_begin:V \g__suts_chapter_tl }
   {
     \end{VerbatimOut}
     \__suts_free_done:
   }
+% Named free-text blocks for fixed subsections (use them in design.tex or any
+% content file except testcases.tex):
+%   IntendedBehavior, InternalArchitecture, AlgorithmDescription
+\clist_map_inline:nn { IntendedBehavior, InternalArchitecture, AlgorithmDescription }
+  {
+    \newenvironment{#1}
+      { \__suts_free_begin:n {#1} }
+      {
+        \end{VerbatimOut}
+        \bool_lazy_or:nnTF
+          { \str_if_eq_p:Vn \g__suts_chapter_tl { testcases } }
+          { \str_if_eq_p:Vn \g__suts_chapter_tl { inplace } }
+          { \msg_warning:nnn { suts } { named-free-place } {#1} }
+          { \__suts_free_register:n {#1} }
+      }
+  }
+\msg_new:nnn { suts } { named-free-place }
+  { #1~block~ignored:~put~it~into~a~content~file~such~as~design.tex~(not~testcases.tex). }
 \cs_new_protected:Npn \__suts_free_done:
   {
     \bool_lazy_or:nnTF
       { \str_if_eq_p:Vn \g__suts_chapter_tl { testcases } }
       { \str_if_eq_p:Vn \g__suts_chapter_tl { inplace } }
       { \bool_if:NF \g__suts_scan_bool { \file_input:V \g__suts_free_file_tl } }
-      {
-        \seq_if_exist:cF { g__suts_free_ \g__suts_chapter_tl _seq }
-          { \seq_new:c { g__suts_free_ \g__suts_chapter_tl _seq } }
-        \seq_gput_right:cV { g__suts_free_ \g__suts_chapter_tl _seq } \g__suts_free_file_tl
-      }
+      { \__suts_free_register:V \g__suts_chapter_tl }
   }
 \cs_generate_variant:Nn \file_input:n { V }
+\cs_generate_variant:Nn \__suts_free_register:n { V }
+% named block or placeholder
+\cs_new_protected:Npn \__suts_free_or_ph:nn #1#2
+  {
+    \seq_if_exist:cTF { g__suts_free_#1_seq } { \__suts_free:n {#1} }
+      { \ph{#2~--~\string\begin\string{#1\string}~in~content/design.tex} }
+  }
 % place the free text blocks of content file #1
 \cs_new_protected:Npn \__suts_free:n #1
   {
@@ -522,8 +596,8 @@
 % =============================================================================
 %  Loading content
 % =============================================================================
-% \LoadContent{dir}: reads dir/{metadata,introduction,unit,approach,
-% environment,requirements,results}.tex (missing files are skipped) and scans
+% \LoadContent{dir}: reads dir/{metadata,introduction,requirements,unit,design,
+% approach,environment,results}.tex (missing files are skipped) and scans
 % dir/testcases.tex. Use in the preamble.
 \tl_new:N \g__suts_dir_tl
 \cs_new_protected:Npn \__suts_input:n #1
@@ -532,7 +606,7 @@
   {
     \tl_gset:Nn \g__suts_dir_tl {#1}
     \clist_map_inline:nn
-      { metadata, introduction, unit, approach, environment, requirements, results }
+      { metadata, introduction, requirements, unit, design, approach, environment, results }
       { \tl_gset:Nn \g__suts_chapter_tl {##1} \__suts_input:n {##1} }
     \bool_gset_true:N \g__suts_scan_bool
     \tl_gset:Nn \g__suts_chapter_tl { testcases }
@@ -670,6 +744,8 @@
     \end{tabularx}
     \subsection{Functional~Description}
     \__suts_text:nn { FunctionalDescription } { \ph{FunctionalDescription} }
+    \subsection{Intended~Behavior}
+    \__suts_free_or_ph:nn { IntendedBehavior } { intended~behavior }
     \bool_lazy_and:nnF
       { \seq_if_empty_p:N \g__suts_callers_seq }
       { \seq_if_empty_p:N \g__suts_depcomp_seq }
@@ -692,7 +768,12 @@
       \__suts_if_list_empty:nTF { dependencies } { \__suts_none_row:n {3} } { \__suts_rows:n { dependencies } }
       \bottomrule
     \end{xltabular}
+    \subsection{Internal~Architecture}
+    \__suts_free_or_ph:nn { InternalArchitecture } { internal~architecture }
+    \subsection{Algorithm~Description}
+    \__suts_free_or_ph:nn { AlgorithmDescription } { algorithm~description }
     \__suts_free:n { unit }
+    \__suts_free:n { design }
   }
 
 \cs_new_protected:Npn \__suts_itemize:n #1
@@ -758,8 +839,43 @@
 % rows are built before the tables (no loops inside alignment cells)
 \tl_new:N \l__suts_trace_tl
 \tl_new:N \l__suts_uncov_tl
+\tl_new:N \l__suts_rows_tl
 \tl_new:N \l__suts_a_tl
 \tl_new:N \l__suts_b_tl
+\tl_new:N \l__suts_c_tl
+\tl_new:N \l__suts_d_tl
+\tl_new:N \l__suts_k_tl
+\clist_new:N \l__suts_c_clist
+% #2 := how requirement #1 is verified: its own test cases, and for a
+% stakeholder requirement also "via" its verified internal children
+\cs_new_protected:Npn \__suts_req_verified:nN #1#2
+  {
+    \prop_get:NnNF \g__suts_reqtc_prop {#1} #2 { \tl_clear:N #2 }
+    \prop_get:NnNT \g__suts_reqchild_prop {#1} \l__suts_c_tl
+      {
+        \tl_clear:N \l__suts_d_tl
+        \clist_set:NV \l__suts_c_clist \l__suts_c_tl
+        \clist_map_inline:Nn \l__suts_c_clist
+          {
+            \prop_if_in:NnT \g__suts_reqtc_prop {##1}
+              {
+                \tl_if_empty:NF \l__suts_d_tl { \tl_put_right:Nn \l__suts_d_tl { ,~ } }
+                \tl_put_right:Nn \l__suts_d_tl {##1}
+              }
+          }
+        \tl_if_empty:NF \l__suts_d_tl
+          {
+            \tl_if_empty:NF #2 { \tl_put_right:Nn #2 { ;~ } }
+            \tl_put_right:Nn #2 { via~ }
+            \tl_put_right:NV #2 \l__suts_d_tl
+          }
+      }
+  }
+\cs_new:Npn \__suts_kind_label:n #1
+  {
+    \str_if_eq:eeTF { \prop_item:Nn \g__suts_reqlevel_prop {#1} } { S } { stakeholder } { internal } ,~
+    \str_if_eq:eeTF { \prop_item:Nn \g__suts_reqkind_prop {#1} } { NF } { non-functional } { functional }
+  }
 \cs_new_protected:Npn \__suts_build_trace:
   {
     \tl_clear:N \l__suts_trace_tl
@@ -767,51 +883,132 @@
     \seq_map_inline:Nn \g__suts_req_seq
       {
         \prop_get:NnN \g__suts_reqdesc_prop {##1} \l__suts_a_tl
-        \prop_get:NnNTF \g__suts_reqtc_prop {##1} \l__suts_b_tl
-          { }
+        \__suts_req_verified:nN {##1} \l__suts_b_tl
+        \tl_if_empty:NT \l__suts_b_tl
           {
             \tl_set:Nn \l__suts_b_tl { \textit{none~--~see~\ref{suts:uncovered}} }
-            \prop_get:NnNF \g__suts_reqnot_prop {##1} \l__suts_a_tl
-              { \tl_set:Nn \l__suts_a_tl { \textcolor{warn}{rationale~missing~(add~\string\NotUnitTested)} } }
+            \prop_get:NnNF \g__suts_reqnot_prop {##1} \l__suts_c_tl
+              {
+                \prop_get:NnNTF \g__suts_reqchild_prop {##1} \l__suts_d_tl
+                  {   % stakeholder requirement: rationale lies with its derived requirements
+                    \clist_set:NV \l__suts_c_clist \l__suts_d_tl
+                    \tl_set:Nx \l__suts_c_tl
+                      { via~derived~\clist_use:Nn \l__suts_c_clist { ,~ }~--~see~their~rationale }
+                  }
+                  { \tl_set:Nn \l__suts_c_tl { \textcolor{warn}{rationale~missing~(add~\string\NotUnitTested)} } }
+              }
             \tl_put_right:Nx \l__suts_uncov_tl
-              { \exp_not:n {##1} & \exp_not:V \l__suts_a_tl \exp_not:N \\ }
-            \prop_get:NnN \g__suts_reqdesc_prop {##1} \l__suts_a_tl
+              { \exp_not:n {##1} & \exp_not:V \l__suts_c_tl \exp_not:N \\ }
           }
         \tl_put_right:Nx \l__suts_trace_tl
-          { \exp_not:n {##1} & \exp_not:V \l__suts_a_tl & \exp_not:V \l__suts_b_tl \exp_not:N \\ }
+          {
+            \exp_not:n {##1} & { \exp_not:N \footnotesize \__suts_kind_label:n {##1} } &
+            \exp_not:V \l__suts_a_tl & \exp_not:V \l__suts_b_tl \exp_not:N \\
+          }
       }
     \prop_map_inline:Nn \g__suts_reqtc_prop   % verified but never declared
       {
         \prop_if_in:NnF \g__suts_reqdesc_prop {##1}   % prop keys compare as strings
           {
             \tl_put_right:Nn \l__suts_trace_tl
-              { ##1 & \textcolor{warn}{not~declared~in~requirements.tex} & ##2 \\ }
+              { ##1 & & \textcolor{warn}{not~declared~in~requirements.tex} & ##2 \\ }
           }
       }
-    \tl_if_empty:NT \l__suts_trace_tl { \tl_set:Nn \l__suts_trace_tl { \__suts_none_row:n {3} } }
+    \tl_if_empty:NT \l__suts_trace_tl { \tl_set:Nn \l__suts_trace_tl { \__suts_none_row:n {4} } }
     \tl_if_empty:NT \l__suts_uncov_tl { \tl_set:Nn \l__suts_uncov_tl { \__suts_none_row:n {2} } }
+  }
+% rows of one requirements table: level #1 (S/I), kind #2 (F/NF)
+\cs_new_protected:Npn \__suts_req_rows:nn #1#2
+  {
+    \tl_clear:N \l__suts_rows_tl
+    \seq_map_inline:Nn \g__suts_req_seq
+      {
+        \bool_lazy_and:nnT
+          { \str_if_eq_p:ee { \prop_item:Nn \g__suts_reqlevel_prop {##1} } {#1} }
+          { \str_if_eq_p:ee { \prop_item:Nn \g__suts_reqkind_prop {##1} } {#2} }
+          {
+            \prop_get:NnN \g__suts_reqdesc_prop {##1} \l__suts_a_tl
+            \prop_get:NnN \g__suts_reqsrc_prop {##1} \l__suts_k_tl
+            \str_if_eq:nnT {#1} {I}   % parents: unknown IDs in red
+              {
+                \clist_set:NV \l__suts_c_clist \l__suts_k_tl
+                \tl_clear:N \l__suts_k_tl
+                \clist_map_inline:Nn \l__suts_c_clist
+                  {
+                    \tl_if_empty:NF \l__suts_k_tl { \tl_put_right:Nn \l__suts_k_tl { ,~ } }
+                    \prop_if_in:NnTF \g__suts_reqdesc_prop {####1}
+                      { \tl_put_right:Nn \l__suts_k_tl {####1} }
+                      { \tl_put_right:Nn \l__suts_k_tl { \textcolor{warn}{####1~(unknown)} } }
+                  }
+                \tl_if_empty:NT \l__suts_k_tl { \tl_set:Nn \l__suts_k_tl { -- } }
+              }
+            \__suts_req_verified:nN {##1} \l__suts_b_tl
+            \tl_if_empty:NT \l__suts_b_tl
+              { \tl_set:Nn \l__suts_b_tl { \textit{not~unit~tested~(\ref{suts:uncovered})} } }
+            \tl_put_right:Nx \l__suts_rows_tl
+              {
+                \exp_not:n {##1} & \exp_not:V \l__suts_a_tl & \exp_not:V \l__suts_k_tl &
+                \exp_not:V \l__suts_b_tl \exp_not:N \\
+              }
+          }
+      }
+    \tl_if_empty:NT \l__suts_rows_tl { \tl_set:Nn \l__suts_rows_tl { \__suts_none_row:n {4} } }
+  }
+\cs_new_protected:Npn \__suts_req_table:nnn #1#2#3   % level kind third-column header
+  {
+    \__suts_req_rows:nn {#1} {#2}
+    \begin{xltabular}{\linewidth}{@{}L{2.1cm} Y L{2.6cm} L{3.2cm}@{}}
+      \toprule
+      \textbf{ID} & \textbf{Requirement} & \textbf{#3} & \textbf{Verified~by} \\ \midrule
+      \endhead
+      \tl_use:N \l__suts_rows_tl
+      \bottomrule
+    \end{xltabular}
+  }
+\NewDocumentCommand \SpecRequirements {}
+  {
+    \section{Requirements}
+    Stakeholder~requirements~state~what~users~and~other~stakeholders~need~from~\TheUnit;~
+    internal~requirements~are~derived~from~them~(or~from~the~design)~and~are~what~the~unit~
+    tests~verify.~A~stakeholder~requirement~counts~as~verified~via~its~verified~internal~requirements.
+    \Needspace{8\baselineskip}
+    \subsection{Stakeholder~Requirements}
+    \subsubsection{Functional}
+    \__suts_req_table:nnn {S} {F} {Source}
+    \Needspace{6\baselineskip}
+    \subsubsection{Non-Functional}
+    \__suts_req_table:nnn {S} {NF} {Source}
+    \Needspace{8\baselineskip}
+    \subsection{Internal~Requirements}
+    \subsubsection{Functional}
+    \__suts_req_table:nnn {I} {F} {Derived~from}
+    \Needspace{6\baselineskip}
+    \subsubsection{Non-Functional}
+    \__suts_req_table:nnn {I} {NF} {Derived~from}
+    \__suts_free:n { requirements }
   }
 \NewDocumentCommand \SpecTraceability {}
   {
     \__suts_build_trace:
     \section{Traceability}
+    \Needspace{8\baselineskip}
     \subsection{Requirements~to~Test~Cases}
-    \begin{xltabular}{\linewidth}{@{}L{2.6cm} Y L{4.5cm}@{}}
+    \begin{xltabular}{\linewidth}{@{}L{2.5cm} L{2.2cm} Y L{3.6cm}@{}}
       \toprule
-      \textbf{Requirement} & \textbf{Short~description} & \textbf{Test~cases} \\ \midrule
+      \textbf{Requirement} & \textbf{Type} & \textbf{Description} & \textbf{Test~cases} \\ \midrule
       \endhead
       \tl_use:N \l__suts_trace_tl
       \bottomrule
     \end{xltabular}
+    \Needspace{6\baselineskip}
     \subsection{Uncovered~Requirements}\label{suts:uncovered}
-    Requirements~allocated~to~the~unit~that~no~test~case~verifies:
-    \begin{xltabular}{\linewidth}{@{}L{2.6cm} Y@{}}
+    Requirements~that~no~test~case~verifies~(directly~or,~for~stakeholder~requirements,~via~internal~ones):
+    \begin{xltabular}{\linewidth}{@{}L{2.5cm} Y@{}}
       \toprule
       \textbf{Requirement} & \textbf{Rationale~/~verified~instead~by} \\ \midrule
       \tl_use:N \l__suts_uncov_tl
       \bottomrule
     \end{xltabular}
-    \__suts_free:n { requirements }
   }
 
 \NewDocumentCommand \SpecResults {}

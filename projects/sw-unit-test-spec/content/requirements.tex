@@ -1,10 +1,56 @@
-% Requirements allocated to the unit: {ID}{short description}
-% The traceability table finds the test cases automatically (\Verifies in testcases.tex).
-\Requirement{SWR-0101}{Default state after initialisation}
-\Requirement{SWR-0102}{Read persistent setpoint at start-up}
-\Requirement{SWR-0110}{Setpoint range 0..100}
-\Requirement{SWR-0120}{NvM failure handling}
-\Requirement{SWR-0130}{Setpoint ramp limit}
+% Requirements of the unit, in four groups. Kind: functional | non-functional
+%
+% Stakeholder requirements -- what users / other stakeholders need:
+%   \StakeholderRequirement{ID}{kind}{text}{source}
+% Internal requirements -- derived from stakeholder requirements or the design,
+% verified by the unit tests (\Verifies in testcases.tex):
+%   \InternalRequirement{ID}{kind}{text}{derived from: ID, ID}
+% Tables, "verified by" and traceability are generated. A stakeholder
+% requirement is verified via its verified internal requirements.
+
+% --- stakeholder, functional
+\StakeholderRequirement{STK-010}{functional}
+  {The occupant can select a heating setpoint between 0 and 100.}
+  {Vehicle occupant, \DocRef{srs}}
+\StakeholderRequirement{STK-011}{functional}
+  {The selected setpoint is kept across ignition cycles.}
+  {Vehicle occupant}
+\StakeholderRequirement{STK-012}{functional}
+  {The service technician can read the controller state.}
+  {Service technician}
+
+% --- stakeholder, non-functional
+\StakeholderRequirement{STK-020}{non-functional}
+  {Setpoint changes take effect smoothly, without steps in heating power.}
+  {Vehicle occupant (comfort)}
+\StakeholderRequirement{STK-021}{non-functional}
+  {Faults of persistent storage must not lead to an undefined heater state (ASIL B).}
+  {Safety concept}
+
+% --- internal, functional
+\InternalRequirement{SWR-0101}{functional}
+  {After initialisation the unit is in state IDLE.}
+  {STK-012}
+\InternalRequirement{SWR-0102}{functional}
+  {At start-up the last setpoint is read from NvM.}
+  {STK-011}
+\InternalRequirement{SWR-0110}{functional}
+  {Setpoints outside 0..100 are rejected with E_NOT_OK; the previous setpoint is kept.}
+  {STK-010}
+\InternalRequirement{SWR-0120}{functional}
+  {If NvM cannot be read, the unit enters DEGRADED with setpoint 20 and reports DEM_E_NVM_READ.}
+  {STK-011, STK-021}
+
+% --- internal, non-functional
+\InternalRequirement{SWR-0130}{non-functional}
+  {The effective setpoint changes by at most 2 K/s.}
+  {STK-020}
+\InternalRequirement{SWR-0140}{non-functional}
+  {SetpointCtrl_Main() needs at most 50 us per call on the target.}
+  {}
 
 % Requirements without a unit test: {ID}{rationale / where verified instead}
 \NotUnitTested{SWR-0130}{Timing behaviour, verified in integration test ITS-SPC-007}
+\NotUnitTested{SWR-0140}{Target timing measurement, see timing analysis report TAR-SPC-001}
+
+% Free text here is printed at the end of the Requirements chapter.
