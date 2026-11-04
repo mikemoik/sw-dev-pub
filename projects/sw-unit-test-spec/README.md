@@ -2,7 +2,7 @@
 
 LaTeX template for a **Software Unit Test Specification**. Structure follows ISO/IEC/IEEE 29119-3 (test design / test case specification) and covers the work products expected by Automotive SPICE SWE.4 (software unit verification) and ISO 26262-6 clause 9 (software unit verification). Drop the safety-specific parts if they don't apply. The template addresses those clauses; it does not make a project compliant — content, reviews and evidence remain the project's job.
 
-**Content is separated from the template:** you write only data and plain text into `content/*.tex` — no tables, no `&`/`\\`, no environments except `TestCase`. All layout lives in `suts.cls`. Traceability tables, the uncovered-requirements list, test case count, reference numbers and the list of test cases are generated.
+**Content is separated from the template:** you write only data and plain text into `content/*.tex` — no tables, no `&`/`\\`, no environments except `TestCase` — plus optional `FreeText` blocks for anything else (see *Free text*). All layout lives in `suts.cls`. Traceability tables, the uncovered-requirements list, test case count, reference numbers and the list of test cases are generated.
 
 **Owner:** swdevos · **Status:** stable, builds clean (TeX Live 2026) · **License:** MIT (repo root)
 
@@ -20,12 +20,13 @@ LaTeX template for a **Software Unit Test Specification**. Structure follows ISO
 | `content/results.tex` | execution results, achieved coverage, deviations (optional) | yes |
 | `sw_unit_test_spec.tex` | main file: chapter order | rarely |
 | `suts.cls` | the template: all formatting and input commands | no |
+| `latexmkrc` | lets `latexmk -c` also remove the free-text helper files | no |
 
 The `content/` files ship with a small worked example (unit `setpoint_ctrl`) — replace the text inside the braces.
 
 ## Build
 
-Needs a TeX distribution with `latexmk` and the packages `tcolorbox`, `xltabular`, `enumitem`, `fancyhdr`, `lastpage`, `underscore`, `microtype` (TeX Live: `texlive-latexextra` or equivalent).
+Needs a TeX distribution with `latexmk` and the packages `tcolorbox`, `xltabular`, `enumitem`, `fancyhdr`, `lastpage`, `underscore`, `microtype`, `fancyvrb` (TeX Live: `texlive-latexextra` or equivalent).
 
 ```sh
 latexmk -pdf sw_unit_test_spec.tex        # -> sw_unit_test_spec.pdf
@@ -43,6 +44,35 @@ The PDF is not committed (build output); build it from the sources.
 - Anything left out shows up as a grey `⟨placeholder⟩` or `none` — the document always builds. Missing files in `content/` are skipped.
 - Formatting is optional and up to you: `\textbf{…}`, `\emph{…}`, `\code{…}` (typewriter, for identifiers and command lines), lists etc. work in the text arguments.
 - Values for use in your own text: `\TheUnit`, `\TheBaseline`, `\TheIntegrityLevel`; cite a reference with `\DocRef{key}` → `[R2]`.
+
+## Free text
+
+Every content file may contain any number of free-text blocks with **any LaTeX** — own subsections, tables, figures, `verbatim`, listings; normal LaTeX rules apply inside (`%` is a comment, `\&` etc.):
+
+```latex
+\begin{FreeText}
+\subsection{Public API (excerpt)}
+\begin{verbatim}
+Std_ReturnType SetpointCtrl_Set(uint8 sp);   /* 0..100 */
+\end{verbatim}
+\end{FreeText}
+```
+
+Write `\end{FreeText}` on its own line. Where a block appears:
+
+| Block in | Printed at the end of |
+|---|---|
+| `metadata.tex` | Document Control |
+| `introduction.tex` | 1 Introduction |
+| `unit.tex` | 2 Unit Under Test |
+| `approach.tex` | 3 Test Approach |
+| `environment.tex` | 4 Test Environment |
+| `testcases.tex` | — exactly where it stands (between test cases / groups) |
+| `requirements.tex` | 6 Traceability |
+| `results.tex` | 7 Test Results Summary |
+| `sw_unit_test_spec.tex` (document body) | — exactly where it stands |
+
+Start the block with `\subsection{…}` if it should get its own heading. Not allowed inside a `TestCase` (use the text fields there). Each block is copied to a helper file `<jobname>.free-*.tex` during the build (gitignored, removed by `latexmk -c`).
 
 ## Command reference
 

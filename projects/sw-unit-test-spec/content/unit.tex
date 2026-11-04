@@ -14,3 +14,15 @@
 % {dependency}{replaced by}{behaviour in test}
 \Dependency{NvM_ReadBlock()}{Mock}{Returns a configurable value, records calls}
 \Dependency{Dem_ReportError()}{Mock}{Records reported events}
+
+% Free text: any LaTeX, printed at the end of this chapter (Unit Under Test).
+% Write \end{FreeText} on its own line.
+\begin{FreeText}
+\subsection{Public API (excerpt)}
+From \texttt{include/setpoint\_ctrl.h} -- 50\% of the API shown:
+\begin{verbatim}
+Std_ReturnType SetpointCtrl_Init(void);
+Std_ReturnType SetpointCtrl_Set(uint8 sp);   /* 0..100 */
+SetpointCtrl_StateType SetpointCtrl_GetState(void);
+\end{verbatim}
+\end{FreeText}

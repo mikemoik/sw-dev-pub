@@ -11,3 +11,6 @@
 *.synctex.gz
 *.toc
 *.xdv
+
+# FreeText blocks, written at build time
+*.free-*.tex

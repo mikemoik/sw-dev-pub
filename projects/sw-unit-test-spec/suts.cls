@@ -35,6 +35,7 @@
 \RequirePackage{lastpage}
 \RequirePackage{amssymb}
 \RequirePackage[most]{tcolorbox}
+\RequirePackage{fancyvrb}               % FreeText: body copied verbatim to a file
 \RequirePackage[hidelinks]{hyperref}
 
 % ---------------------------------------------------------------- styling ---
@@ -332,6 +333,50 @@
   { \__suts_add:nn { deviations } { #1 & #2 & #3 & #4 \\ } }
 
 % =============================================================================
+%  Free text  (any content file)
+% =============================================================================
+% \begin{FreeText} ... any LaTeX ... \end{FreeText}   (\end{FreeText} on its own line)
+% The body is copied verbatim to \jobname.free-<file>-<n>.tex, so %, &, verbatim,
+% listings, own tables all work. Placement: at the end of the chapter that the
+% file belongs to; in testcases.tex (and in the main document body) exactly
+% where it stands. Not inside a TestCase.
+\tl_new:N \g__suts_chapter_tl
+\tl_gset:Nn \g__suts_chapter_tl { inplace }
+\int_new:N \g__suts_free_int
+\tl_new:N \g__suts_free_file_tl
+\newenvironment{FreeText}
+  {
+    \int_gincr:N \g__suts_free_int
+    \tl_gset:Nx \g__suts_free_file_tl
+      { \c_sys_jobname_str .free- \g__suts_chapter_tl - \int_use:N \g__suts_free_int .tex }
+    \VerbatimEnvironment
+    \begin{VerbatimOut}{\g__suts_free_file_tl}
+  }
+  {
+    \end{VerbatimOut}
+    \__suts_free_done:
+  }
+\cs_new_protected:Npn \__suts_free_done:
+  {
+    \bool_lazy_or:nnTF
+      { \str_if_eq_p:Vn \g__suts_chapter_tl { testcases } }
+      { \str_if_eq_p:Vn \g__suts_chapter_tl { inplace } }
+      { \bool_if:NF \g__suts_scan_bool { \file_input:V \g__suts_free_file_tl } }
+      {
+        \seq_if_exist:cF { g__suts_free_ \g__suts_chapter_tl _seq }
+          { \seq_new:c { g__suts_free_ \g__suts_chapter_tl _seq } }
+        \seq_gput_right:cV { g__suts_free_ \g__suts_chapter_tl _seq } \g__suts_free_file_tl
+      }
+  }
+\cs_generate_variant:Nn \file_input:n { V }
+% place the free text blocks of content file #1
+\cs_new_protected:Npn \__suts_free:n #1
+  {
+    \seq_if_exist:cT { g__suts_free_#1_seq }
+      { \par \seq_map_inline:cn { g__suts_free_#1_seq } { \file_input:n {##1} } }
+  }
+
+% =============================================================================
 %  Loading content
 % =============================================================================
 % \LoadContent{dir}: reads dir/{metadata,introduction,unit,approach,
@@ -345,10 +390,12 @@
     \tl_gset:Nn \g__suts_dir_tl {#1}
     \clist_map_inline:nn
       { metadata, introduction, unit, approach, environment, requirements, results }
-      { \__suts_input:n {##1} }
+      { \tl_gset:Nn \g__suts_chapter_tl {##1} \__suts_input:n {##1} }
     \bool_gset_true:N \g__suts_scan_bool
+    \tl_gset:Nn \g__suts_chapter_tl { testcases }
     \__suts_input:n { testcases }
     \bool_gset_false:N \g__suts_scan_bool
+    \tl_gset:Nn \g__suts_chapter_tl { inplace }
   }
 
 % =============================================================================
@@ -422,6 +469,7 @@
       Approver & \__suts_meta:n{Approver} & & \\
       \bottomrule
     \end{tabularx}
+    \__suts_free:n { metadata }
   }
 
 \NewDocumentCommand \SpecContents {}
@@ -454,6 +502,7 @@
       \__suts_if_list_empty:nTF { terms } { \__suts_none_row:n {2} } { \__suts_rows:n { terms } }
       \bottomrule
     \end{xltabular}
+    \__suts_free:n { introduction }
   }
 
 \NewDocumentCommand \SpecUnitUnderTest {}
@@ -486,6 +535,7 @@
       \__suts_if_list_empty:nTF { dependencies } { \__suts_none_row:n {3} } { \__suts_rows:n { dependencies } }
       \bottomrule
     \end{xltabular}
+    \__suts_free:n { unit }
   }
 
 \cs_new_protected:Npn \__suts_itemize:n #1
@@ -519,6 +569,7 @@
     \textbf{Exit:}  \__suts_itemize:n { exit }
     \subsection{Pass/Fail~Criteria}
     \__suts_text:nn { PassFailCriteria } { \ph{PassFailCriteria} }
+    \__suts_free:n { approach }
   }
 
 \NewDocumentCommand \SpecTestEnvironment {}
@@ -531,12 +582,15 @@
       \bottomrule
     \end{xltabular}
     \par \__suts_text:nn { ToolQualification } { }
+    \__suts_free:n { environment }
   }
 
 \NewDocumentCommand \SpecTestCases {}
   {
     \section{Test~Cases}
+    \tl_gset:Nn \g__suts_chapter_tl { testcases }
     \__suts_input:n { testcases }
+    \tl_gset:Nn \g__suts_chapter_tl { inplace }
   }
 
 % rows are built before the tables (no loops inside alignment cells)
@@ -595,6 +649,7 @@
       \tl_use:N \l__suts_uncov_tl
       \bottomrule
     \end{xltabular}
+    \__suts_free:n { requirements }
   }
 
 \NewDocumentCommand \SpecResults {}
@@ -616,6 +671,7 @@
       \__suts_if_list_empty:nTF { deviations } { \__suts_none_row:n {4} } { \__suts_rows:n { deviations } }
       \bottomrule
     \end{xltabular}
+    \__suts_free:n { results }
   }
 \ExplSyntaxOff
 \endinput

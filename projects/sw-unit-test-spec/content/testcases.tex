@@ -38,6 +38,12 @@
 
 \TestGroup{Error Handling and Fault Injection}
 
+% Free text in testcases.tex is printed exactly where it stands.
+\begin{FreeText}
+All fault injection tests use the NvM mock in \emph{error} mode; see
+\DocRef{plan} for the mock configuration.
+\end{FreeText}
+
 \begin{TestCase}{TC-SPC-003}{NvM read failure falls back to defaults}
   \Objective{Defined behaviour when the persistent setpoint cannot be read.}
   \Verifies{SWR-0120}
