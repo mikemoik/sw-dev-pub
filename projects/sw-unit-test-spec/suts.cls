@@ -132,15 +132,37 @@
       { \prop_gput:Nnn \g__suts_text_prop {#1} {##1} }
   }
 
-% \Reference{key}{document}{version}  -- numbered [R1], [R2], ... ; cite with \DocRef{key}
+% \Reference{key}{internal | external}{document}{version}
+%   numbered [R1], [R2], ... ; cite with \DocRef{key}
 \prop_new:N \g__suts_refnum_prop
-\NewDocumentCommand \Reference { m +m m }
+\str_new:N \l__suts_scope_str
+\tl_new:N \l__suts_scope_tl
+\NewDocumentCommand \Reference { m m +m m }
   {
     \int_gincr:N \g__suts_references_int
     \prop_gput:Nnx \g__suts_refnum_prop {#1} { \int_use:N \g__suts_references_int }
+    \str_set:Nx \l__suts_scope_str { \str_casefold:n {#2} }
+    \str_case:VnF \l__suts_scope_str
+      {
+        {internal} { \tl_set:Nn \l__suts_scope_tl { internal } }
+        {int}      { \tl_set:Nn \l__suts_scope_tl { internal } }
+        {i}        { \tl_set:Nn \l__suts_scope_tl { internal } }
+        {external} { \tl_set:Nn \l__suts_scope_tl { external } }
+        {ext}      { \tl_set:Nn \l__suts_scope_tl { external } }
+        {e}        { \tl_set:Nn \l__suts_scope_tl { external } }
+      }
+      {
+        \msg_warning:nnnn { suts } { bad-scope } {#1} {#2}
+        \tl_set:Nn \l__suts_scope_tl { \textcolor{warn}{#2} }
+      }
     \tl_gput_right:Nx \g__suts_references_tl
-      { { [R\int_use:N \g__suts_references_int] } \exp_not:n { & #2 & #3 \\ } }
+      {
+        { [R\int_use:N \g__suts_references_int] }
+        \exp_not:n { & #3 & } \exp_not:V \l__suts_scope_tl \exp_not:n { & #4 \\ }
+      }
   }
+\msg_new:nnn { suts } { bad-scope }
+  { \Reference{#1}:~'#2'~is~neither~'internal'~nor~'external'. }
 \NewDocumentCommand \DocRef { m }
   {
     \prop_get:NnNTF \g__suts_refnum_prop {#1} \l_tmpa_tl
@@ -712,10 +734,10 @@
         \__suts_usecase_diagram:
       }
     \subsection{References}
-    \begin{xltabular}{\linewidth}{@{}l Y l@{}}
+    \begin{xltabular}{\linewidth}{@{}l Y l l@{}}
       \toprule
-      \textbf{ID} & \textbf{Document} & \textbf{Version} \\ \midrule
-      \__suts_if_list_empty:nTF { references } { \__suts_none_row:n {3} } { \__suts_rows:n { references } }
+      \textbf{ID} & \textbf{Document} & \textbf{Type} & \textbf{Version} \\ \midrule
+      \__suts_if_list_empty:nTF { references } { \__suts_none_row:n {4} } { \__suts_rows:n { references } }
       \bottomrule
     \end{xltabular}
     \subsection{Terms~and~Abbreviations}

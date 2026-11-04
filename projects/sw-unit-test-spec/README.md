@@ -137,7 +137,7 @@ Start the block with `\subsection{…}` if it should get its own heading. The ex
 | | `\Revision{version}{date}{author}{change}` | one row of the revision history |
 | introduction | `\Purpose{text}` | overrides the default purpose paragraph |
 | | `\Scope{text}` | scope |
-| | `\Reference{key}{document}{version}` | row `[Rn]`, numbered in order; cite with `\DocRef{key}` |
+| | `\Reference{key}{internal/external}{document}{version}` | row `[Rn]` with type column, numbered in order; cite with `\DocRef{key}` (type also `int`/`ext`, `i`/`e`) |
 | | `\Term{term}{definition}` | terms table row |
 | | `\UseCase{use case}{actor, actor}` `\UseCaseNote{text}` | use case diagram (actors collected automatically) |
 | unit | `\FunctionalDescription{text}` | functional description |
@@ -164,7 +164,7 @@ Start the block with `\subsection{…}` if it should get its own heading. The ex
 | | `\CoverageResult{metric}{achieved}` | achieved coverage row |
 | | `\Deviation{ID}{test case}{description}{status}` | deviations table row |
 
-Consistency checks, shown in red in the PDF: a requirement in `\Verifies` that is not declared in `requirements.tex`; a declared requirement with no test case and no `\NotUnitTested` rationale (a stakeholder requirement defers to its derived requirements); an unknown *derived from* ID; `\DocRef` to an unknown key (also a LaTeX warning). Duplicate test case or requirement IDs and an unknown requirement kind give a LaTeX warning.
+Consistency checks, shown in red in the PDF: a requirement in `\Verifies` that is not declared in `requirements.tex`; a declared requirement with no test case and no `\NotUnitTested` rationale (a stakeholder requirement defers to its derived requirements); an unknown *derived from* ID; `\DocRef` to an unknown key (also a LaTeX warning); a reference type other than internal/external (also a warning). Duplicate test case or requirement IDs and an unknown requirement kind give a LaTeX warning.
 
 ## Customizing
 

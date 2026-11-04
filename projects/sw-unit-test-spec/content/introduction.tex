@@ -11,15 +11,16 @@
   integration with the heater power stage (integration test).
 }
 
-% {key}{document}{version} -- numbered [R1], [R2], ... in this order.
-% Cite them anywhere with \DocRef{key}.
-\Reference{srs}{Software Requirements Specification, SRS-SPC-001}{1.3}
-\Reference{design}{Software Detailed Design of setpoint_ctrl, SDD-SPC-004}{1.1}
-\Reference{misra}{MISRA C:2012 Guidelines}{2019}
-\Reference{plan}{Software Verification Plan, SVP-PRJ-002}{2.0}
-\Reference{29119}{ISO/IEC/IEEE 29119-3 -- Test documentation}{2021}
-\Reference{aspice}{Automotive SPICE PAM -- SWE.4 Software Unit Verification}{4.0}
-\Reference{26262}{ISO 26262-6 -- Clause 9, Software unit verification}{2018}
+% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
+% in this order. internal = your organisation's documents, external = standards,
+% guidelines, supplier documents. Cite them anywhere with \DocRef{key}.
+\Reference{srs}{internal}{Software Requirements Specification, SRS-SPC-001}{1.3}
+\Reference{design}{internal}{Software Detailed Design of setpoint_ctrl, SDD-SPC-004}{1.1}
+\Reference{plan}{internal}{Software Verification Plan, SVP-PRJ-002}{2.0}
+\Reference{misra}{external}{MISRA C:2012 Guidelines}{2019}
+\Reference{29119}{external}{ISO/IEC/IEEE 29119-3 -- Test documentation}{2021}
+\Reference{aspice}{external}{Automotive SPICE PAM -- SWE.4 Software Unit Verification}{4.0}
+\Reference{26262}{external}{ISO 26262-6 -- Clause 9, Software unit verification}{2018}
 
 % Stakeholders and use cases (optional; usually taken over from the SRS).
 % {use case}{actor, actor} -- actors are collected automatically.
