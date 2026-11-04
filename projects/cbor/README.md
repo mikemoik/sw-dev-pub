@@ -51,43 +51,81 @@ uv venv .venv && uv pip install -p .venv/bin/python cbor2     # or: python3 -m v
 
 ## Use
 
-### C++
+### C++: install
 
-Link the target `cbor::cbor` (header-only, sets C++17) and `#include "cbor.hpp"`. Three ways to get it:
+The build/test commands above install nothing. Installing is a separate step; it copies only the header and the CMake package files (no tests, examples, MATLAB or Python files):
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ctest --test-dir build
+cmake --install build --prefix $HOME/.local     # per user, no root
+# or: sudo cmake --install build                # default prefix /usr/local
+# with presets: cmake --install build/dev --prefix $HOME/.local
+```
+
+Installed files:
+
+```
+<prefix>/include/cbor.hpp
+<prefix>/share/cmake/cbor/cborConfig.cmake          # loaded by find_package(cbor)
+<prefix>/share/cmake/cbor/cborTargets.cmake         # defines the target cbor::cbor
+<prefix>/share/cmake/cbor/cborConfigVersion.cmake   # version check (same major, >= requested)
+```
+
+Uninstall = delete those four paths.
+
+### C++: use in your own CMake project
+
+Every route ends in the same line: link the target `cbor::cbor` and `#include "cbor.hpp"`. The target is header-only and carries the include path and the C++17 requirement, so no `include_directories` or `-std` flags are needed.
+
+**A. Installed package** (several projects share one copy):
 
 ```cmake
-# 1. vendored copy / git submodule
-add_subdirectory(third_party/cbor)
+cmake_minimum_required(VERSION 3.21)
+project(app CXX)
 
-# 2. FetchContent (straight from this repo)
+find_package(cbor 1.1 REQUIRED CONFIG)
+
+add_executable(app main.cpp)
+target_link_libraries(app PRIVATE cbor::cbor)
+```
+
+```sh
+cmake -S . -B build -DCMAKE_PREFIX_PATH=$HOME/.local   # not needed for /usr/local
+# alternative: -Dcbor_DIR=$HOME/.local/share/cmake/cbor
+```
+
+Version rule: `find_package(cbor 1.1)` accepts any installed 1.x ≥ 1.1; a different major version is rejected.
+
+**B. Download at configure time** (reproducible builds, CI; nothing installed). Pin a release and its hash:
+
+```cmake
 include(FetchContent)
 FetchContent_Declare(cbor
-    GIT_REPOSITORY https://github.com/mikemoik/sw-dev-pub.git
-    GIT_TAG        main            # pin a commit for reproducible builds
-    SOURCE_SUBDIR  projects/cbor)
-FetchContent_MakeAvailable(cbor)
-
-# 2b. FetchContent without git (plain HTTPS download, pinned + hash-checked)
-FetchContent_Declare(cbor
-    URL      https://github.com/mikemoik/sw-dev-pub/releases/download/cbor-v1.0.0/cbor-1.0.0.tar.gz
-    URL_HASH SHA256=<from cbor-1.0.0.tar.gz.sha256>
+    URL      https://github.com/mikemoik/sw-dev-pub/releases/download/cbor-v<version>/cbor-<version>.tar.gz
+    URL_HASH SHA256=<contents of cbor-<version>.tar.gz.sha256>
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-#    or the whole-repo archive of a commit:  URL https://github.com/mikemoik/sw-dev-pub/archive/<sha>.tar.gz
-#    plus  SOURCE_SUBDIR projects/cbor
 FetchContent_MakeAvailable(cbor)
-
-# 3. installed package:  cmake --install build --prefix <prefix>,  then
-find_package(cbor 1.0 REQUIRED CONFIG)   # CMAKE_PREFIX_PATH=<prefix>
 
 target_link_libraries(app PRIVATE cbor::cbor)
 ```
 
-Or skip CMake entirely: copy `cbor.hpp` into your tree.
+With git available, `GIT_REPOSITORY https://github.com/mikemoik/sw-dev-pub.git` + `GIT_TAG cbor-v<version>` + `SOURCE_SUBDIR projects/cbor` works as well; so does the whole-repo archive `URL https://github.com/mikemoik/sw-dev-pub/archive/<commit>.tar.gz` + `SOURCE_SUBDIR projects/cbor`.
+
+**C. Copy in the tree** (vendored directory or git submodule):
+
+```cmake
+add_subdirectory(third_party/cbor)
+target_link_libraries(app PRIVATE cbor::cbor)
+```
+
+In B and C cbor's tests, examples and install rules are off automatically (it isn't the top-level project); force them with `-DCBOR_BUILD_TESTS=ON` / `-DCBOR_BUILD_EXAMPLES=ON` / `-DCBOR_INSTALL=ON` (cbor's tests then run with `ctest --test-dir <build>/_deps/cbor-build` for B or `<build>/third_party/cbor` for C, or from the top if your project calls `enable_testing()`).
+
+**D. No CMake:** copy `cbor.hpp` anywhere on your include path and compile with `-std=c++17`.
 
 ### Quickstart: install, then serialize a struct
 
 ```sh
-# from a release tarball (or this directory of a checkout)
+# from a release tarball (or this directory of a checkout); details: "install" / "use in your own CMake project" above
 curl -fLO https://github.com/mikemoik/sw-dev-pub/releases/download/cbor-v<version>/cbor-<version>.tar.gz
 tar xzf cbor-<version>.tar.gz && cd cbor
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ctest --test-dir build
