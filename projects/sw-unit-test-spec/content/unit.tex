@@ -34,3 +34,34 @@ Std_ReturnType SetpointCtrl_Set(uint8 sp);   /* 0..100 */
 SetpointCtrl_StateType SetpointCtrl_GetState(void);
 \end{verbatim}
 \end{FreeText}
+
+% Free text example 2: own subsections, numbered formulas, cross-references.
+% Normal LaTeX rules apply inside FreeText (write \% for a percent sign).
+\begin{FreeText}
+\subsection{Setpoint Processing}
+Summary of the processing the test cases check against; see \DocRef{design}
+for the full design.
+
+\subsubsection{Range Limitation}
+A requested setpoint $sp_{\mathrm{req}}$ is accepted only inside the valid range:
+\begin{equation}
+  sp_k =
+  \begin{cases}
+    sp_{\mathrm{req}} & \text{if } 0 \le sp_{\mathrm{req}} \le 100,\\
+    sp_{k-1}          & \text{otherwise (request rejected, \texttt{E\_NOT\_OK})}.
+  \end{cases}
+  \label{eq:range}
+\end{equation}
+
+\subsubsection{Ramp Limitation}
+The effective setpoint follows the accepted one with at most
+$\Delta_{\max} = 2\,\mathrm{K/s}$, sampled every $T_s = 10\,\mathrm{ms}$:
+\begin{align}
+  \Delta_k     &= \operatorname{clamp}\!\left(sp_k - sp^{\mathrm{eff}}_{k-1},\; -\Delta_{\max} T_s,\; \Delta_{\max} T_s\right), \label{eq:ramp-step}\\
+  sp^{\mathrm{eff}}_k &= sp^{\mathrm{eff}}_{k-1} + \Delta_k . \label{eq:ramp}
+\end{align}
+A step from 20 to 100 therefore takes $\lceil 80 / (\Delta_{\max} T_s) \rceil = 4000$
+cycles ($40\,\mathrm{s}$). Equation \eqref{eq:range} defines the expected results of
+TC-SPC-002; the ramp \eqref{eq:ramp-step}--\eqref{eq:ramp} (SWR-0130) is verified
+in integration test.
+\end{FreeText}

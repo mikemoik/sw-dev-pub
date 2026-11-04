@@ -59,7 +59,7 @@ Generated with TikZ from the data you already enter — nothing to draw. Each di
 
 ## Free text
 
-Every content file may contain any number of free-text blocks with **any LaTeX** — own subsections, tables, figures, `verbatim`, listings; normal LaTeX rules apply inside (`%` is a comment, `\&` etc.):
+Every content file may contain any number of free-text blocks with **any LaTeX** — own (sub)subsections, formulas (`amsmath` is loaded: `equation`, `align`, `cases`, `\eqref`), tables, figures, `verbatim`, listings; normal LaTeX rules apply inside (`%` is a comment, `\&` etc.):
 
 ```latex
 \begin{FreeText}
@@ -84,7 +84,7 @@ Write `\end{FreeText}` on its own line. Where a block appears:
 | `results.tex` | 7 Test Results Summary |
 | `sw_unit_test_spec.tex` (document body) | — exactly where it stands |
 
-Start the block with `\subsection{…}` if it should get its own heading. Not allowed inside a `TestCase` (use the text fields there). Each block is copied to a helper file `<jobname>.free-*.tex` during the build (gitignored, removed by `latexmk -c`).
+Start the block with `\subsection{…}` if it should get its own heading. The example content has blocks in `unit.tex` (API excerpt in `verbatim`; *Setpoint Processing* with subsubsections, `cases`, `align`, `\eqref`), `approach.tex` (own table, displayed formula) and `testcases.tex` (paragraph with formulas between the test groups). Not allowed inside a `TestCase` (use the text fields there). Each block is copied to a helper file `<jobname>.free-*.tex` during the build (gitignored, removed by `latexmk -c`).
 
 ## Command reference
 

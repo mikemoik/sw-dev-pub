@@ -27,3 +27,22 @@
   A test case passes if every step yields the expected result and no
   unexpected side effect (assertion, sanitizer report, timeout) occurs.
 }
+
+% Free text example: own subsection with a self-made table and interval notation.
+\begin{FreeText}
+\subsection{Equivalence Classes of the Setpoint}
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Class} & \textbf{Range} & \textbf{Representatives (boundaries)} \\ \midrule
+  invalid low  & $sp < 0$            & not representable (\texttt{uint8}) \\
+  valid        & $0 \le sp \le 100$  & 0, 1, 50, 99, 100 \\
+  invalid high & $100 < sp \le 255$  & 101, 255 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+Statement coverage is measured as
+\[
+  C_{\mathrm{stmt}} = \frac{\text{executed statements}}{\text{all statements}} \cdot 100\,\% .
+\]
+\end{FreeText}

@@ -20,6 +20,17 @@
   \Implementation{test/setpoint_ctrl_test.cpp: InitTest.SetsDefaults}
 \end{TestCase}
 
+% Free text example: a paragraph with an inline and a displayed formula,
+% printed exactly here (between the groups).
+\begin{FreeText}
+\paragraph{Comparison of real values.} Where a step expects a computed value $y$,
+it passes if
+\[
+  \lvert y - y_{\mathrm{exp}} \rvert \le \varepsilon ,
+  \qquad \varepsilon = 10^{-3}\cdot\max(1, \lvert y_{\mathrm{exp}}\rvert).
+\]
+\end{FreeText}
+
 \TestGroup{Boundary Values}
 
 \begin{TestCase}{TC-SPC-002}{Setpoint accepted at upper limit}

@@ -33,6 +33,7 @@
 \RequirePackage{enumitem}
 \RequirePackage{fancyhdr}
 \RequirePackage{lastpage}
+\RequirePackage{amsmath}               % formulas in free text: align, cases, ...
 \RequirePackage{amssymb}
 \RequirePackage[most]{tcolorbox}
 \RequirePackage{tikz}
