@@ -85,7 +85,15 @@ $\Delta_{\max} = 2\,\mathrm{K/s}$, sampled every $T_s = 10\,\mathrm{ms}$:
   sp^{\mathrm{eff}}_k &= sp^{\mathrm{eff}}_{k-1} + \Delta_k . \label{eq:ramp}
 \end{align}
 A step from 20 to 100 therefore takes $\lceil 80 / (\Delta_{\max} T_s) \rceil = 4000$
-cycles ($40\,\mathrm{s}$). Equation \eqref{eq:range} defines the expected results of
+cycles ($40\,\mathrm{s}$), see Figure~\ref{fig:ramp}. Equation \eqref{eq:range} defines the expected results of
 TC-SPC-002; the ramp \eqref{eq:ramp-step}--\eqref{eq:ramp} (SWR-0130) is verified
 in integration test.
+
+% Image files live in figures/ (searched automatically, no path or extension needed).
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\linewidth]{ramp_response}
+  \caption{Ramp limitation: step request from 20 to 100 at $t = 5\,\mathrm{s}$.}
+  \label{fig:ramp}
+\end{figure}
 \end{AlgorithmDescription}

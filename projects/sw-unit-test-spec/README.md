@@ -19,6 +19,7 @@ LaTeX template for a **Software Unit Test Specification**. Structure follows ISO
 | `content/requirements.tex` | stakeholder and internal requirements (functional / non-functional), rationale for untested ones | yes |
 | `content/testcases.tex` | the test cases | yes |
 | `content/results.tex` | execution results, achieved coverage, deviations (optional) | yes |
+| `figures/` | image files for `\includegraphics` (PDF, PNG, JPG) — searched automatically; example: `ramp_response.pdf` | yes |
 | `sw_unit_test_spec.tex` | main file: chapter order | rarely |
 | `suts.cls` | the template: all formatting and input commands | no |
 | `sw_unit_test_spec.pdf` | the example, built — a preview of what the template produces | (rebuilt) |
@@ -69,6 +70,7 @@ On `main`, replace the worked example in **every** `content/*.tex` with the proj
 
 ```sh
 git rm sw_unit_test_spec.pdf          # the example's preview; unit branches carry their own PDF
+git rm figures/ramp_response.pdf      # the example's figure
 latexmk -pdf sw_unit_test_spec.tex    # check: builds, 0 warnings (PDF stays untracked on main)
 git commit -am "Project setup: project-wide content"
 git push -u origin main
@@ -85,11 +87,11 @@ git switch -c unit/setpoint_ctrl
 #   metadata (UnitName, baseline, …) → requirements → unit → design
 #   → approach/environment (unit specifics) → testcases → results (after execution)
 latexmk -pdf sw_unit_test_spec.tex
-git add content/ sw_unit_test_spec.pdf && git commit -m "setpoint_ctrl: initial spec"
+git add content/ figures/ sw_unit_test_spec.pdf && git commit -m "setpoint_ctrl: initial spec"
 git push -u origin unit/setpoint_ctrl
 ```
 
-Commit the rebuilt PDF with every content change on the unit branch, so reviewers can read the branch without building it. For a review, compare the content against the last baseline: `git diff setpoint_ctrl-v1.0 -- content/` (see step 5).
+Commit the rebuilt PDF with every content change on the unit branch, so reviewers can read the branch without building it. For a review, compare the content against the last baseline: `git diff setpoint_ctrl-v1.0 -- content/ figures/` (see step 5).
 
 ### 3. Project-wide change (e.g. a new tool version)
 
@@ -114,14 +116,15 @@ Expect two kinds of conflicts, both resolved the same way every time:
 |---|---|---|
 | `content/*.tex` | upstream changed its worked example; the project has its own content | keep ours: `git checkout --ours -- content/` |
 | `sw_unit_test_spec.pdf` (modify/delete) | upstream rebuilt its example PDF; `main` has none | `git rm sw_unit_test_spec.pdf` |
+| `figures/*` (modify/delete) | upstream changed an example figure; `main` has none | `git rm` it |
 
 ```sh
-git checkout --ours -- content/ && git rm -q --ignore-unmatch sw_unit_test_spec.pdf
+git checkout --ours -- content/ && git rm -q --ignore-unmatch sw_unit_test_spec.pdf figures/ramp_response.pdf
 git add content/ && git commit -m "Merge template update from upstream"
 git push
 ```
 
-`suts.cls`, `latexmkrc` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `sw_unit_test_spec.tex` and to *new* files in `content/`: a new content file arrives with example text. Replace that text on `main`. Then merge `main` into every unit branch as in step 3, and rebuild and commit each unit's PDF.
+`suts.cls`, `latexmkrc` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `sw_unit_test_spec.tex` and to *new* files in `content/` and `figures/`: a new content file arrives with example text, a new example figure is not needed. Replace that text and `git rm` the figure on `main`. Then merge `main` into every unit branch as in step 3, and rebuild and commit each unit's PDF.
 
 ### 5. Baseline a unit's spec
 
@@ -223,7 +226,22 @@ Write `\end{FreeText}` on its own line. Where a block appears:
 | `results.tex` | 8 Test Results Summary |
 | `sw_unit_test_spec.tex` (document body) | — exactly where it stands |
 
-Start the block with `\subsection{…}` if it should get its own heading. The example content has blocks in `design.tex` (state diagram + table; architecture diagram + list; *Algorithm Description* with subsubsections, `cases`, `align`, `\eqref`), `unit.tex` (API excerpt in `verbatim`), `approach.tex` (own table, displayed formula) and `testcases.tex` (paragraph with formulas between the test groups). Not allowed inside a `TestCase` (use the text fields there). Each block is copied to a helper file `<jobname>.free-*.tex` during the build (gitignored, removed by `latexmk -c`).
+Start the block with `\subsection{…}` if it should get its own heading. The example content has blocks in `design.tex` (state diagram + table; architecture diagram + list; *Algorithm Description* with subsubsections, `cases`, `align`, `\eqref` and a figure from `figures/`), `unit.tex` (API excerpt in `verbatim`), `approach.tex` (own table, displayed formula) and `testcases.tex` (paragraph with formulas between the test groups). Not allowed inside a `TestCase` (use the text fields there). Each block is copied to a helper file `<jobname>.free-*.tex` during the build (gitignored, removed by `latexmk -c`).
+
+### Figures
+
+Put image files (PDF, PNG, JPG; e.g. exported plots or diagrams from a modelling tool) into `figures/`. The class sets `\graphicspath{{figures/}}`, so a free-text block needs only the file name, without path or extension:
+
+```latex
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\linewidth]{ramp_response}   % figures/ramp_response.pdf
+  \caption{Ramp limitation: step request from 20 to 100.}
+  \label{fig:ramp}
+\end{figure}
+```
+
+Reference it with `Figure~\ref{fig:ramp}`. Subfolders work with a relative name (`{nvm/sequence}` → `figures/nvm/sequence.pdf`). Prefer vector PDF over PNG/JPG. Keep figures small: they are committed with the spec.
 
 ## Command reference
 

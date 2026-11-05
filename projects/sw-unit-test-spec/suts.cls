@@ -40,6 +40,8 @@
 \RequirePackage[export]{adjustbox}      % diagrams shrink to the text width if needed
 \RequirePackage{needspace}              % keep headings with their tables
 \RequirePackage{fancyvrb}               % FreeText: body copied verbatim to a file
+\RequirePackage{graphicx}
+\graphicspath{{figures/}}               % \includegraphics{name} finds figures/name.pdf|png|jpg
 \RequirePackage[hidelinks]{hyperref}
 % underscore LAST: its active _ breaks older packages loaded after it
 % (pgf < 3.1.11, older fancyvrb on TeX Live 2022)
