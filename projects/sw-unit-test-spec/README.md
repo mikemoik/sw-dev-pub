@@ -14,6 +14,7 @@ suts.cls                  the template: all formatting and input commands
 latexmkrc                 lets latexmk -c also remove the free-text helper files
 sw_unit_test_spec.pdf     the sample unit, built: a preview of what the template produces
 scripts/new_unit.py       creates units/<unit>/ from units/empty/
+scripts/build.py          builds units into build/<unit>.pdf (build/ is gitignored)
 figures/  data/  code/    shared by all units (a unit's own file of the same name wins)
 units/
   empty/                  skeleton for new units: commented command templates, no content
@@ -42,15 +43,24 @@ You edit only `units/<unit>/` and the shared `figures/`, `data/`, `code/`. `suts
 Needs a TeX distribution with `latexmk` and the packages `tcolorbox`, `xltabular`, `enumitem`, `fancyhdr`, `lastpage`, `underscore`, `microtype`, `fancyvrb`, `tikz` (pgf), `adjustbox` (TeX Live: `texlive-latexextra` or equivalent), and Python 3.6+ for `scripts/` (standard library only). Run everything from the template's root folder.
 
 ```sh
-python3 scripts/new_unit.py nvm_mgr      # new unit: copies units/empty/ to units/nvm_mgr/
-latexmk -pdf -jobname=nvm_mgr -usepretex='\def\SpecUnit{nvm_mgr}' sw_unit_test_spec.tex   # -> nvm_mgr.pdf
-latexmk -pdf -pvc -jobname=nvm_mgr -usepretex='\def\SpecUnit{nvm_mgr}' sw_unit_test_spec.tex   # live rebuild
-latexmk -c -jobname=nvm_mgr sw_unit_test_spec.tex                                              # remove intermediates
-latexmk -pdf sw_unit_test_spec.tex       # the default unit (\LoadUnit{sample}) -> sw_unit_test_spec.pdf
+python3 scripts/new_unit.py nvm_mgr          # new unit: copies units/empty/ to units/nvm_mgr/
+python3 scripts/build.py nvm_mgr             # -> build/nvm_mgr.pdf
+python3 scripts/build.py nvm_mgr sample      # several units -> build/nvm_mgr.pdf, build/sample.pdf
+python3 scripts/build.py --all               # every unit except units/empty
+```
+
+`build.py` creates `build/` if needed; PDFs go to `build/<unit>.pdf`, intermediates to `build/.aux/<unit>/`, the root stays clean. `build/` is gitignored, so delete it at any time. Each unit is built with its own job name, so an unchanged unit is skipped (`--force` rebuilds). The summary lists the LaTeX warnings of each unit, and the errors of a failed one, whose PDF is removed so that no stale PDF is left behind. The script continues with the remaining units and exits non-zero if one failed. Options: `--strict` (warnings count as failure, e.g. in CI), `--force`, `-v` (latexmk output).
+
+Behind it is one latexmk call per unit, which you can also run directly, e.g. for a live preview:
+
+```sh
+latexmk -pdf -pvc -jobname=nvm_mgr -outdir=build -auxdir=build/.aux/nvm_mgr \
+        -usepretex='\def\SpecUnit{nvm_mgr}' sw_unit_test_spec.tex
+latexmk -pdf sw_unit_test_spec.tex           # the default unit (\LoadUnit{sample}) -> sw_unit_test_spec.pdf in the root
 ```
 
 - **`\SpecUnit` selects the unit** (its folder name under `units/`). Without it, the unit named in `\LoadUnit{…}` in `sw_unit_test_spec.tex` is built.
-- **Always add `-jobname=<unit>`.** latexmk does not count `-usepretex` code as input. Without its own job name, a build of another unit finds the previous PDF up to date and does nothing (force it with `-g`). With its own job name, each unit gets its own PDF, intermediates and change tracking: editing `units/nvm_mgr/*` rebuilds `nvm_mgr.pdf` only.
+- **One job name per unit** (`-jobname=<unit>`, as `build.py` does). latexmk does not count `-usepretex` code as input. Under a shared job name, a build of another unit finds the previous PDF up to date and does nothing (force it with `-g`).
 - A unit folder without `metadata.tex` gives the warning `Unit folder … has no metadata.tex` (typo guard). The log names the folder used: `suts: content folder …`.
 - Plain `pdflatex` without latexmk: `pdflatex -jobname=nvm_mgr '\def\SpecUnit{nvm_mgr}\input{sw_unit_test_spec}'` (three runs).
 - `new_unit.py <unit> --from <other>` copies another unit instead of the skeleton, e.g. for a similar unit. Unit names: letters, digits, `_`, `-`, `.`.
@@ -64,13 +74,13 @@ The template is used as its own repository (the *upstream*). A project gets **on
 ```
 upstream (this template)  ──merge──▶  main of <project>-unit-test-specs
   template + units/empty + units/sample        template + units/empty (with project defaults)
-                                               + units/<unit>/ and <unit>.pdf per unit
+                                               + units/<unit>/ per unit (PDFs built, not committed)
                                                + shared figures/ data/ code/
 ```
 
 - **`units/empty/`** holds what is the same for all units of the project: `\Company`, `\ProjectName`, approver, common references and terms, test approach, test environment. `new_unit.py` copies it, so every new unit starts with these defaults.
 - **Shared files** — figures, data and source files used by several units — go to the root `figures/`, `data/`, `code/`. A change there reaches every unit with its next build.
-- **`units/<unit>/`** holds one unit's content and its own figures, data and code; its built `<unit>.pdf` is committed next to `sw_unit_test_spec.tex`.
+- **`units/<unit>/`** holds one unit's content and its own figures, data and code. PDFs are build output (`build/`, gitignored): built by `scripts/build.py` from any commit, the released ones filed from the baseline tag (step 5).
 - Changes flow one way only: **upstream → `main`**. Template fixes go to upstream (not edited in the copy).
 
 **Outside the code repository.** Keep the spec repository separate from the unit's source code, not as a folder or submodule in it. The spec is a work product with its own versions, tags and releases (`\DocVersion`, `<unit>-v<version>`, review and approval). Its life cycle differs from the code's: a spec is often baselined before the code exists, and a code release does not imply a new spec version. To link the two, reference the code baseline under test in the spec (`\UnitBaseline`, `\SourceFiles`, a `\Reference` to the code repository and tag), never the other way round. Copies of source files for listings (`code/`) are excerpts for reading, not the code under test.
@@ -89,7 +99,7 @@ git rm -r -q units/sample sw_unit_test_spec.pdf figures/test_process.tex   # the
 In `sw_unit_test_spec.tex`, change `\LoadUnit{sample}` to `\LoadUnit{empty}`. Put the project-wide defaults into `units/empty/*.tex` (uncomment the lines and fill them in) and shared files into `figures/`, `data/`, `code/`. Then check and push:
 
 ```sh
-latexmk -pdf sw_unit_test_spec.tex && latexmk -C   # check: builds units/empty, 0 warnings
+python3 scripts/build.py --strict empty            # check: units/empty builds, 0 warnings
 git add -A && git commit -m "Project setup: project-wide defaults"
 git push -u origin main
 ```
@@ -102,16 +112,16 @@ python3 scripts/new_unit.py setpoint_ctrl        # units/setpoint_ctrl/, \UnitNa
 # fill units/setpoint_ctrl/*.tex in this order:
 #   metadata (baseline, …) → requirements → unit → design
 #   → approach/environment (unit specifics) → testcases → results (after execution)
-latexmk -pdf -jobname=setpoint_ctrl -usepretex='\def\SpecUnit{setpoint_ctrl}' sw_unit_test_spec.tex
-git add units/setpoint_ctrl setpoint_ctrl.pdf && git commit -m "setpoint_ctrl: initial spec"
+python3 scripts/build.py setpoint_ctrl          # -> build/setpoint_ctrl.pdf
+git add units/setpoint_ctrl && git commit -m "setpoint_ctrl: initial spec"
 git push
 ```
 
-Commit the rebuilt `<unit>.pdf` with every change to the unit, so reviewers can read it without building. Prefix commit messages with the unit name. For a review, compare against the last baseline: `git diff setpoint_ctrl-v1.0 -- units/setpoint_ctrl/` (see step 5).
+Prefix commit messages with the unit name. Reviewers build the PDF themselves (`scripts/build.py <unit>`) or get it from CI (`scripts/build.py --all --strict`, `build/*.pdf` as artifacts). For a review, compare against the last baseline: `git diff setpoint_ctrl-v1.0 -- units/setpoint_ctrl/` (see step 5).
 
 ### 3. Project-wide change (e.g. a new tool version)
 
-- Shared files in `figures/`, `data/`, `code/`: change them once; rebuild and commit the PDFs of the units that use them.
+- Shared files in `figures/`, `data/`, `code/`: change them once; every unit that uses them picks it up with its next build (`scripts/build.py --all`).
 - Text that every unit carries (e.g. `\Tool` lines in `environment.tex`): change it in `units/empty/` for future units, and in each existing unit that should take it over. Each unit is a separate document with its own version — changing it means a new revision of that unit's spec.
 
 ### 4. Take over template updates from upstream
@@ -134,18 +144,18 @@ git checkout --ours -- units/empty/ && git add units/empty/
 git commit -m "Merge template update from upstream" && git push
 ```
 
-`suts.cls`, `latexmkrc`, `scripts/` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `units/empty/` (a new content file or command is shown there) and to `sw_unit_test_spec.tex`. Then rebuild every unit and commit the PDFs.
+`suts.cls`, `latexmkrc`, `scripts/` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `units/empty/` (a new content file or command is shown there) and to `sw_unit_test_spec.tex`. Then rebuild every unit: `scripts/build.py --all --strict`.
 
 ### 5. Baseline a unit's spec
 
-Set `\DocVersion` and `\DocStatus` in the unit's `metadata.tex` and add a `\Revision` row. Rebuild and commit, then tag:
+Set `\DocVersion` and `\DocStatus` in the unit's `metadata.tex` and add a `\Revision` row. Build it (`scripts/build.py --strict setpoint_ctrl`), commit, then tag:
 
 ```sh
 git tag -a setpoint_ctrl-v1.0 -m "setpoint_ctrl unit test spec v1.0"   # tag version = \DocVersion
 git push origin setpoint_ctrl-v1.0
 ```
 
-The tagged commit, with `units/setpoint_ctrl/` and `setpoint_ctrl.pdf`, is the released document; the other units in that commit are not part of it. File the PDF in the project's document management if required. Never move a tag; fix forward with a new version.
+The tagged commit's `units/setpoint_ctrl/` is the released document's source; the other units in that commit are not part of it. File `build/setpoint_ctrl.pdf`, built from the tagged commit, in the project's document management, as the released PDF is not in git. Never move a tag; fix forward with a new version.
 
 **Template from sw-dev-pub.** Until the template has its own repository, `git subtree split --prefix=projects/sw-unit-test-spec -b sw-unit-test-spec` in a sw-dev-pub clone produces a branch with the template's history, ready to push as upstream. The split is deterministic, so later splits continue the same history and step 4 keeps working.
 
@@ -324,4 +334,4 @@ In `sw_unit_test_spec.tex` you can reorder or drop the chapter commands (`\SpecT
 
 ## Test
 
-"Test" = it builds without errors or warnings: `latexmk -pdf sw_unit_test_spec.tex` (the sample unit) and `units/empty` (everything as placeholders); `scripts/new_unit.py` creates a unit that builds the same way.
+"Test" = it builds without errors or warnings: `latexmk -pdf sw_unit_test_spec.tex` (the sample unit, also the committed preview) and `python3 scripts/build.py --strict --force sample empty` (`units/empty`: everything as placeholders); a unit created by `scripts/new_unit.py` builds the same way.

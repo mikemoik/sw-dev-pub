@@ -5,8 +5,9 @@
 %  units/<unit>/*.tex (new unit: python3 scripts/new_unit.py <unit>; see README.md).
 %  Formatting lives in suts.cls.
 %
-%  Build a unit (own job name per unit -> <unit>.pdf):
-%    latexmk -pdf -jobname=<unit> -usepretex='\def\SpecUnit{<unit>}' sw_unit_test_spec.tex
+%  Build units -> build/<unit>.pdf:
+%    python3 scripts/build.py <unit> [<unit> ...]     or     --all
+%  (one latexmk call per unit, own job name; \SpecUnit selects the unit).
 %  Without \SpecUnit the unit named in \LoadUnit below is built:
 %    latexmk -pdf sw_unit_test_spec.tex
 %

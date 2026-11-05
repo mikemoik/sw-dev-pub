@@ -1,5 +1,8 @@
 # sw_unit_test_spec.pdf IS tracked (preview of the example, see README)
 
+# scripts/build.py output: build/<unit>.pdf, intermediates in build/.aux/
+build/
+
 # LaTeX intermediates
 *.aux
 *.fdb_latexmk
