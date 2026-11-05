@@ -143,7 +143,7 @@
   {
     \int_gincr:N \g__suts_references_int
     \prop_gput:Nnx \g__suts_refnum_prop {#1} { \int_use:N \g__suts_references_int }
-    \str_set:Nx \l__suts_scope_str { \str_casefold:n {#2} }
+    \str_set:Nx \l__suts_scope_str { \str_lowercase:n {#2} }
     \str_case:VnF \l__suts_scope_str
       {
         {internal} { \tl_set:Nn \l__suts_scope_tl { internal } }
@@ -337,8 +337,8 @@
   }
 \cs_new:Npn \__suts_check:n #1
   {
-    \str_if_eq:eeTF { \str_casefold:n {#1} } { yes } { $\boxtimes$ }
-      { \str_if_eq:eeTF { \str_casefold:n {#1} } { no } { $\square$ } {#1} }
+    \str_if_eq:eeTF { \str_lowercase:n {#1} } { yes } { $\boxtimes$ }
+      { \str_if_eq:eeTF { \str_lowercase:n {#1} } { no } { $\square$ } {#1} }
   }
 \NewDocumentCommand \DerivationTechnique { +m } { \__suts_add:nn { derivation } { \item #1 } }
 % \Coverage{metric}{target}{justification if not met}   -- target 100 -> 100 %
@@ -379,7 +379,7 @@
     \prop_gput:Nnn \g__suts_reqdesc_prop {#2} {#4}
     \prop_gput:Nnn \g__suts_reqlevel_prop {#2} {#1}
     \prop_gput:Nnn \g__suts_reqsrc_prop {#2} {#5}
-    \str_set:Nx \l__suts_kind_str { \str_casefold:n {#3} }
+    \str_set:Nx \l__suts_kind_str { \str_lowercase:n {#3} }
     \str_case:VnF \l__suts_kind_str
       {
         {functional}     { \tl_set:Nn \l__suts_kindv_tl {F} }
