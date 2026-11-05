@@ -21,6 +21,8 @@
 % ---------------------------------------------------------------- packages ---
 \RequirePackage[T1]{fontenc}
 \RequirePackage{lmodern}
+\RequirePackage{tikz}                   % before underscore: pgf < 3.1.11 breaks on an active _
+\usetikzlibrary{arrows.meta,positioning,fit,calc,shapes.geometric}
 \RequirePackage[strings,nohyphen]{underscore} % plain _ in text: unit_name, Unit_Init()
 \RequirePackage{microtype}
 \DisableLigatures[-]{family=tt*}      % --coverage stays two hyphens in code
@@ -36,8 +38,6 @@
 \RequirePackage{amsmath}               % formulas in free text: align, cases, ...
 \RequirePackage{amssymb}
 \RequirePackage[most]{tcolorbox}
-\RequirePackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,fit,calc,shapes.geometric}
 \RequirePackage[export]{adjustbox}      % diagrams shrink to the text width if needed
 \RequirePackage{needspace}              % keep headings with their tables
 \RequirePackage{fancyvrb}               % FreeText: body copied verbatim to a file
