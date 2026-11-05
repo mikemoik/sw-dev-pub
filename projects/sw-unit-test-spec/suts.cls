@@ -21,9 +21,8 @@
 % ---------------------------------------------------------------- packages ---
 \RequirePackage[T1]{fontenc}
 \RequirePackage{lmodern}
-\RequirePackage{tikz}                   % before underscore: pgf < 3.1.11 breaks on an active _
+\RequirePackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,calc,shapes.geometric}
-\RequirePackage[strings,nohyphen]{underscore} % plain _ in text: unit_name, Unit_Init()
 \RequirePackage{microtype}
 \DisableLigatures[-]{family=tt*}      % --coverage stays two hyphens in code
 \RequirePackage[margin=2.2cm,headheight=28pt]{geometry}
@@ -42,6 +41,9 @@
 \RequirePackage{needspace}              % keep headings with their tables
 \RequirePackage{fancyvrb}               % FreeText: body copied verbatim to a file
 \RequirePackage[hidelinks]{hyperref}
+% underscore LAST: its active _ breaks older packages loaded after it
+% (pgf < 3.1.11, older fancyvrb on TeX Live 2022)
+\RequirePackage[strings,nohyphen]{underscore} % plain _ in text: unit_name, Unit_Init()
 
 % ---------------------------------------------------------------- styling ---
 \definecolor{accent}{HTML}{1F4E79}
