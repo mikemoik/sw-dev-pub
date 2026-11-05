@@ -1,0 +1,18 @@
+% Unit test process of the project -- shared figure code (root figures/), used by
+% every unit via \InputFigure{test_process}. A unit's own figures/test_process.tex
+% would take precedence. Only a tikzpicture: no preamble, no \begin{document}.
+\begin{tikzpicture}[node distance=0.9cm,
+    tp proc/.style={draw=accent, fill=sutsunit, rounded corners, align=center,
+                 minimum width=3.0cm, minimum height=1.1cm, font=\small},
+    tp out/.style={font=\scriptsize\itshape, text=accent, align=center}]
+  \node[tp proc] (derive) {Derive\\test cases};
+  \node[tp proc, right=of derive] (impl) {Implement\\tests};
+  \node[tp proc, right=of impl] (exec) {Execute\\in CI};
+  \node[tp proc, right=of exec] (rep) {Report and\\review};
+  \foreach \a/\b in {derive/impl, impl/exec, exec/rep}
+    \draw[->, >={Stealth}, accent, thick] (\a) -- (\b);
+  \node[tp out, below=0.25cm of derive] {this specification};
+  \node[tp out, below=0.25cm of impl] {test code};
+  \node[tp out, below=0.25cm of exec] {logs, coverage};
+  \node[tp out, below=0.25cm of rep] {test report};
+\end{tikzpicture}

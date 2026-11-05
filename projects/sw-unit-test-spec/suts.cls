@@ -40,8 +40,7 @@
 \RequirePackage[export]{adjustbox}      % diagrams shrink to the text width if needed
 \RequirePackage{needspace}              % keep headings with their tables
 \RequirePackage{fancyvrb}               % FreeText: body copied verbatim to a file
-\RequirePackage{graphicx}
-\graphicspath{{figures/}}               % \includegraphics{name} finds figures/name.pdf|png|jpg
+\RequirePackage{graphicx}               % search paths: see \LoadContent
 \RequirePackage[hidelinks]{hyperref}
 % underscore LAST: its active _ breaks older packages loaded after it
 % (pgf < 3.1.11, older fancyvrb on TeX Live 2022)
@@ -62,14 +61,6 @@
 % helpers usable in content
 \newcommand{\ph}[1]{\textcolor{phgray}{\textit{$\langle$#1$\rangle$}}} % placeholder
 \newcommand{\code}[1]{\texttt{#1}}                                      % code / identifiers
-% Figures in figures/ -- two ways:
-%   \includegraphics[width=...]{name}  image file figures/name.pdf|png|jpg (graphicspath)
-%   \InputFigure[max width]{name}      figure code figures/name.tex (a tikzpicture),
-%                                      typeset in the document: template colours,
-%                                      TikZ libraries and fonts apply; shrunk to
-%                                      max width (default \linewidth), never enlarged
-\NewDocumentCommand{\InputFigure}{O{\linewidth} m}
-  {\begin{adjustbox}{max width=#1}\input{figures/#2}\end{adjustbox}}
 
 \ExplSyntaxOn
 % =============================================================================
@@ -630,28 +621,81 @@
 % =============================================================================
 %  Loading content
 % =============================================================================
+% \LoadUnit{name}: loads the unit folder units/name (see \LoadContent).
+%   Build-time override: if \SpecUnit is defined before the class, e.g.
+%     latexmk -pdf -jobname=foo -usepretex='\def\SpecUnit{foo}' sw_unit_test_spec.tex
+%   it replaces name. A unit folder without metadata.tex gives a warning.
 % \LoadContent{dir}: reads dir/{metadata,introduction,requirements,unit,design,
-% approach,environment,results}.tex (missing files are skipped) and scans
-% dir/testcases.tex. Use in the preamble.
-% Build-time override: if \ContentDir is defined before the class (e.g.
-%   latexmk -pdf -usepretex='\def\ContentDir{units/foo}' sw_unit_test_spec.tex)
-% it replaces dir; a missing dir/metadata.tex then gives a warning (typo guard).
+%   approach,environment,results}.tex (missing files are skipped) and scans
+%   dir/testcases.tex. Use in the preamble.
+% Both set the search paths: unit first, then the shared folders at root level
+%   figures: dir/figures/, figures/  (\includegraphics, \InputFigure)
+%   code:    dir/code/,    code/     (\InputCode)
+%   data:    dir/data/,    data/
+%   data and code are also added to LaTeX's \input@path, so \input, \VerbatimInput,
+%   \IfFileExists etc. find their files by name. \UnitDir expands to dir.
 \tl_new:N \g__suts_dir_tl
+\tl_new:N \l__suts_found_tl
+\cs_new:Npn \UnitDir { \g__suts_dir_tl }
 \cs_new_protected:Npn \__suts_input:n #1
   { \file_if_exist_input:nF { \g__suts_dir_tl / #1 .tex } { } }
+\cs_new_protected:Npn \__suts_set_paths:
+  {
+    \use:x { \exp_not:N \graphicspath { { \g__suts_dir_tl / figures/ } { figures/ } } }
+    \cs_if_exist:NF \input@path { \tl_gset:Nn \input@path { } }
+    \tl_gput_left:Nx \input@path
+      { { \g__suts_dir_tl / data/ } { \g__suts_dir_tl / code/ } { data/ } { code/ } }
+  }
+% \__suts_find:nnTF {kind}{file}: unit folder first, then shared folder;
+% the path found is in \l__suts_found_tl.
+% Names are turned into strings first: underscore makes _ active.
+\tl_new:N \l__suts_name_tl
+\prg_new_protected_conditional:Npnn \__suts_find:nn #1#2 { TF }
+  {
+    \tl_set:Nx \l__suts_name_tl { \tl_to_str:n {#2} }
+    \file_if_exist:nTF { \g__suts_dir_tl / #1 / \l__suts_name_tl }
+      {
+        \tl_set:Nx \l__suts_found_tl { \g__suts_dir_tl / #1 / \l__suts_name_tl }
+        \prg_return_true:
+      }
+      {
+        \file_if_exist:nTF { #1 / \l__suts_name_tl }
+          { \tl_set:Nx \l__suts_found_tl { #1 / \l__suts_name_tl } \prg_return_true: }
+          { \prg_return_false: }
+      }
+  }
+\msg_new:nnn { suts } { missing-file }
+  { #1~`#2'~not~found~in~\g__suts_dir_tl / #1/~nor~in~#1/. }
+\msg_new:nnn { suts } { missing-unit }
+  { Unit~folder~`#1'~has~no~metadata.tex. }
+\cs_new_protected:Npn \__suts_missing:nn #1#2
+  {
+    \msg_warning:nnnn { suts } { missing-file } {#1} {#2}
+    \fbox { \textcolor{warn}{ missing~#1/#2 } }
+  }
+% \InputFigure[max width]{name}: figure code name.tex (a tikzpicture), typeset
+% in the document (template colours, TikZ libraries, fonts apply); shrunk to
+% max width (default \linewidth), never enlarged.
+\NewDocumentCommand \InputFigure { O{\linewidth} m }
+  {
+    \__suts_find:nnTF { figures } { #2 .tex }
+      { \begin{adjustbox}{max~width=#1} \input{\l__suts_found_tl} \end{adjustbox} }
+      { \__suts_missing:nn { figures } { #2 .tex } }
+  }
+% \InputCode[fancyvrb options]{file}: a source file from code/, verbatim.
+\NewDocumentCommand \InputCode { O{} m }
+  {
+    \__suts_find:nnTF { code } {#2}
+      { \exp_args:NnV \__suts_verbatim_input:nn {#1} \l__suts_found_tl }
+      { \__suts_missing:nn { code } {#2} }
+  }
+\cs_new_protected:Npn \__suts_verbatim_input:nn #1#2
+  { \VerbatimInput [ fontsize = \small , #1 ] {#2} }
 \NewDocumentCommand \LoadContent { m }
   {
-    \cs_if_exist:NTF \ContentDir
-      {
-        \tl_gset:No \g__suts_dir_tl { \ContentDir }
-        \file_if_exist:nF { \g__suts_dir_tl / metadata.tex }
-          {
-            \ClassWarningNoLine { suts }
-              { Content~folder~`\g__suts_dir_tl'~(from~\token_to_str:N \ContentDir)~has~no~metadata.tex }
-          }
-      }
-      { \tl_gset:Nn \g__suts_dir_tl {#1} }
+    \tl_gset:Nx \g__suts_dir_tl { \tl_to_str:n {#1} }
     \typeout { suts:~content~folder~`\g__suts_dir_tl' }
+    \__suts_set_paths:
     \clist_map_inline:nn
       { metadata, introduction, requirements, unit, design, approach, environment, results }
       { \tl_gset:Nn \g__suts_chapter_tl {##1} \__suts_input:n {##1} }
@@ -660,6 +704,15 @@
     \__suts_input:n { testcases }
     \bool_gset_false:N \g__suts_scan_bool
     \tl_gset:Nn \g__suts_chapter_tl { inplace }
+  }
+\NewDocumentCommand \LoadUnit { m }
+  {
+    \cs_if_exist:NTF \SpecUnit
+      { \tl_set:Nx \l_tmpa_tl { units / \tl_to_str:N \SpecUnit } }
+      { \tl_set:Nx \l_tmpa_tl { units / \tl_to_str:n {#1} } }
+    \file_if_exist:nF { \l_tmpa_tl / metadata.tex }
+      { \exp_args:NnnV \msg_warning:nnn { suts } { missing-unit } \l_tmpa_tl }
+    \exp_args:NV \LoadContent \l_tmpa_tl
   }
 
 % =============================================================================
