@@ -63,6 +63,16 @@ outside \texttt{setpoint\_ctrl.c}.
   \item \textbf{Persistence} -- wraps \texttt{NvM\_ReadBlock()} / \texttt{NvM\_WriteBlock()}.
   \item \textbf{State machine} -- static \texttt{state}, see Intended Behavior.
 \end{itemize}
+
+Start-up runs through all internal parts, see Figure~\ref{fig:init-seq}.
+
+% Figure code (TikZ) in figures/init_sequence.tex -- typeset as part of the document.
+\begin{figure}[htbp]
+  \centering
+  \InputFigure{init_sequence}
+  \caption{Start-up sequence of \texttt{SetpointCtrl\_Init()}.}
+  \label{fig:init-seq}
+\end{figure}
 \end{InternalArchitecture}
 
 \begin{AlgorithmDescription}
@@ -89,7 +99,7 @@ cycles ($40\,\mathrm{s}$), see Figure~\ref{fig:ramp}. Equation \eqref{eq:range} 
 TC-SPC-002; the ramp \eqref{eq:ramp-step}--\eqref{eq:ramp} (SWR-0130) is verified
 in integration test.
 
-% Image files live in figures/ (searched automatically, no path or extension needed).
+% Image file figures/ramp_response.pdf -- searched in figures/, no path or extension needed.
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.75\linewidth]{ramp_response}

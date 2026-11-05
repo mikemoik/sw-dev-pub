@@ -62,6 +62,14 @@
 % helpers usable in content
 \newcommand{\ph}[1]{\textcolor{phgray}{\textit{$\langle$#1$\rangle$}}} % placeholder
 \newcommand{\code}[1]{\texttt{#1}}                                      % code / identifiers
+% Figures in figures/ -- two ways:
+%   \includegraphics[width=...]{name}  image file figures/name.pdf|png|jpg (graphicspath)
+%   \InputFigure[max width]{name}      figure code figures/name.tex (a tikzpicture),
+%                                      typeset in the document: template colours,
+%                                      TikZ libraries and fonts apply; shrunk to
+%                                      max width (default \linewidth), never enlarged
+\NewDocumentCommand{\InputFigure}{O{\linewidth} m}
+  {\begin{adjustbox}{max width=#1}\input{figures/#2}\end{adjustbox}}
 
 \ExplSyntaxOn
 % =============================================================================

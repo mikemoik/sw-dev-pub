@@ -19,7 +19,7 @@ LaTeX template for a **Software Unit Test Specification**. Structure follows ISO
 | `content/requirements.tex` | stakeholder and internal requirements (functional / non-functional), rationale for untested ones | yes |
 | `content/testcases.tex` | the test cases | yes |
 | `content/results.tex` | execution results, achieved coverage, deviations (optional) | yes |
-| `figures/` | image files for `\includegraphics` (PDF, PNG, JPG) — searched automatically; example: `ramp_response.pdf` | yes |
+| `figures/` | figures: image files (`\includegraphics`) and figure code (`\InputFigure`); examples `ramp_response.pdf`, `init_sequence.tex` | yes |
 | `sw_unit_test_spec.tex` | main file: chapter order | rarely |
 | `suts.cls` | the template: all formatting and input commands | no |
 | `sw_unit_test_spec.pdf` | the example, built — a preview of what the template produces | (rebuilt) |
@@ -70,7 +70,7 @@ On `main`, replace the worked example in **every** `content/*.tex` with the proj
 
 ```sh
 git rm sw_unit_test_spec.pdf          # the example's preview; unit branches carry their own PDF
-git rm figures/ramp_response.pdf      # the example's figure
+git rm figures/ramp_response.pdf figures/init_sequence.tex   # the example's figures
 latexmk -pdf sw_unit_test_spec.tex    # check: builds, 0 warnings (PDF stays untracked on main)
 git commit -am "Project setup: project-wide content"
 git push -u origin main
@@ -119,7 +119,7 @@ Expect two kinds of conflicts, both resolved the same way every time:
 | `figures/*` (modify/delete) | upstream changed an example figure; `main` has none | `git rm` it |
 
 ```sh
-git checkout --ours -- content/ && git rm -q --ignore-unmatch sw_unit_test_spec.pdf figures/ramp_response.pdf
+git checkout --ours -- content/ && git rm -q --ignore-unmatch sw_unit_test_spec.pdf figures/ramp_response.pdf figures/init_sequence.tex
 git add content/ && git commit -m "Merge template update from upstream"
 git push
 ```
@@ -226,11 +226,16 @@ Write `\end{FreeText}` on its own line. Where a block appears:
 | `results.tex` | 8 Test Results Summary |
 | `sw_unit_test_spec.tex` (document body) | — exactly where it stands |
 
-Start the block with `\subsection{…}` if it should get its own heading. The example content has blocks in `design.tex` (state diagram + table; architecture diagram + list; *Algorithm Description* with subsubsections, `cases`, `align`, `\eqref` and a figure from `figures/`), `unit.tex` (API excerpt in `verbatim`), `approach.tex` (own table, displayed formula) and `testcases.tex` (paragraph with formulas between the test groups). Not allowed inside a `TestCase` (use the text fields there). Each block is copied to a helper file `<jobname>.free-*.tex` during the build (gitignored, removed by `latexmk -c`).
+Start the block with `\subsection{…}` if it should get its own heading. The example content has blocks in `design.tex` (state diagram + table; architecture diagram + list; *Algorithm Description* with subsubsections, `cases`, `align`, `\eqref` and a PDF figure from `figures/`; *Internal Architecture* also a TikZ figure from `figures/`), `unit.tex` (API excerpt in `verbatim`), `approach.tex` (own table, displayed formula) and `testcases.tex` (paragraph with formulas between the test groups). Not allowed inside a `TestCase` (use the text fields there). Each block is copied to a helper file `<jobname>.free-*.tex` during the build (gitignored, removed by `latexmk -c`).
 
 ### Figures
 
-Put image files (PDF, PNG, JPG; e.g. exported plots or diagrams from a modelling tool) into `figures/`. The class sets `\graphicspath{{figures/}}`, so a free-text block needs only the file name, without path or extension:
+Figures live in `figures/`, in one of two forms. Both go inside a `FreeText` block (usually in a `figure` float with caption and label) and are found by name alone, without path or extension:
+
+| Form | File | Include with | Typical source |
+|---|---|---|---|
+| Image file | `figures/<name>.pdf` (also `.png`, `.jpg`) | `\includegraphics[width=…]{<name>}` | exported plot (MATLAB, Python), modelling tool export, screenshot |
+| Figure code | `figures/<name>.tex` — a bare `tikzpicture`, no preamble or `\begin{document}` | `\InputFigure[max width]{<name>}` | hand-written TikZ: sequence and state diagrams, block diagrams |
 
 ```latex
 \begin{figure}[htbp]
@@ -239,9 +244,19 @@ Put image files (PDF, PNG, JPG; e.g. exported plots or diagrams from a modelling
   \caption{Ramp limitation: step request from 20 to 100.}
   \label{fig:ramp}
 \end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \InputFigure{init_sequence}                             % figures/init_sequence.tex
+  \caption{Start-up sequence of \texttt{SetpointCtrl\_Init()}.}
+  \label{fig:init-seq}
+\end{figure}
 ```
 
-Reference it with `Figure~\ref{fig:ramp}`. Subfolders work with a relative name (`{nvm/sequence}` → `figures/nvm/sequence.pdf`). Prefer vector PDF over PNG/JPG. Keep figures small: they are committed with the spec.
+Reference them with `Figure~\ref{fig:ramp}`. Subfolders work with a relative name (`{nvm/sequence}` → `figures/nvm/sequence.pdf`).
+
+- **Image file:** prefer vector PDF over PNG/JPG and keep files small (they are committed with the spec). Older pdfTeX (TeX Live 2022) warns for PDF versions above 1.5. Export as PDF 1.5 if your tool allows.
+- **Figure code** is typeset as part of the document: the template's colours (`accent`, `sutsunit`, `sutsdouble`, …), TikZ libraries (`arrows.meta`, `positioning`, `fit`, `calc`, `shapes.geometric`) and fonts apply, and the text stays searchable. A figure wider than the text is shrunk to `\linewidth`, or to the optional `[max width]`, but never enlarged. Short TikZ can also stay inline in the `FreeText` block, as the state diagram in *Intended Behavior* does. Move it into `figures/` once it gets long or is reused.
 
 ## Command reference
 

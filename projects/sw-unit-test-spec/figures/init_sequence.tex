@@ -1,0 +1,32 @@
+% Sequence diagram of SetpointCtrl_Init() -- figure code, included with
+% \InputFigure{init_sequence}. Only a tikzpicture: no preamble, no \begin{document}.
+% The template's colours (accent, sutsunit, ...) and TikZ libraries are available.
+\begin{tikzpicture}[
+    font=\small, >={Stealth},
+    head/.style={draw=accent, fill=sutsunit, minimum width=2.6cm, minimum height=0.8cm, font=\small\bfseries},
+    life/.style={accent!60, dashed},
+    msg/.style={->, accent},
+    ret/.style={->, accent, dashed},
+    lbl/.style={above, text=black, font=\scriptsize\ttfamily},
+    note/.style={draw=accent!60, fill=white, font=\scriptsize, inner sep=3pt}]
+  % lifelines
+  \foreach \x/\name/\id in {0/HeaterApp/app, 3.6/SetpointCtrl/spc, 7.2/NvM/nvm, 10.8/Dem/dem} {
+    \node[head] (\id) at (\x,0) {\name};
+    \draw[life] (\id.south) -- (\x,-7.1);
+  }
+  % messages
+  \draw[msg] (0,-1.0) -- node[lbl] {SetpointCtrl\_Init()} (3.6,-1.0);
+  \draw[msg] (3.6,-1.8) -- node[lbl] {NvM\_ReadBlock()} (7.2,-1.8);
+  \draw[ret] (7.2,-2.6) -- node[lbl] {E\_OK / E\_NOT\_OK} (3.6,-2.6);
+  % alt fragment
+  \draw[accent] (-1.5,-3.1) rectangle (12.2,-6.1);
+  \node[draw=accent, fill=white, anchor=north west, font=\scriptsize\bfseries, inner sep=2pt] at (-1.5,-3.1) {alt};
+  \node[anchor=north west, font=\scriptsize] at (-0.7,-3.15) {[E\_OK]};
+  \node[note] at (3.6,-3.9) {state = IDLE, sp = stored value};
+  \draw[accent, dashed] (-1.5,-4.5) -- (12.2,-4.5);
+  \node[anchor=north west, font=\scriptsize] at (-1.5,-4.55) {[E\_NOT\_OK]};
+  \draw[msg] (3.6,-5.0) -- node[lbl] {Dem\_ReportError(DEM\_E\_NVM\_READ)} (10.8,-5.0);
+  \node[note] at (3.6,-5.65) {state = DEGRADED, sp = 20};
+  % return
+  \draw[ret] (3.6,-6.6) -- (0,-6.6);
+\end{tikzpicture}
