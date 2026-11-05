@@ -633,12 +633,25 @@
 % \LoadContent{dir}: reads dir/{metadata,introduction,requirements,unit,design,
 % approach,environment,results}.tex (missing files are skipped) and scans
 % dir/testcases.tex. Use in the preamble.
+% Build-time override: if \ContentDir is defined before the class (e.g.
+%   latexmk -pdf -usepretex='\def\ContentDir{units/foo}' sw_unit_test_spec.tex)
+% it replaces dir; a missing dir/metadata.tex then gives a warning (typo guard).
 \tl_new:N \g__suts_dir_tl
 \cs_new_protected:Npn \__suts_input:n #1
   { \file_if_exist_input:nF { \g__suts_dir_tl / #1 .tex } { } }
 \NewDocumentCommand \LoadContent { m }
   {
-    \tl_gset:Nn \g__suts_dir_tl {#1}
+    \cs_if_exist:NTF \ContentDir
+      {
+        \tl_gset:No \g__suts_dir_tl { \ContentDir }
+        \file_if_exist:nF { \g__suts_dir_tl / metadata.tex }
+          {
+            \ClassWarningNoLine { suts }
+              { Content~folder~`\g__suts_dir_tl'~(from~\token_to_str:N \ContentDir)~has~no~metadata.tex }
+          }
+      }
+      { \tl_gset:Nn \g__suts_dir_tl {#1} }
+    \typeout { suts:~content~folder~`\g__suts_dir_tl' }
     \clist_map_inline:nn
       { metadata, introduction, requirements, unit, design, approach, environment, results }
       { \tl_gset:Nn \g__suts_chapter_tl {##1} \__suts_input:n {##1} }

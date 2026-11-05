@@ -39,6 +39,21 @@ latexmk -c                                # remove intermediates
 
 `sw_unit_test_spec.pdf` is committed as a preview of the example; rebuild it whenever the template or example content changes.
 
+### Choosing the content folder at build time
+
+`\LoadContent{content}` in `sw_unit_test_spec.tex` sets the default folder. To build another folder without editing the file, define `\ContentDir` on the command line:
+
+```sh
+latexmk -pdf -jobname=demo -usepretex='\def\ContentDir{units/demo}' sw_unit_test_spec.tex   # -> demo.pdf
+latexmk -c -jobname=demo sw_unit_test_spec.tex                                              # its intermediates
+```
+
+- **Always add `-jobname=<name>` (one name per folder).** latexmk does not count `-usepretex` code as input. Without its own job name, a build of another folder finds the previous PDF up to date and does nothing; force it with `-g` in that case. With its own job name, each folder gets its own PDF, intermediates and change tracking: editing `units/demo/*.tex` rebuilds `demo.pdf` and leaves the others alone.
+- The path is relative to the main file. Without `\ContentDir` the argument of `\LoadContent` applies, as before.
+- A folder without `metadata.tex` gives the warning `Content folder … has no metadata.tex` (typo guard). The log always names the folder used: `suts: content folder …`.
+- Figures stay in the shared `figures/` folder.
+- Plain `pdflatex` without latexmk: `pdflatex -jobname=demo '\def\ContentDir{units/demo}\input{sw_unit_test_spec}'`.
+
 ## Using it for a project
 
 The template is used as its own repository (the *upstream*). A project gets **one copy of it, with one branch per unit**:
@@ -299,7 +314,7 @@ Consistency checks, shown in red in the PDF: a requirement in `\Verifies` that i
 
 ## Customizing
 
-In `sw_unit_test_spec.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecRequirements`, `\SpecUnitUnderTest`, `\SpecTestApproach`, `\SpecTestEnvironment`, `\SpecTestCases`, `\SpecTraceability`, `\SpecResults`), load your own packages, and add own sections (`\section{…}` + `\input{content/my_extra}`). One spec per unit: one branch per unit in a project copy (see *Using it for a project*). For a quick local use without git, keep several content folders and point `\LoadContent{…}` at one. Class options go to `article` (`\documentclass[10pt]{suts}`).
+In `sw_unit_test_spec.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecRequirements`, `\SpecUnitUnderTest`, `\SpecTestApproach`, `\SpecTestEnvironment`, `\SpecTestCases`, `\SpecTraceability`, `\SpecResults`), load your own packages, and add own sections (`\section{…}` + `\input{content/my_extra}`). One spec per unit: one branch per unit in a project copy (see *Using it for a project*). For a quick local use without git, keep several content folders and pick one at build time (see *Choosing the content folder at build time*). Class options go to `article` (`\documentclass[10pt]{suts}`).
 
 ## Test
 

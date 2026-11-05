@@ -5,6 +5,8 @@
 %  (see README.md). Formatting lives in suts.cls.
 %
 %  Build:  latexmk -pdf sw_unit_test_spec.tex
+%  Other content folder (own job name, see README):
+%          latexmk -pdf -jobname=demo -usepretex='\def\ContentDir{units/demo}' sw_unit_test_spec.tex
 %
 %  Here you may: reorder or drop chapters, add own packages/macros in the
 %  preamble, add own sections (\section{...} \input{content/my_extra}).
