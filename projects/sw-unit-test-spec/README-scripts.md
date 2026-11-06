@@ -2,6 +2,11 @@
 
 Run from the template's root folder. Python 3.6+ (standard library only) and `latexmk` are needed.
 
+## Shipped units
+
+- `units/empty/`: the skeleton for new units. It holds commented command templates and no content. `new_unit.py` copies it.
+- `units/sample/`: a fully filled worked example. Use it to check that your setup builds (`python3 scripts/build.py sample`), and as a reference for how each content command and free-text block is used.
+
 ## New unit
 
 ```sh
