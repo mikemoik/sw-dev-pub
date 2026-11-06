@@ -20,22 +20,22 @@ Assumes Gemma 4 (e.g. `gemma4-31b-it`) is already running on a server Continue c
        provider: ollama              # or openai for any OpenAI-compatible server
        model: gemma4-31b-it          # name as known to your server
        # apiBase: http://<host>:<port>/v1   # if not the provider's default
-       roles: [chat, edit, apply]
-       capabilities: [tool_use]      # lets the model read related files itself; only if your server supports tool calls for Gemma 4
+       roles: [chat]
        defaultCompletionOptions:
          contextLength: 32000        # at least 16000; the server must allow it too (Ollama: num_ctx)
    ```
 
-3. Open **the template folder itself** as the workspace (*File → Open Folder*). Continue reads the rules from `.continue/rules/` at the top of the workspace. If the template is inside a larger workspace, copy `.continue/` to that workspace's top folder.
+3. In the Continue panel, choose the **Chat** mode. **Agent mode must not be used**: the model gets no tools and doesn't read or change files itself. Don't add `capabilities: [tool_use]` to the model entry.
+4. Open **the template folder itself** as the workspace (*File → Open Folder*). Continue reads the rules from `.continue/rules/` at the top of the workspace. If the template is inside a larger workspace, copy `.continue/` to that workspace's top folder.
 
 Nothing else to install. The rules come with the template.
 
 ## Use
 
-1. Open a content file, e.g. `units/nvm_mgr/testcases.tex`. If it isn't in the chat context automatically, add it with `@` or select some lines and press Ctrl+L.
-2. Ask in plain language in the Continue chat. Continue loads the common rules and the guide for that file (with command reference and an example) automatically.
-3. Related files (for test cases: `requirements.tex`, `unit.tex`) are read by the model itself in agent mode with tools. Otherwise add them with `@`.
-4. Paste the answer into the file and check it: `python3 scripts/build.py --strict nvm_mgr`. Red marks in the PDF show inconsistencies.
+1. Open a content file, e.g. `units/nvm_mgr/testcases.tex`, and add it to the chat with `@` (or select some lines and press Ctrl+L). Continue then adds the common rules and the guide for that file (with command reference and an example) automatically.
+2. Add the related files with `@` too. For test cases: `@requirements.tex @unit.tex`. The guide names them, and the model asks for them if they are missing.
+3. Ask in plain language in the Continue chat.
+4. Copy the answer into the file yourself and check it: `python3 scripts/build.py --strict nvm_mgr`. Red marks in the PDF show inconsistencies.
 
 New units need nothing extra: the rules match every `units/<unit>/` folder, including those made with `new_unit.py`.
 

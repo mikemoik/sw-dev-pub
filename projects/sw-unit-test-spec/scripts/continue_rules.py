@@ -6,7 +6,7 @@
 
 Writes .continue/rules/suts-00-common.md (applies to every units/*/*.tex) and
 one suts-<file>.md per content file (applies to units/*/<file>.tex): the guide,
-the list of related files to read, the command reference (units/empty/) and
+the list of related files the chat needs, the command reference (units/empty/) and
 the worked example (units/sample/). Continue adds a rule to the chat when a
 file matching its glob is in the chat context. llm/ is the source: edit the
 guides there and rerun this script. Standard library only.
@@ -45,7 +45,9 @@ def common_rule() -> str:
         + "\n\n# Where things are\n\n"
         "The engineer works on one content file `units/<unit>/<file>.tex` (the file in "
         "the chat context). The other content files of the same unit are in the same "
-        "folder. A file-specific rule names the files you need to read.\n"
+        "folder. A file-specific rule names the files you also need. You only see "
+        "files the engineer has added to the chat; you have no tools and don't try to "
+        "open files yourself.\n"
     )
 
 
@@ -55,9 +57,10 @@ def file_rule(file: str) -> str:
     if related:
         names = " and ".join(f"`{name}.tex`" for name in related)
         context = (
-            f"Before your first answer, read {names} from the same unit folder as the "
-            f"`{file}.tex` you work on, for reference (don't edit them unless asked). If "
-            "you can't read files, ask the engineer to add them to the chat with `@`.\n"
+            f"You also need {names} from the same unit folder as the `{file}.tex` you "
+            "work on, for reference (don't change them unless asked). If they are not in "
+            "the chat, ask the engineer first to add them with `@` (e.g. "
+            f"`@{related[0]}.tex`), before you answer.\n"
         )
     else:
         context = "No other files are needed.\n"

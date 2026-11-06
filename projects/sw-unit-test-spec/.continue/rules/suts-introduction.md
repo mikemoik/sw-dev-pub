@@ -39,7 +39,7 @@ This file holds the scope, the referenced documents, the use cases and the terms
 
 ## Related files
 
-Before your first answer, read `metadata.tex` and `unit.tex` from the same unit folder as the `introduction.tex` you work on, for reference (don't edit them unless asked). If you can't read files, ask the engineer to add them to the chat with `@`.
+You also need `metadata.tex` and `unit.tex` from the same unit folder as the `introduction.tex` you work on, for reference (don't change them unless asked). If they are not in the chat, ask the engineer first to add them with `@` (e.g. `@metadata.tex`), before you answer.
 
 ## Command reference (units/empty/introduction.tex)
 

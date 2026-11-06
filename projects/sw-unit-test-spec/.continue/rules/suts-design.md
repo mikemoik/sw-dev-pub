@@ -50,7 +50,7 @@ In both states $0 \le sp \le 100$ holds at all times.
 
 ## Related files
 
-Before your first answer, read `unit.tex` from the same unit folder as the `design.tex` you work on, for reference (don't edit them unless asked). If you can't read files, ask the engineer to add them to the chat with `@`.
+You also need `unit.tex` from the same unit folder as the `design.tex` you work on, for reference (don't change them unless asked). If they are not in the chat, ask the engineer first to add them with `@` (e.g. `@unit.tex`), before you answer.
 
 ## Command reference (units/empty/design.tex)
 

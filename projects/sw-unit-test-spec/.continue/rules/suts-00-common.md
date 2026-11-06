@@ -60,4 +60,4 @@ English, present tense, short sentences, precise and checkable. Use the names ex
 
 # Where things are
 
-The engineer works on one content file `units/<unit>/<file>.tex` (the file in the chat context). The other content files of the same unit are in the same folder. A file-specific rule names the files you need to read.
+The engineer works on one content file `units/<unit>/<file>.tex` (the file in the chat context). The other content files of the same unit are in the same folder. A file-specific rule names the files you also need. You only see files the engineer has added to the chat; you have no tools and don't try to open files yourself.
