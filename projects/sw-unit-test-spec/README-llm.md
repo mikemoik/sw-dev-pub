@@ -4,18 +4,12 @@ An LLM in VS Code helps you fill in a unit's content files: "add a test case for
 
 ## Setup in VS Code (Continue)
 
-Assumes Gemma 4 (e.g. `gemma4-31b-it`) is already set up as Continue's chat model (the model configuration is provided and not changed by users).
+Continue and its Gemma 4 chat model (e.g. `gemma4-31b-it`) are already installed and configured on your system. Only two things to do:
 
-1. Install the Continue extension: Extensions view → search *Continue* → install, or run
+1. In the Continue panel, choose the **Chat** mode. **Agent mode must not be used**: the model gets no tools and doesn't read or change files itself.
+2. Open **the template folder itself** as the workspace (*File → Open Folder*). Continue reads the rules from `.continue/rules/` at the top of the workspace. If the template is inside a larger workspace, copy `.continue/` to that workspace's top folder.
 
-   ```sh
-   code --install-extension Continue.continue
-   ```
-
-2. In the Continue panel, choose the **Chat** mode. **Agent mode must not be used**: the model gets no tools and doesn't read or change files itself.
-3. Open **the template folder itself** as the workspace (*File → Open Folder*). Continue reads the rules from `.continue/rules/` at the top of the workspace. If the template is inside a larger workspace, copy `.continue/` to that workspace's top folder.
-
-Nothing else to install. The rules come with the template.
+The rules come with the template.
 
 ## Use
 
