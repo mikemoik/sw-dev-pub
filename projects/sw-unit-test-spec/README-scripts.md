@@ -32,4 +32,15 @@ python3 scripts/build.py --all            # all units except units/empty
 
 PDFs go to `build/<unit>.pdf` (gitignored, safe to delete). At the end you get a summary of each unit's warnings and errors. If a unit fails, its PDF is removed and the script exits non-zero.
 
+## Chat with an LLM about a content file
+
+```sh
+python3 scripts/llm_prompt.py nvm_mgr testcases -o build/prompt.md                 # prompt for testcases.tex
+python3 scripts/llm_prompt.py nvm_mgr unit --add ../src/nvm_mgr.h -o build/prompt.md # with extra input
+```
+
+Paste the prompt as the first message of a new chat, then ask in plain language, e.g. "add a test case for a setpoint of 101". The model asks for missing facts and answers with LaTeX lines to paste into the file. Afterwards check them with `python3 scripts/build.py --strict nvm_mgr`.
+
+The prompt contains the general rules (`llm/_common.md`), the guide for that file (`llm/<file>.md`, e.g. how to derive a test case), the command reference from `units/empty/`, the unit's file, the related files (e.g. requirements and interfaces for test cases), and any `--add` files. The script prints an estimate of the size. Above 6000 tokens (`--max-tokens`) it warns, because a model with an 8K context (e.g. Gemma 2) loses the start of the chat. Don't paste confidential content into a chat service your organisation doesn't allow.
+
 More details are in [README.md](README.md).

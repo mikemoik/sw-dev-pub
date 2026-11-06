@@ -15,7 +15,9 @@ latexmkrc                 lets latexmk -c also remove the free-text helper files
 sw_unit_test_spec.pdf     the sample unit, built: a preview of what the template produces
 scripts/new_unit.py       creates units/<unit>/ from units/empty/
 scripts/build.py          builds units into build/<unit>.pdf (build/ is gitignored)
-README-scripts.md         short usage of the two scripts
+scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a unit's file
+llm/                      the guides it uses: general rules + one per content file
+README-scripts.md         short usage of the scripts
 figures/  data/  code/    shared by all units (a unit's own file of the same name wins)
 units/
   empty/                  skeleton for new units: commented command templates, no content
