@@ -4,7 +4,7 @@ An LLM in VS Code helps you fill in a unit's content files: "add a test case for
 
 ## Setup in VS Code (Continue)
 
-Assumes Gemma 4 (e.g. `gemma4-31b-it`) is already running on a server Continue can reach.
+Assumes Gemma 4 (e.g. `gemma4-31b-it`) is already set up as Continue's chat model (the model configuration is provided and not changed by users).
 
 1. Install the Continue extension: Extensions view → search *Continue* → install, or run
 
@@ -12,21 +12,8 @@ Assumes Gemma 4 (e.g. `gemma4-31b-it`) is already running on a server Continue c
    code --install-extension Continue.continue
    ```
 
-2. In Continue's config (`~/.continue/config.yaml`, gear icon in the Continue panel), check the model entry:
-
-   ```yaml
-   models:
-     - name: Gemma 4 31B
-       provider: ollama              # or openai for any OpenAI-compatible server
-       model: gemma4-31b-it          # name as known to your server
-       # apiBase: http://<host>:<port>/v1   # if not the provider's default
-       roles: [chat]
-       defaultCompletionOptions:
-         contextLength: 32000        # at least 16000; the server must allow it too (Ollama: num_ctx)
-   ```
-
-3. In the Continue panel, choose the **Chat** mode. **Agent mode must not be used**: the model gets no tools and doesn't read or change files itself. Don't add `capabilities: [tool_use]` to the model entry.
-4. Open **the template folder itself** as the workspace (*File → Open Folder*). Continue reads the rules from `.continue/rules/` at the top of the workspace. If the template is inside a larger workspace, copy `.continue/` to that workspace's top folder.
+2. In the Continue panel, choose the **Chat** mode. **Agent mode must not be used**: the model gets no tools and doesn't read or change files itself.
+3. Open **the template folder itself** as the workspace (*File → Open Folder*). Continue reads the rules from `.continue/rules/` at the top of the workspace. If the template is inside a larger workspace, copy `.continue/` to that workspace's top folder.
 
 Nothing else to install. The rules come with the template.
 
