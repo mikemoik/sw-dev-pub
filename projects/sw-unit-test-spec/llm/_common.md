@@ -26,6 +26,27 @@ Keep answers short. No explanations of LaTeX unless asked.
 - Write `\end{...}` of an environment on its own line.
 - Lines starting with `%` in the files are comments and explain the commands. Keep them.
 
+# Helpers usable in every content file
+
+- **Values from `metadata.tex`:** `\TheUnit` (unit name, typewriter), `\TheBaseline` (code baseline), `\TheIntegrityLevel`. Write `\TheUnit\ ` (with backslash-space) when a word follows.
+- **`\code{text}`:** an identifier or command line in typewriter font, same as `\texttt{}`.
+- **`\DocRef{key}`:** cites a `\Reference` from `introduction.tex` as [Rn]. An unknown key prints in red.
+- **`FreeText` block:** `\begin{FreeText}` ... `\end{FreeText}` takes any LaTeX. It works in every content file and is printed at the end of that file's chapter (metadata: end of *Document Control*). In `testcases.tex` it is printed exactly where it stands. It can't go inside a `TestCase`.
+- **Figures, code and data:** a unit's own `figures/`, `code/` and `data/` folders are searched first, then the shared ones at the template root. Use them inside free text:
+  - `\includegraphics[width=0.75\linewidth]{name}` for `figures/name.pdf` (also `.png`, `.jpg`), inside `\begin{figure}[htbp]` with `\centering`, `\caption{}` and `\label{fig:...}`. Cite it with `Figure~\ref{fig:...}`.
+  - `\InputFigure[max width]{name}` for TikZ code in `figures/name.tex` (a bare `tikzpicture`).
+  - `\InputCode[fancyvrb options]{file}` lists `code/file` verbatim, e.g. `[firstline=5, lastline=12, numbers=left]`.
+  - `\input{name}` reads `data/name.tex`. `\UnitDir` expands to `units/<unit>` for packages that need a path, e.g. `\UnitDir/data/vectors.csv`.
+  - A missing file gives a warning and a red *missing* box.
+- **Red marks in the PDF** show inconsistencies. Fix them, don't hide them:
+  - a `\Verifies` ID not declared in `requirements.tex`
+  - a declared requirement with neither a test case nor `\NotUnitTested`
+  - an unknown *derived from* ID
+  - an unknown `\DocRef` key
+  - a missing figure or code file
+
+  Duplicate test case or requirement IDs, an unknown requirement kind and a reference type other than internal/external give LaTeX warnings.
+
 # Writing style
 
 English, present tense, short sentences, precise and checkable. Use the names exactly as written in the files (same spelling, same case). Don't write vague phrases such as "works correctly" or "as expected": say what is observed (return value, state, recorded call, output value with tolerance).

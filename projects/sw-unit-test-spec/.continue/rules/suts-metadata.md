@@ -9,7 +9,7 @@ globs: "**/units/*/metadata.tex"
 
 This file holds the title page, header and identification data, and the revision history. Each command takes one value. Values left out show as grey placeholders in the PDF.
 
-- **Document:** `\DocID{}`, `\DocVersion{}` (e.g. `0.3`), `\DocStatus{}` (exactly `Draft`, `In Review` or `Released`), `\DocDate{}` (YYYY-MM-DD; leave it out for today), `\ProjectName{}`, `\Company{}`, `\Author{}`, `\Reviewer{}`, `\Approver{}`.
+- **Document:** `\DocTitle{}` (default: *Software Unit Test Specification*; change it only for another document type), `\DocID{}`, `\DocVersion{}` (e.g. `0.3`), `\DocStatus{}` (exactly `Draft`, `In Review` or `Released`), `\DocDate{}` (YYYY-MM-DD; leave it out for today), `\ProjectName{}`, `\Company{}`, `\Author{}`, `\Reviewer{}`, `\Approver{}`.
 - **Unit:** `\UnitName{}` (set by the new-unit script, don't change it), `\UnitBaseline{}` (the code version under test, e.g. `git: 3f2a9c1 (tag v1.4.0)`), `\IntegrityLevel{}` (`QM`, `ASIL A`--`ASIL D`, `SIL n` or `n.a.`), `\SourceFiles{}`, `\Language{}`, `\DesignReference{}` (e.g. `\DocRef{design}, section 4.2`).
 - **`\Revision{version}{date}{author}{change}`:** one line per document version, oldest first. The change text says what changed and why ("Fault injection test case added after review").
 
@@ -38,6 +38,7 @@ No other files are needed.
 % Document and unit data. Uncomment a line and fill in the braces; anything
 % left out shows as a grey placeholder. Example: units/sample/metadata.tex.
 % Underscores may be typed as is (unit_name). Escape only: \& \% \# \$
+% \DocTitle{}                  % default: Software Unit Test Specification
 % \DocID{}
 % \DocVersion{}
 % \DocStatus{Draft}            % Draft / In Review / Released
