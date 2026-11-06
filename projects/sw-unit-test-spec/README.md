@@ -19,8 +19,7 @@ scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a unit's 
 llm/                      the guides it uses: general rules + one per content file
 scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)
 .continue/rules/          generated: the guides as Continue rules, one per content file
-README-scripts.md         short usage of the scripts
-README-llm.md             chat help with an LLM: VS Code/Continue setup and use
+README-scripts.md         short usage of the scripts, incl. LLM chat help
 figures/  data/  code/    shared by all units (a unit's own file of the same name wins)
 units/
   empty/                  skeleton for new units: commented command templates, no content
