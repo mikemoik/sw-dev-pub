@@ -47,9 +47,11 @@ The prompt contains the general rules (`llm/_common.md`), the guide for that fil
 
 `.continue/rules/` holds one rule per content file. When `units/<unit>/testcases.tex` is in the chat context (the open file, or added with `@`), Continue adds the common rules and the test case guide, with command reference and worked example, to the chat automatically. You chat right away, without a prompt to paste. The model reads the related files itself (e.g. `requirements.tex`, `unit.tex`) if its tools allow it, otherwise add them with `@`.
 
-Open the template folder itself as the VS Code workspace: Continue looks for `.continue/rules/` at the top of the workspace.
+**New units need nothing extra.** The rules exist once for all units: their globs (`**/units/*/<file>.tex`) match every folder under `units/`, so a unit made with `new_unit.py` is covered as soon as it exists. The rules hold only template-level content (guides, command reference, example). The unit's own files are what the model reads in the chat. There is nothing to copy or install per unit.
 
-The rules are generated from `llm/`, `units/empty/` and `units/sample/`. After changing one of these, run:
+**Workspace:** open the template folder itself in VS Code. Continue reads `.continue/rules/` only at the top of the workspace. If the template sits inside a larger workspace, copy `.continue/` to that workspace's top folder. The `**/` globs still match there.
+
+**Maintainers only:** the rules are generated from `llm/`, `units/empty/` and `units/sample/`, and committed. After changing one of these, run:
 
 ```sh
 python3 scripts/continue_rules.py           # regenerate .continue/rules/
