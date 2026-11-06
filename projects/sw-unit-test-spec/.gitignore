@@ -16,3 +16,6 @@ build/
 
 # FreeText blocks, written at build time
 *.free-*.tex
+
+# Python bytecode (scripts/ import each other)
+__pycache__/

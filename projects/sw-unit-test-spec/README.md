@@ -17,6 +17,8 @@ scripts/new_unit.py       creates units/<unit>/ from units/empty/
 scripts/build.py          builds units into build/<unit>.pdf (build/ is gitignored)
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a unit's file
 llm/                      the guides it uses: general rules + one per content file
+scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)
+.continue/rules/          generated: the guides as Continue rules, one per content file
 README-scripts.md         short usage of the scripts
 figures/  data/  code/    shared by all units (a unit's own file of the same name wins)
 units/

@@ -43,4 +43,17 @@ Paste the prompt as the first message of a new chat, then ask in plain language,
 
 The prompt contains the general rules (`llm/_common.md`), the guide for that file (`llm/<file>.md`, e.g. how to derive a test case), the command reference from `units/empty/`, the matching file of `units/sample/` as a worked example (`--no-example` leaves it out), the unit's file, the related files (e.g. requirements and interfaces for test cases), and any `--add` files. The script prints an estimate of the size. Prompts are about 2K–5K tokens plus any `--add` files; above 32000 (`--max-tokens`) it warns. Large-context models such as Gemma 4 31B take this easily, but check the context length your server is set to: e.g. Ollama uses a small default (`num_ctx`), and a model that runs out of context forgets the start of the chat, i.e. the rules. Don't paste confidential content into a chat service your organisation doesn't allow.
 
+### In VS Code with Continue
+
+`.continue/rules/` holds one rule per content file. When `units/<unit>/testcases.tex` is in the chat context (the open file, or added with `@`), Continue adds the common rules and the test case guide, with command reference and worked example, to the chat automatically. You chat right away, without a prompt to paste. The model reads the related files itself (e.g. `requirements.tex`, `unit.tex`) if its tools allow it, otherwise add them with `@`.
+
+Open the template folder itself as the VS Code workspace: Continue looks for `.continue/rules/` at the top of the workspace.
+
+The rules are generated from `llm/`, `units/empty/` and `units/sample/`. After changing one of these, run:
+
+```sh
+python3 scripts/continue_rules.py           # regenerate .continue/rules/
+python3 scripts/continue_rules.py --check   # exit 1 if out of date (e.g. in CI)
+```
+
 More details are in [README.md](README.md).
