@@ -32,6 +32,15 @@ python3 scripts/build.py --all            # all units except units/empty
 
 PDFs go to `build/<unit>.pdf` (gitignored, safe to delete). At the end you get a summary of each unit's warnings and errors. If a unit fails, its PDF is removed and the script exits non-zero.
 
+## tikz-uml (optional)
+
+```sh
+python3 scripts/install_tikz_uml.py                       # downloads v1.1 into the user's TeX tree (TEXMFHOME)
+python3 scripts/install_tikz_uml.py --file tikz-uml.sty   # from a file downloaded by hand
+```
+
+Needed only for units that draw UML diagrams with `tikz-uml` (see README.md, *Diagrams*). `--force` replaces an installed file, `--texmf DIR` installs into another TeX tree.
+
 ## Chat with an LLM
 
 Guides in `llm/` tell a chat model how the template works, so it can help fill in a unit's content files ("add a test case for a setpoint of 101"). The model asks for missing facts and answers with LaTeX lines to paste.
