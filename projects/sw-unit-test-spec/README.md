@@ -11,11 +11,11 @@ LaTeX template for a **Software Unit Test Specification**. Structure follows ISO
 ```
 sw_unit_test_spec.tex     main file: chapter order, default unit
 suts.cls                  the template: all formatting and input commands
-latexmkrc                 lets latexmk -c also remove the free-text helper files
+latexmkrc                 latexmk settings: sty/ on TeX's search path, -c also removes the free-text helper files
+sty/                      packages TeX Live does not have, found without install: tikz-uml.sty
 sw_unit_test_spec.pdf     the sample unit, built: a preview of what the template produces
 scripts/new_unit.py       creates units/<unit>/ from units/empty/
 scripts/build.py          builds units into build/<unit>.pdf (build/ is gitignored)
-scripts/install_tikz_uml.py  optional: installs tikz-uml.sty (UML diagrams in free text)
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a unit's file
 llm/                      the guides it uses: general rules + one per content file
 scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)
@@ -150,7 +150,7 @@ git checkout --ours -- units/empty/ && git add units/empty/
 git commit -m "Merge template update from upstream" && git push
 ```
 
-`suts.cls`, `latexmkrc`, `scripts/` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `units/empty/` (a new content file or command is shown there) and to `sw_unit_test_spec.tex`. Then rebuild every unit: `scripts/build.py --all --strict`.
+`suts.cls`, `latexmkrc`, `sty/`, `scripts/` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `units/empty/` (a new content file or command is shown there) and to `sw_unit_test_spec.tex`. Then rebuild every unit: `scripts/build.py --all --strict`.
 
 ### 5. Baseline a unit's spec
 
@@ -227,15 +227,11 @@ Generated with TikZ from the data you already enter — nothing to draw. Each di
 
 ### tikz-uml (optional)
 
-[TikZ-UML](https://tikzuml.pages.math.cnrs.fr/) draws class, sequence, state, use case and component diagrams with little code. It is not on CTAN or in TeX Live, so install it once per user:
-
-```sh
-python3 scripts/install_tikz_uml.py          # v1.1 -> <TEXMFHOME>/tex/latex/tikz-uml/tikz-uml.sty
-```
-
-The file is checked against a SHA-256. Without internet access, download <https://plmlab.math.cnrs.fr/tikzuml/tikzuml/-/raw/v1.1/tikz-uml.sty> by hand and pass it with `--file`. Then add `\usepackage{tikz-uml}` after `\documentclass{suts}` in `sw_unit_test_spec.tex` and use its commands in a `tikzpicture` inside a `FreeText` block or a `figures/<name>.tex`. The template itself does not need it.
+[TikZ-UML](https://tikzuml.pages.math.cnrs.fr/) draws class, sequence, state, use case and component diagrams with little code. It is not on CTAN or in TeX Live, so the template ships it as `sty/tikz-uml.sty` (v1.1, unchanged, LaTeX Project Public License 1.3). `latexmkrc` puts `sty/` on TeX's search path (`TEXINPUTS`), so `scripts/build.py` and `latexmk` find it: nothing to install. For plain `pdflatex`, set `TEXINPUTS=./sty//:` yourself. Add `\usepackage{tikz-uml}` after `\documentclass{suts}` in `sw_unit_test_spec.tex` and use its commands in a `tikzpicture` inside a `FreeText` block or a `figures/<name>.tex`. The template itself does not use it.
 
 On TeX Live 2022, write `\_` in class names (`\umlclass{Setpoint\_Ctrl}…`) and use no underscore in the names you refer to (`\umlobject[class=Setpoint_Ctrl]{spctrl}`, `alias=`, `name=`). In all other text a plain `_` works as usual.
+
+Other packages that are not in the TeX distribution can be put into `sty/` the same way.
 
 ## Free text
 

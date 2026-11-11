@@ -1,2 +1,6 @@
 # latexmk -c / -C also remove the FreeText helper files (<jobname>.free-*.tex)
 $clean_ext .= ' free-*.tex ltc';
+
+# sty/: packages shipped with the template that TeX Live does not have
+# (tikz-uml). TeX searches it before the TeX trees: no install needed.
+ensure_path('TEXINPUTS', './sty//');
