@@ -46,6 +46,8 @@ You also need `metadata.tex` and `unit.tex` from the same unit folder as the `in
 ```latex
 % Introduction. Plain text; empty lines start a new paragraph.
 % Example: units/sample/introduction.tex.
+% Text commands (\Purpose, \Scope, ...) also work as environments with any
+% LaTeX inside: \begin{Scope} ... \end{Scope}, \end{Scope} on its own line.
 
 % Optional: replace the default purpose text.
 % \Purpose{This document ...}

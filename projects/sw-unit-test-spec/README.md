@@ -301,6 +301,8 @@ Reference figures with `Figure~\ref{fig:ramp}`. Subfolders work with a relative 
 
 ## Command reference
 
+The text commands `\Purpose`, `\Scope`, `\UseCaseNote`, `\FunctionalDescription`, `\PassFailCriteria`, `\ToolQualification` and `\ResultsNote` also work as environments with any LaTeX inside, like `FreeText`: `\begin{Scope}` ... `\end{Scope}` (`\end{...}` on its own line). Given twice, the last one is used (warning).
+
 | File | Command | Produces |
 |---|---|---|
 | metadata | `\DocID{}` `\DocVersion{}` `\DocStatus{}` `\DocDate{}` `\DocTitle{}` `\ProjectName{}` `\Company{}` | title page, header/footer (`\DocStatus` default Draft, `\DocDate` default today) |

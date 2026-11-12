@@ -127,12 +127,43 @@
 % =============================================================================
 %  Input commands: introduction  (content/introduction.tex)
 % =============================================================================
+% Prose slots, each in two forms:
+%   \Scope{text}                        plain text and paragraphs
+%   \begin{Scope} ... \end{Scope}       any LaTeX (verbatim, listings, own
+%                                       tables, %, &); \end{...} on its own line
+% One macro serves both: called through \begin it starts the verbatim copy
+% (see Free text below), otherwise it takes its argument. Given twice, the
+% last one wins (warning).
+\cs_new_protected:Npn \__suts_text_set:nn #1#2
+  {
+    \bool_lazy_and:nnF
+      { \str_if_eq_p:Vn \g__suts_chapter_tl { testcases } }
+      { ! \g__suts_scan_bool }     % testcases.tex is read twice
+      {
+        \prop_if_in:NnT \g__suts_text_prop {#1}
+          { \msg_warning:nnn { suts } { duplicate-text } {#1} }
+      }
+    \prop_gput:Nnn \g__suts_text_prop {#1} {#2}
+  }
+\cs_generate_variant:Nn \__suts_text_set:nn { nx }
+\msg_new:nnn { suts } { duplicate-text }
+  { #1~given~more~than~once;~the~last~one~is~used. }
 \clist_map_inline:nn
   { Purpose, Scope, UseCaseNote, FunctionalDescription, PassFailCriteria,
     ToolQualification, ResultsNote }
   {
-    \exp_args:Nc \NewDocumentCommand {#1} { +m }
-      { \prop_gput:Nnn \g__suts_text_prop {#1} {##1} }
+    \exp_args:Nc \NewDocumentCommand {#1} { }
+      {
+        \str_if_eq:VnTF \@currenvir {#1}
+          { \__suts_free_begin:n {#1} }
+          { \__suts_text_set:nn {#1} }
+      }
+    \cs_new_protected:cpn { end#1 }
+      {
+        \end{VerbatimOut}
+        \__suts_text_set:nx {#1}
+          { \exp_not:N \file_input:n { \g__suts_free_file_tl } \exp_not:N \unskip }
+      }
   }
 
 % \Reference{key}{internal | external}{document}{version}
