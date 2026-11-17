@@ -12,7 +12,7 @@ LaTeX template for a **Software Unit Test Specification**. Structure follows ISO
 sw_unit_test_spec.tex     main file: chapter order, default unit
 suts.cls                  the template: all formatting and input commands
 latexmkrc                 latexmk settings: sty/ on TeX's search path, -c also removes the free-text helper files
-sty/                      packages TeX Live does not have, found without install: tikz-uml.sty
+sty/                      packages TeX Live does not have, found without install: tikz-uml.sty, specfig*.sty
 sw_unit_test_spec.pdf     the sample unit, built: a preview of what the template produces
 scripts/new_unit.py       creates units/<unit>/ from units/empty/
 scripts/build.py          builds units into build/<unit>.pdf (build/ is gitignored)
@@ -233,6 +233,10 @@ Generated with TikZ from the data you already enter — nothing to draw. Each di
 On TeX Live 2022, write `\_` in class names (`\umlclass{Setpoint\_Ctrl}…`) and use no underscore in the names you refer to (`\umlobject[class=Setpoint_Ctrl]{spctrl}`, `alias=`, `name=`). In all other text a plain `_` works as usual.
 
 Other packages that are not in the TeX distribution can be put into `sty/` the same way.
+
+### specfig (optional)
+
+[`spec-figures`](../spec-figures/) draws sequence, state, activity, class, component and block diagrams, Gantt charts, timelines, risk matrices, timing diagrams and charts from plain data commands, with problems in red. Its packages are shipped in `sty/specfig*.sty`, and its chat rules in `.continue/rules/sf-*.md`; refresh both from there with `scripts/vendor.py`. Add `\usepackage{specfig}` after `\documentclass{suts}` in `sw_unit_test_spec.tex`, then write a figure as `figures/<type>_<name>.tex` (e.g. `figures/sequence_cycle.tex`) and include it with `\InputFigure{sequence_cycle}`. Command reference: the spec-figures guides and catalogue.
 
 ## Free text
 

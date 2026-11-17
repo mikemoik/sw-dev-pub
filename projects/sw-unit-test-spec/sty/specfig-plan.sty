@@ -1,0 +1,921 @@
+% =============================================================================
+%  specfig-plan.sty -- planning figures of specfig: Gantt chart, milestone
+%  timeline, organisation chart, RACI matrix (a table)
+%
+%  Loaded by specfig.sty; uses its core (\sf_begin:nnn, \sf_problem:n,
+%  \sf_problems_draw:, \sf_day:nN, colours and styles). Same rules: data
+%  commands exist only inside their environment, problems are listed in red
+%  under the figure. TeX Live 2022 compatible. MIT license (repo root).
+% =============================================================================
+\NeedsTeXFormat{LaTeX2e}[2022-06-01]
+\ProvidesPackage{specfig-plan}[2026/11/17 v0.1 Planning figures: Gantt, timeline, organisation chart, RACI]
+\RequirePackage{array}
+\RequirePackage{booktabs}
+
+\tikzset{
+  sf/gantt/label/.style   = {font=\small, anchor=west, inner sep=1pt},
+  sf/gantt/group/.style   = {font=\small\bfseries, anchor=west, inner sep=1pt},
+  sf/gantt/tick/.style    = {font=\scriptsize, text=sfline, anchor=south, inner sep=2pt},
+  sf/gantt/grid/.style    = {draw=sfmuted!35, thin},
+  sf/gantt/frame/.style   = {draw=sfmuted, thin},
+  sf/gantt/ms/.style      = {diamond, fill=sfline, minimum size=0.32cm, inner sep=0pt},
+  sf/gantt/summary/.style = {fill=sfline},
+  sf/gantt/dep/.style     = {draw=sfline!80, -{Stealth[length=1.6mm]}, rounded corners=1pt},
+  sf/gantt/pct/.style     = {font=\tiny, anchor=west, inner sep=1.5pt, text=sfline},
+  sf/today/.style         = {draw=sfwarn, dashed, thick},
+  sf/todaylabel/.style    = {font=\scriptsize, text=sfwarn, anchor=south, inner sep=1pt},
+  sf/tl/axis/.style       = {draw=sfaccent, very thick, -{Stealth[length=2.6mm]}},
+  sf/tl/ms/.style         = {diamond, draw=sfaccent, fill=sfaccent, inner sep=2.2pt},
+  sf/tl/rel/.style        = {regular polygon, regular polygon sides=3, draw=sfaccent, fill=white,
+                             thick, inner sep=1.4pt},
+  sf/tl/tick/.style       = {draw=sfaccent!60, thin},
+  sf/tl/label/.style      = {font=\scriptsize, align=center, inner sep=1.5pt},
+  sf/tl/minor/.style      = {draw=sfaccent!50, thin},
+  sf/tl/year/.style       = {font=\scriptsize\bfseries, text=sfaccent, anchor=north west, inner sep=1pt},
+  sf/tl/phase/.style      = {font=\scriptsize\bfseries, anchor=center, inner sep=0pt},
+  sf/org/unit/.style      = {sf/box, anchor=north, text width=2.9cm, minimum width=3.1cm,
+                             minimum height=1cm, inner sep=3pt},
+  sf/org/edge/.style      = {draw=sfaccent, thick},
+}
+
+\ExplSyntaxOn
+% shared scratch variables of this module
+\tl_new:N \l__sf_plan_a_tl
+\tl_new:N \l__sf_plan_b_tl
+\tl_new:N \l__sf_plan_c_tl
+\tl_new:N \l__sf_plan_d_tl
+\tl_new:N \l__sf_plan_x_tl
+\tl_new:N \l__sf_plan_y_tl
+\tl_new:N \l__sf_plan_ya_tl
+\tl_new:N \l__sf_plan_yb_tl
+\tl_new:N \l__sf_plan_lx_tl
+\tl_new:N \l__sf_plan_col_tl
+\int_new:N \l__sf_plan_a_int
+\int_new:N \l__sf_plan_b_int
+\int_new:N \l__sf_plan_min_int
+\int_new:N \l__sf_plan_max_int
+\int_new:N \l__sf_plan_first_int
+\seq_new:N \l__sf_plan_seq
+\clist_const:Nn \c__sf_plan_months_clist
+  { Jan , Feb , Mar , Apr , May , Jun , Jul , Aug , Sep , Oct , Nov , Dec }
+\cs_generate_variant:Nn \sf_day:nNT { x }
+\cs_generate_variant:Nn \seq_set_split:Nnn { NnV }
+\cs_generate_variant:Nn \prop_get:NnNTF { NV }
+\cs_generate_variant:Nn \prop_get:NnNT { NV }
+\cs_generate_variant:Nn \prop_get:NnN { NV }
+\cs_generate_variant:Nn \prop_put:Nnn { NV , NVx , NVV }
+\cs_generate_variant:Nn \prop_gput:Nnn { NVn , NVV }
+\cs_generate_variant:Nn \prop_if_in:NnTF { NV }
+\cs_generate_variant:Nn \clist_if_in:NnTF { NV }
+
+% year / month / day of day number #1: \l__sf_plan_a_int, \l__sf_plan_b_int,
+% item 3 of \l__sf_plan_seq
+\cs_new_protected:Npn \__sf_plan_ym:n #1
+  {
+    \sf_date_from_day:nN {#1} \l__sf_plan_a_tl
+    \seq_set_split:NnV \l__sf_plan_seq { - } \l__sf_plan_a_tl
+    \int_set:Nn \l__sf_plan_a_int { \seq_item:Nn \l__sf_plan_seq { 1 } }
+    \int_set:Nn \l__sf_plan_b_int { \seq_item:Nn \l__sf_plan_seq { 2 } }
+  }
+% \l__sf_plan_first_int := day number of the first of month #2 (1..13) of year #1
+\cs_new_protected:Npn \__sf_plan_first:nn #1#2
+  {
+    \int_compare:nNnTF {#2} > { 12 }
+      { \sf_day:xNT { \int_eval:n { #1 + 1 } - \int_eval:n { #2 - 12 } - 1 } \l__sf_plan_first_int { } }
+      { \sf_day:xNT { \int_eval:n {#1} - \int_eval:n {#2} - 1 } \l__sf_plan_first_int { } }
+  }
+% next month: \l__sf_plan_a_int / \l__sf_plan_b_int
+\cs_new_protected:Npn \__sf_plan_next_month:
+  {
+    \int_incr:N \l__sf_plan_b_int
+    \int_compare:nNnT \l__sf_plan_b_int > { 12 }
+      { \int_set:Nn \l__sf_plan_b_int { 1 } \int_incr:N \l__sf_plan_a_int }
+  }
+
+% =============================================================================
+%  Gantt chart
+% =============================================================================
+\seq_new:N \g__sf_gantt_rows_seq          % {n}{type}{ID}{name}{start}{end}{progress}
+\seq_new:N \g__sf_gantt_deps_seq          % {from}{to}
+\prop_new:N \g__sf_gantt_id_prop          % ID -> row number
+\int_new:N \g__sf_gantt_n_int
+\prop_new:N \l__sf_gantt_day_prop         % row -> {start day}{end day, exclusive}
+\prop_new:N \l__sf_gantt_col_prop         % row -> colour
+\prop_new:N \l__sf_gantt_gmin_prop        % group row -> first day
+\prop_new:N \l__sf_gantt_gmax_prop        % group row -> last day (exclusive)
+\tl_new:N \l__sf_gantt_group_tl           % current group row
+\int_new:N \l__sf_gantt_colour_int
+\dim_new:N \l__sf_gantt_lw_dim            % label column width
+\box_new:N \l__sf_gantt_box
+\fp_new:N \l__sf_gantt_scale_fp           % cm per day
+\bool_new:N \l__sf_gantt_ok_bool
+
+\NewDocumentEnvironment { sfGantt } { O{} }
+  {
+    \sf_begin:nnn { sfGantt } { width = 11cm , step = 0.55cm } {#1}
+    \seq_gclear:N \g__sf_gantt_rows_seq
+    \seq_gclear:N \g__sf_gantt_deps_seq
+    \prop_gclear:N \g__sf_gantt_id_prop
+    \int_gzero:N \g__sf_gantt_n_int
+    \DeclareDocumentCommand \Group { m }
+      { \__sf_gantt_row:nnnnnn { group } { } {##1} { } { } { } }
+    \DeclareDocumentCommand \Task { O{} m m m m }
+      { \__sf_gantt_row:nnnnnn { task } {##2} {##3} {##4} {##5} {##1} }
+    \DeclareDocumentCommand \Milestone { m m m }
+      { \__sf_gantt_row:nnnnnn { ms } {##1} {##2} {##3} {##3} { } }
+    \DeclareDocumentCommand \Depends { m m }
+      { \seq_gput_right:Nn \g__sf_gantt_deps_seq { {##1} {##2} } }
+    \ignorespaces
+  }
+  { \__sf_gantt_draw: }
+
+\cs_new_protected:Npn \__sf_gantt_row:nnnnnn #1#2#3#4#5#6
+  {
+    \int_gincr:N \g__sf_gantt_n_int
+    \tl_if_blank:nF {#2}
+      {
+        \prop_if_in:NnTF \g__sf_gantt_id_prop {#2}
+          { \sf_problem:n { duplicate~ID~#2 } }
+          { \prop_gput:Nnx \g__sf_gantt_id_prop {#2} { \int_use:N \g__sf_gantt_n_int } }
+      }
+    \seq_gput_right:Nx \g__sf_gantt_rows_seq
+      { { \int_use:N \g__sf_gantt_n_int } \exp_not:n { {#1} {#2} {#3} {#4} {#5} {#6} } }
+  }
+
+% pass 1: dates, range, colours, group spans, label column width
+\cs_new_protected:Npn \__sf_gantt_scan:nnnnnnn #1#2#3#4#5#6#7   % n type ID name start end progress
+  {
+    \str_if_eq:nnTF {#2} { group }
+      {
+        \tl_set:Nn \l__sf_gantt_group_tl {#1}
+        \int_incr:N \l__sf_gantt_colour_int
+      }
+      {
+        \tl_set:Nx \l__sf_plan_col_tl
+          { sfc \int_eval:n { \int_mod:nn { \int_max:nn { \l__sf_gantt_colour_int } { 1 } - 1 } { 6 } + 1 } }
+        \prop_put:NnV \l__sf_gantt_col_prop {#1} \l__sf_plan_col_tl
+        \bool_set_true:N \l__sf_gantt_ok_bool
+        \sf_day:nNF {#5} \l__sf_plan_a_int
+          {
+            \bool_set_false:N \l__sf_gantt_ok_bool
+            \sf_problem:n { #3:~date~`#5'~is~not~YYYY-MM-DD }
+          }
+        \str_if_eq:nnF {#2} { ms }
+          {
+            \sf_day:nNF {#6} \l__sf_plan_b_int
+              {
+                \bool_set_false:N \l__sf_gantt_ok_bool
+                \sf_problem:n { #3:~end~`#6'~is~not~YYYY-MM-DD }
+              }
+          }
+        \bool_if:NT \l__sf_gantt_ok_bool
+          {
+            \str_if_eq:nnTF {#2} { ms }
+              { \int_set_eq:NN \l__sf_plan_b_int \l__sf_plan_a_int }
+              {
+                \int_compare:nNnTF \l__sf_plan_b_int < \l__sf_plan_a_int
+                  {
+                    \bool_set_false:N \l__sf_gantt_ok_bool
+                    \sf_problem:n { #3:~end~#6~is~before~start~#5 }
+                  }
+                  { \int_incr:N \l__sf_plan_b_int }   % the end day is included
+              }
+          }
+        \bool_if:NT \l__sf_gantt_ok_bool
+          {
+            \prop_put:Nnx \l__sf_gantt_day_prop {#1}
+              { { \int_use:N \l__sf_plan_a_int } { \int_use:N \l__sf_plan_b_int } }
+            \int_set:Nn \l__sf_plan_min_int { \int_min:nn \l__sf_plan_min_int \l__sf_plan_a_int }
+            \int_set:Nn \l__sf_plan_max_int { \int_max:nn \l__sf_plan_max_int \l__sf_plan_b_int }
+            \tl_if_empty:NF \l__sf_gantt_group_tl
+              {
+                \prop_get:NVNTF \l__sf_gantt_gmin_prop \l__sf_gantt_group_tl \l__sf_plan_a_tl
+                  {
+                    \prop_put:NVx \l__sf_gantt_gmin_prop \l__sf_gantt_group_tl
+                      { \int_min:nn \l__sf_plan_a_tl \l__sf_plan_a_int }
+                    \prop_get:NVN \l__sf_gantt_gmax_prop \l__sf_gantt_group_tl \l__sf_plan_a_tl
+                    \prop_put:NVx \l__sf_gantt_gmax_prop \l__sf_gantt_group_tl
+                      { \int_max:nn \l__sf_plan_a_tl \l__sf_plan_b_int }
+                  }
+                  {
+                    \prop_put:NVx \l__sf_gantt_gmin_prop \l__sf_gantt_group_tl
+                      { \int_use:N \l__sf_plan_a_int }
+                    \prop_put:NVx \l__sf_gantt_gmax_prop \l__sf_gantt_group_tl
+                      { \int_use:N \l__sf_plan_b_int }
+                  }
+              }
+          }
+      }
+    \hbox_set:Nn \l__sf_gantt_box
+      { \str_if_eq:nnTF {#2} { group } { \small\bfseries #4 } { \small #4 } }
+    \dim_set:Nn \l__sf_gantt_lw_dim
+      {
+        \dim_max:nn \l__sf_gantt_lw_dim
+          { \box_wd:N \l__sf_gantt_box + \str_if_eq:nnTF {#2} { group } { 0pt } { 0.3cm } }
+      }
+  }
+
+% x (cm, as text) of day #1; y (cm, as text) of the middle of row #1
+\cs_new:Npn \__sf_gantt_x:n #1
+  { \fp_eval:n { round ( ( (#1) - \l__sf_plan_min_int ) * \l__sf_gantt_scale_fp , 4 ) } cm }
+\cs_new:Npn \__sf_gantt_y:n #1
+  { \fp_eval:n { round ( - ( (#1) - 0.5 ) * \dim_to_fp:n { \l_sf_step_dim } / 28.45274 , 4 ) } cm }
+
+\cs_new_protected:Npn \__sf_gantt_draw:
+  {
+    \prop_clear:N \l__sf_gantt_day_prop
+    \prop_clear:N \l__sf_gantt_col_prop
+    \prop_clear:N \l__sf_gantt_gmin_prop
+    \prop_clear:N \l__sf_gantt_gmax_prop
+    \tl_clear:N \l__sf_gantt_group_tl
+    \int_zero:N \l__sf_gantt_colour_int
+    \dim_zero:N \l__sf_gantt_lw_dim
+    \int_set:Nn \l__sf_plan_min_int { 100000000 }
+    \int_set:Nn \l__sf_plan_max_int { -1 }
+    \seq_map_inline:Nn \g__sf_gantt_rows_seq { \__sf_gantt_scan:nnnnnnn ##1 }
+    \int_compare:nNnT \l__sf_plan_max_int < { 0 }
+      {
+        \sf_problem:n { no~valid~dates }
+        % an empty four-week axis (a Monday), so the axis code gets real dates
+        \sf_day:nNT { 2000-01-03 } \l__sf_plan_min_int { }
+        \int_set:Nn \l__sf_plan_max_int { \l__sf_plan_min_int + 28 }
+      }
+    \fp_set:Nn \l__sf_gantt_scale_fp
+      {
+        \dim_to_fp:n { \l_sf_width_dim } / 28.45274
+        / max ( 1 , \l__sf_plan_max_int - \l__sf_plan_min_int )
+      }
+    \tl_set:Nx \l__sf_plan_yb_tl { \__sf_gantt_y:n { \g__sf_gantt_n_int + 0.5 } }   % bottom
+    \tl_set:Nx \l__sf_plan_lx_tl     % left edge of the label column
+      { \fp_eval:n { round ( - \dim_to_fp:n { \l__sf_gantt_lw_dim } / 28.45274 - 0.3 , 4 ) } cm }
+    \begin{tikzpicture}
+      % row stripes
+      \int_step_inline:nn { \g__sf_gantt_n_int }
+        {
+          \int_if_odd:nF {##1}
+            {
+              \tl_set:Nx \l__sf_plan_ya_tl { \__sf_gantt_y:n { ##1 - 0.5 } }
+              \tl_set:Nx \l__sf_plan_y_tl { \__sf_gantt_y:n { ##1 + 0.5 } }
+              \fill [ sffill ] ( \l__sf_plan_lx_tl , \l__sf_plan_ya_tl )
+                rectangle ( \dim_use:N \l_sf_width_dim , \l__sf_plan_y_tl ) ;
+            }
+        }
+      % time axis: grid lines and labels
+      \int_compare:nNnTF { \l__sf_plan_max_int - \l__sf_plan_min_int } > { 70 }
+        { \__sf_gantt_months: } { \__sf_gantt_weeks: }
+      \draw [ sf/gantt/frame ] ( \l__sf_plan_lx_tl , 0 ) -- ( \dim_use:N \l_sf_width_dim , 0 )
+        -- ( \dim_use:N \l_sf_width_dim , \l__sf_plan_yb_tl ) -- ( \l__sf_plan_lx_tl , \l__sf_plan_yb_tl ) ;
+      \draw [ sf/gantt/frame ] ( 0 , 0 ) -- ( 0 , \l__sf_plan_yb_tl ) ;
+      % rows
+      \seq_map_inline:Nn \g__sf_gantt_rows_seq { \__sf_gantt_draw_row:nnnnnnn ##1 }
+      % dependencies
+      \seq_map_inline:Nn \g__sf_gantt_deps_seq { \__sf_gantt_dep:nn ##1 }
+      % today
+      \tl_if_blank:VF \l_sf_today_tl
+        {
+          \sf_day:VNTF \l_sf_today_tl \l__sf_plan_a_int
+            {
+              \bool_lazy_or:nnTF
+                { \int_compare_p:nNn \l__sf_plan_a_int < \l__sf_plan_min_int }
+                { \int_compare_p:nNn \l__sf_plan_a_int > \l__sf_plan_max_int }
+                { \sf_problem:x { today~\l_sf_today_tl \c_space_tl is~outside~the~chart } }
+                {
+                  \tl_set:Nx \l__sf_plan_x_tl { \__sf_gantt_x:n { \l__sf_plan_a_int } }
+                  \draw [ sf/today ] ( \l__sf_plan_x_tl , 0.45cm ) -- ( \l__sf_plan_x_tl , \l__sf_plan_yb_tl ) ;
+                  \node [ sf/todaylabel ] at ( \l__sf_plan_x_tl , 0.45cm ) { today } ;
+                }
+            }
+            { \sf_problem:x { today~`\l_sf_today_tl'~is~not~YYYY-MM-DD } }
+        }
+      \sf_problems_draw:
+    \end{tikzpicture}
+  }
+
+% month grid: a line at each first of month, the month name centred in it
+\int_new:N \l__sf_gantt_step_int
+\int_new:N \l__sf_gantt_k_int
+\int_new:N \l__sf_gantt_ma_int
+\int_new:N \l__sf_gantt_mb_int
+\cs_new_protected:Npn \__sf_gantt_months:
+  {
+    \__sf_plan_ym:n { \l__sf_plan_min_int }
+    \int_set:Nn \l__sf_gantt_step_int    % label every n-th month when the span is long
+      { \int_div_truncate:nn { \l__sf_plan_max_int - \l__sf_plan_min_int + 365 } { 366 } }
+    \int_zero:N \l__sf_gantt_k_int
+    \__sf_plan_first:nn { \l__sf_plan_a_int } { \l__sf_plan_b_int }
+    \int_do_until:nNnn \l__sf_plan_first_int > \l__sf_plan_max_int
+      {
+        \int_set_eq:NN \l__sf_gantt_ma_int \l__sf_plan_first_int
+        \__sf_plan_first:nn { \l__sf_plan_a_int } { \l__sf_plan_b_int + 1 }
+        \int_set_eq:NN \l__sf_gantt_mb_int \l__sf_plan_first_int
+        \int_compare:nNnT \l__sf_gantt_ma_int > \l__sf_plan_min_int
+          {
+            \tl_set:Nx \l__sf_plan_x_tl { \__sf_gantt_x:n { \l__sf_gantt_ma_int } }
+            \draw [ sf/gantt/grid ] ( \l__sf_plan_x_tl , 0 ) -- ( \l__sf_plan_x_tl , \l__sf_plan_yb_tl ) ;
+          }
+        % label if the visible part of the month is wide enough
+        \fp_set:Nn \l_tmpa_fp
+          {
+            ( \int_min:nn \l__sf_gantt_mb_int \l__sf_plan_max_int
+              - \int_max:nn \l__sf_gantt_ma_int \l__sf_plan_min_int ) * \l__sf_gantt_scale_fp
+          }
+        \bool_lazy_and:nnT
+          { \fp_compare_p:nNn \l_tmpa_fp > { 0.4 } }
+          { \int_compare_p:nNn { \int_mod:nn \l__sf_gantt_k_int \l__sf_gantt_step_int } = { 0 } }
+          {
+            \tl_set:Nx \l__sf_plan_x_tl
+              {
+                \__sf_gantt_x:n
+                  {
+                    ( \int_max:nn \l__sf_gantt_ma_int \l__sf_plan_min_int
+                      + \int_min:nn \l__sf_gantt_mb_int \l__sf_plan_max_int ) / 2
+                  }
+              }
+            \node [ sf/gantt/tick ] at ( \l__sf_plan_x_tl , 0 )
+              {
+                \clist_item:Nn \c__sf_plan_months_clist { \l__sf_plan_b_int }
+                \bool_lazy_and:nnT
+                  { \fp_compare_p:nNn \l_tmpa_fp > { 0.9 } }
+                  {
+                    \bool_lazy_or_p:nn
+                      { \int_compare_p:nNn \l__sf_gantt_k_int = { 0 } }
+                      { \int_compare_p:nNn \l__sf_plan_b_int = { 1 } }
+                  }
+                  { \c_space_tl \int_use:N \l__sf_plan_a_int }
+              } ;
+          }
+        \int_incr:N \l__sf_gantt_k_int
+        \__sf_plan_next_month:
+      }
+  }
+% week grid: a line at each Monday, labelled with its date
+\cs_new_protected:Npn \__sf_gantt_weeks:
+  {
+    \int_set:Nn \l__sf_gantt_ma_int    % first Monday on or after the start (JDN mod 7 = 0)
+      { \l__sf_plan_min_int + \int_mod:nn { 7 - \int_mod:nn \l__sf_plan_min_int { 7 } } { 7 } }
+    \int_while_do:nNnn \l__sf_gantt_ma_int < \l__sf_plan_max_int
+      {
+        \tl_set:Nx \l__sf_plan_x_tl { \__sf_gantt_x:n { \l__sf_gantt_ma_int } }
+        \draw [ sf/gantt/grid ] ( \l__sf_plan_x_tl , 0 ) -- ( \l__sf_plan_x_tl , \l__sf_plan_yb_tl ) ;
+        \__sf_plan_ym:n { \l__sf_gantt_ma_int }
+        \node [ sf/gantt/tick , anchor = south~west ] at ( \l__sf_plan_x_tl , 0 )
+          {
+            \clist_item:Nn \c__sf_plan_months_clist { \l__sf_plan_b_int } ~
+            \int_eval:n { \seq_item:Nn \l__sf_plan_seq { 3 } }
+          } ;
+        \int_add:Nn \l__sf_gantt_ma_int { 7 }
+      }
+  }
+
+\cs_new_protected:Npn \__sf_gantt_draw_row:nnnnnnn #1#2#3#4#5#6#7   % n type ID name start end progress
+  {
+    \tl_set:Nx \l__sf_plan_y_tl { \__sf_gantt_y:n {#1} }
+    \tl_set:Nx \l__sf_plan_ya_tl { \__sf_gantt_y:n { #1 - 0.29 } }   % bar top
+    \tl_set:Nx \l__sf_plan_yb_tl { \__sf_gantt_y:n { #1 + 0.29 } }   % bar bottom
+    \str_if_eq:nnTF {#2} { group }
+      {
+        \node [ sf/gantt/group ] at ( \l__sf_plan_lx_tl , \l__sf_plan_y_tl ) {#4} ;
+        \prop_get:NnNT \l__sf_gantt_gmin_prop {#1} \l__sf_plan_a_tl
+          {
+            \prop_get:NnN \l__sf_gantt_gmax_prop {#1} \l__sf_plan_b_tl
+            \tl_set:Nx \l__sf_plan_x_tl { \__sf_gantt_x:n { \l__sf_plan_a_tl } }
+            \tl_set:Nx \l__sf_plan_d_tl { \__sf_gantt_x:n { \l__sf_plan_b_tl } }
+            \tl_set:Nx \l__sf_plan_ya_tl { \__sf_gantt_y:n { #1 - 0.12 } }
+            \tl_set:Nx \l__sf_plan_yb_tl { \__sf_gantt_y:n { #1 + 0.12 } }
+            \fill [ sf/gantt/summary ]
+              ( \l__sf_plan_x_tl , \l__sf_plan_ya_tl ) rectangle ( \l__sf_plan_d_tl , \l__sf_plan_y_tl )
+              ( \l__sf_plan_x_tl , \l__sf_plan_y_tl ) -- ++ ( 0.14cm , 0 ) -- ( \l__sf_plan_x_tl , \l__sf_plan_yb_tl ) -- cycle
+              ( \l__sf_plan_d_tl , \l__sf_plan_y_tl ) -- ++ ( -0.14cm , 0 ) -- ( \l__sf_plan_d_tl , \l__sf_plan_yb_tl ) -- cycle ;
+          }
+      }
+      {
+        \node [ sf/gantt/label ] at ( \l__sf_plan_lx_tl + 0.3cm , \l__sf_plan_y_tl ) {#4} ;
+        \prop_get:NnNT \l__sf_gantt_day_prop {#1} \l__sf_plan_a_tl
+          {
+            \prop_get:NnN \l__sf_gantt_col_prop {#1} \l__sf_plan_col_tl
+            \tl_set:Nx \l__sf_plan_x_tl { \__sf_gantt_x:n { \tl_item:Nn \l__sf_plan_a_tl { 1 } } }
+            \str_if_eq:nnTF {#2} { ms }
+              { \node [ sf/gantt/ms ] at ( \l__sf_plan_x_tl , \l__sf_plan_y_tl ) { } ; }
+              {
+                \tl_set:Nx \l__sf_plan_d_tl { \__sf_gantt_x:n { \tl_item:Nn \l__sf_plan_a_tl { 2 } } }
+                \filldraw [ draw = \l__sf_plan_col_tl , fill = \l__sf_plan_col_tl !25 ]
+                  ( \l__sf_plan_x_tl , \l__sf_plan_ya_tl ) rectangle ( \l__sf_plan_d_tl , \l__sf_plan_yb_tl ) ;
+                \tl_if_blank:nF {#7}
+                  {
+                    \sf_if_number:nTF {#7}
+                      {
+                        \tl_set:Nx \l__sf_plan_c_tl { \fp_eval:n { min ( 1 , max ( 0 , (#7) / 100 ) ) } }
+                        \filldraw [ draw = \l__sf_plan_col_tl , fill = \l__sf_plan_col_tl ]
+                          ( \l__sf_plan_x_tl , \l__sf_plan_ya_tl )
+                          rectangle
+                          ( $ ( \l__sf_plan_x_tl , \l__sf_plan_yb_tl ) ! \l__sf_plan_c_tl !
+                              ( \l__sf_plan_d_tl , \l__sf_plan_yb_tl ) $ ) ;
+                        \node [ sf/gantt/pct ] at ( \l__sf_plan_d_tl , \l__sf_plan_y_tl ) { #7 \% } ;
+                      }
+                      { \sf_problem:n { #3:~progress~`#7'~is~not~a~number } }
+                  }
+              }
+          }
+      }
+  }
+\cs_new_protected:Npn \__sf_gantt_dep:nn #1#2   % from to
+  {
+    \bool_set_true:N \l__sf_gantt_ok_bool
+    \prop_get:NnNF \g__sf_gantt_id_prop {#1} \l__sf_plan_a_tl
+      { \bool_set_false:N \l__sf_gantt_ok_bool \sf_problem:n { Depends~#1~->~#2:~unknown~ID~#1 } }
+    \prop_get:NnNF \g__sf_gantt_id_prop {#2} \l__sf_plan_b_tl
+      { \bool_set_false:N \l__sf_gantt_ok_bool \sf_problem:n { Depends~#1~->~#2:~unknown~ID~#2 } }
+    \bool_if:NT \l__sf_gantt_ok_bool
+      {
+        \prop_get:NVNT \l__sf_gantt_day_prop \l__sf_plan_a_tl \l__sf_plan_c_tl
+          {
+            \tl_set:Nx \l__sf_plan_x_tl { \__sf_gantt_x:n { \tl_item:Nn \l__sf_plan_c_tl { 2 } } }
+            \prop_get:NVNT \l__sf_gantt_day_prop \l__sf_plan_b_tl \l__sf_plan_c_tl
+              {
+                \tl_set:Nx \l__sf_plan_d_tl { \__sf_gantt_x:n { \tl_item:Nn \l__sf_plan_c_tl { 1 } } }
+                \tl_set:Nx \l__sf_plan_ya_tl { \__sf_gantt_y:n { \l__sf_plan_a_tl } }
+                \tl_set:Nx \l__sf_plan_yb_tl { \__sf_gantt_y:n { \l__sf_plan_b_tl } }
+                \draw [ sf/gantt/dep ]
+                  ( \l__sf_plan_x_tl , \l__sf_plan_ya_tl ) -- ++ ( 0.15cm , 0 )
+                  -- ( \l__sf_plan_x_tl + 0.15cm , \l__sf_plan_yb_tl )
+                  -- ( \l__sf_plan_d_tl , \l__sf_plan_yb_tl ) ;
+              }
+          }
+      }
+  }
+
+% =============================================================================
+%  Milestone timeline: milestones above the axis, releases below, phases on it
+% =============================================================================
+\seq_new:N \g__sf_tl_ms_seq                % {ID}{date}{name}
+\seq_new:N \g__sf_tl_rel_seq               % {version}{date}
+\seq_new:N \g__sf_tl_phase_seq             % {name}{start}{end}
+\bool_new:N \l__sf_tl_dates_bool
+\fp_new:N \l__sf_tl_scale_fp
+\NewDocumentEnvironment { sfTimeline } { O{} }
+  {
+    \sf_begin:nnn { sfTimeline } { width = 13.5cm } {#1}
+    \seq_gclear:N \g__sf_tl_ms_seq
+    \seq_gclear:N \g__sf_tl_rel_seq
+    \seq_gclear:N \g__sf_tl_phase_seq
+    \DeclareDocumentCommand \Milestone { m m m }
+      { \seq_gput_right:Nn \g__sf_tl_ms_seq { {##1} {##2} {##3} } }
+    \DeclareDocumentCommand \Release { m m }
+      { \seq_gput_right:Nn \g__sf_tl_rel_seq { {##1} {##2} } }
+    \DeclareDocumentCommand \Phase { m m m }
+      { \seq_gput_right:Nn \g__sf_tl_phase_seq { {##1} {##2} {##3} } }
+    \ignorespaces
+  }
+  { \__sf_tl_draw: }
+
+% check date #1 of #2, update the range; bool cleared on failure
+\cs_new_protected:Npn \__sf_tl_check:nn #1#2
+  {
+    \sf_day:nNTF {#1} \l__sf_plan_a_int
+      {
+        \int_set:Nn \l__sf_plan_min_int { \int_min:nn \l__sf_plan_min_int \l__sf_plan_a_int }
+        \int_set:Nn \l__sf_plan_max_int { \int_max:nn \l__sf_plan_max_int \l__sf_plan_a_int }
+      }
+      {
+        \bool_set_false:N \l__sf_tl_dates_bool
+        \sf_problem:n { #2:~date~`#1'~is~not~YYYY-MM-DD }
+      }
+  }
+\cs_new_protected:Npn \__sf_tl_check_ms:nnn #1#2#3 { \__sf_tl_check:nn {#2} {#1} }
+\cs_new_protected:Npn \__sf_tl_check_rel:nn #1#2 { \__sf_tl_check:nn {#2} {#1} }
+\cs_new_protected:Npn \__sf_tl_check_phase:nnn #1#2#3
+  {
+    \__sf_tl_check:nn {#2} { phase~#1 }
+    \__sf_tl_check:nn {#3} { phase~#1 }
+    \sf_day:nNT {#2} \l__sf_plan_a_int
+      {
+        \sf_day:nNT {#3} \l__sf_plan_b_int
+          {
+            \int_compare:nNnT \l__sf_plan_b_int < \l__sf_plan_a_int
+              { \sf_problem:n { phase~#1:~end~#3~is~before~start~#2 } }
+          }
+      }
+  }
+% sort keys
+\cs_new:Npn \__sf_tl_date_of:nnn #1#2#3 {#2}
+\cs_new:Npn \__sf_tl_date_of:nn #1#2 {#2}
+\cs_new_protected:Npn \__sf_tl_cmp:nn #1#2
+  {
+    \sf_day:nNT {#1} \l__sf_plan_a_int { }
+    \sf_day:nNT {#2} \l__sf_plan_b_int { }
+    \int_compare:nNnTF \l__sf_plan_a_int > \l__sf_plan_b_int
+      { \sort_return_swapped: } { \sort_return_same: }
+  }
+\cs_generate_variant:Nn \__sf_tl_cmp:nn { ff }
+% \l__sf_plan_x_tl := x of date #1 (dates ok) or of position #2 of #3 (evenly)
+\cs_new_protected:Npn \__sf_tl_x:nnn #1#2#3
+  {
+    \bool_if:NTF \l__sf_tl_dates_bool
+      {
+        \sf_day:nNT {#1} \l__sf_plan_a_int { }
+        \tl_set:Nx \l__sf_plan_x_tl
+          { \fp_eval:n { round ( ( \l__sf_plan_a_int - \l__sf_plan_min_int ) * \l__sf_tl_scale_fp , 4 ) } cm }
+      }
+      {
+        \tl_set:Nx \l__sf_plan_x_tl
+          {
+            \fp_eval:n
+              { round ( \dim_to_fp:n { \l_sf_width_dim } / 28.45274 * ( #2 - 0.5 ) / max ( 1 , #3 ) , 4 ) } cm
+          }
+      }
+  }
+\cs_new_protected:Npn \__sf_tl_draw:
+  {
+    \bool_set_true:N \l__sf_tl_dates_bool
+    \int_set:Nn \l__sf_plan_min_int { 100000000 }
+    \int_set:Nn \l__sf_plan_max_int { -1 }
+    \seq_map_inline:Nn \g__sf_tl_ms_seq { \__sf_tl_check_ms:nnn ##1 }
+    \seq_map_inline:Nn \g__sf_tl_rel_seq { \__sf_tl_check_rel:nn ##1 }
+    \seq_map_inline:Nn \g__sf_tl_phase_seq { \__sf_tl_check_phase:nnn ##1 }
+    \bool_if:NTF \l__sf_tl_dates_bool
+      {
+        % sorted by date, so that alternating label heights do not collide
+        \seq_gsort:Nn \g__sf_tl_ms_seq
+          { \__sf_tl_cmp:ff { \__sf_tl_date_of:nnn ##1 } { \__sf_tl_date_of:nnn ##2 } }
+        \seq_gsort:Nn \g__sf_tl_rel_seq
+          { \__sf_tl_cmp:ff { \__sf_tl_date_of:nn ##1 } { \__sf_tl_date_of:nn ##2 } }
+        \int_compare:nNnT \l__sf_plan_max_int < { 0 }
+          { \int_set:Nn \l__sf_plan_min_int { 0 } \int_set:Nn \l__sf_plan_max_int { 1 } }
+        \fp_set:Nn \l__sf_tl_scale_fp
+          {
+            \dim_to_fp:n { \l_sf_width_dim } / 28.45274
+            / max ( 1 , \l__sf_plan_max_int - \l__sf_plan_min_int )
+          }
+      }
+      {
+        \sf_problem:n { not~all~dates~valid:~events~evenly~spaced }
+        \seq_if_empty:NF \g__sf_tl_phase_seq { \sf_problem:n { phases~not~drawn } }
+      }
+    \begin{tikzpicture}
+      \bool_if:NT \l__sf_tl_dates_bool
+        {
+          \seq_map_indexed_inline:Nn \g__sf_tl_phase_seq { \__sf_tl_phase:nnnn {##1} ##2 }
+          \__sf_tl_ticks:
+        }
+      \draw [ sf/tl/axis ] ( -0.4cm , 0 ) -- ( \dim_use:N \l_sf_width_dim + 0.6cm , 0 ) ;
+      \seq_map_indexed_inline:Nn \g__sf_tl_ms_seq { \__sf_tl_ms:nnnn {##1} ##2 }
+      \seq_map_indexed_inline:Nn \g__sf_tl_rel_seq { \__sf_tl_rel:nnn {##1} ##2 }
+      \tl_if_blank:VF \l_sf_today_tl
+        {
+          \bool_if:NT \l__sf_tl_dates_bool
+            {
+              \sf_day:VNTF \l_sf_today_tl \l__sf_plan_a_int
+                {
+                  \tl_set:Nx \l__sf_plan_x_tl
+                    { \fp_eval:n { round ( ( \l__sf_plan_a_int - \l__sf_plan_min_int ) * \l__sf_tl_scale_fp , 4 ) } cm }
+                  \draw [ sf/today ] ( \l__sf_plan_x_tl , -1.9cm ) -- ( \l__sf_plan_x_tl , 0.42cm ) ;
+                  \node [ sf/todaylabel , anchor = north ] at ( \l__sf_plan_x_tl , -1.9cm ) { today } ;
+                }
+                { \sf_problem:x { today~`\l_sf_today_tl'~is~not~YYYY-MM-DD } }
+            }
+        }
+      \sf_problems_draw:
+    \end{tikzpicture}
+  }
+\cs_new_protected:Npn \__sf_tl_phase:nnnn #1#2#3#4   % n name start end
+  {
+    \__sf_tl_x:nnn {#3} { } { }
+    \tl_set_eq:NN \l__sf_plan_a_tl \l__sf_plan_x_tl
+    \__sf_tl_x:nnn {#4} { } { }
+    \tl_set:Nx \l__sf_plan_col_tl { sfc \int_eval:n { \int_mod:nn { #1 - 1 } { 6 } + 1 } }
+    \fill [ \l__sf_plan_col_tl !30 ] ( \l__sf_plan_a_tl , 0.07cm ) rectangle ( \l__sf_plan_x_tl , 0.42cm ) ;
+    \node [ sf/tl/phase , text = \l__sf_plan_col_tl !60!black ]
+      at ( $ ( \l__sf_plan_a_tl , 0.245cm ) ! 0.5 ! ( \l__sf_plan_x_tl , 0.245cm ) $ ) {#2} ;
+  }
+% minor tick at every first of month, year at every January
+\cs_new_protected:Npn \__sf_tl_ticks:
+  {
+    \__sf_plan_ym:n { \l__sf_plan_min_int }
+    \__sf_plan_next_month:
+    \__sf_plan_first:nn { \l__sf_plan_a_int } { \l__sf_plan_b_int }
+    \int_while_do:nNnn \l__sf_plan_first_int < \l__sf_plan_max_int
+      {
+        \tl_set:Nx \l__sf_plan_x_tl
+          { \fp_eval:n { round ( ( \l__sf_plan_first_int - \l__sf_plan_min_int ) * \l__sf_tl_scale_fp , 4 ) } cm }
+        \int_compare:nNnTF \l__sf_plan_b_int = { 1 }
+          {
+            \draw [ sf/tl/minor , thick ] ( \l__sf_plan_x_tl , -0.3cm ) -- ( \l__sf_plan_x_tl , 0.07cm ) ;
+            \node [ sf/tl/year ] at ( \l__sf_plan_x_tl , -0.08cm )
+              { \int_use:N \l__sf_plan_a_int } ;
+          }
+          { \draw [ sf/tl/minor ] ( \l__sf_plan_x_tl , -0.12cm ) -- ( \l__sf_plan_x_tl , 0cm ) ; }
+        \__sf_plan_next_month:
+        \__sf_plan_first:nn { \l__sf_plan_a_int } { \l__sf_plan_b_int }
+      }
+  }
+\cs_new_protected:Npn \__sf_tl_ms:nnnn #1#2#3#4   % n ID date name
+  {
+    \__sf_tl_x:nnn {#3} {#1} { \seq_count:N \g__sf_tl_ms_seq }
+    \tl_set:Nx \l__sf_plan_y_tl { \int_if_odd:nTF {#1} { 0.65cm } { 1.45cm } }
+    \node [ sf/tl/ms ] at ( \l__sf_plan_x_tl , 0 ) { } ;
+    \draw [ sf/tl/tick ] ( \l__sf_plan_x_tl , 0.42cm ) -- ( \l__sf_plan_x_tl , \l__sf_plan_y_tl ) ;
+    \node [ sf/tl/label , anchor = south ] at ( \l__sf_plan_x_tl , \l__sf_plan_y_tl )
+      { \textbf{#2}~#4 \\ #3 } ;
+  }
+\cs_new_protected:Npn \__sf_tl_rel:nnn #1#2#3   % n version date
+  {
+    \__sf_tl_x:nnn {#3} {#1} { \seq_count:N \g__sf_tl_rel_seq }
+    \tl_set:Nx \l__sf_plan_y_tl { \int_if_odd:nTF {#1} { -0.6cm } { -1.3cm } }
+    \node [ sf/tl/rel ] at ( \l__sf_plan_x_tl , 0 ) { } ;
+    \draw [ sf/tl/tick ] ( \l__sf_plan_x_tl , -0.15cm ) -- ( \l__sf_plan_x_tl , \l__sf_plan_y_tl ) ;
+    \node [ sf/tl/label , anchor = north ] at ( \l__sf_plan_x_tl , \l__sf_plan_y_tl )
+      { \textbf{#2} \\ #3 } ;
+  }
+
+% =============================================================================
+%  Organisation chart: a tree, children centred under their parent
+% =============================================================================
+\seq_new:N \g__sf_org_seq                 % {ID}{parent}{title}{people}
+\prop_new:N \g__sf_org_id_prop            % ID -> n
+\prop_new:N \g__sf_org_kids_prop          % n -> child numbers (clist)
+\prop_new:N \g__sf_org_w_prop             % n -> subtree width (slots)
+\prop_new:N \g__sf_org_cur_prop           % n -> next free slot for its children
+\prop_new:N \g__sf_org_x_prop             % n -> x (slots)
+\prop_new:N \g__sf_org_d_prop             % n -> depth
+\clist_new:N \g__sf_org_roots_clist
+\fp_new:N \g__sf_org_next_fp              % next free slot for a root
+\NewDocumentEnvironment { sfOrgChart } { O{} }
+  {
+    \sf_begin:nnn { sfOrgChart } { xstep = 3.4cm , ystep = 2.1cm } {#1}
+    \seq_gclear:N \g__sf_org_seq
+    \DeclareDocumentCommand \Unit { O{} m m m }
+      { \seq_gput_right:Nn \g__sf_org_seq { {##2} {##1} {##3} {##4} } }
+    \ignorespaces
+  }
+  { \__sf_org_draw: }
+
+\cs_new_protected:Npn \__sf_org_draw:
+  {
+    \prop_gclear:N \g__sf_org_id_prop
+    \prop_gclear:N \g__sf_org_kids_prop
+    \prop_gclear:N \g__sf_org_w_prop
+    \prop_gclear:N \g__sf_org_cur_prop
+    \prop_gclear:N \g__sf_org_x_prop
+    \prop_gclear:N \g__sf_org_d_prop
+    \clist_gclear:N \g__sf_org_roots_clist
+    \seq_map_indexed_inline:Nn \g__sf_org_seq
+      {
+        \tl_set:Nx \l__sf_plan_a_tl { \tl_item:nn {##2} { 1 } }
+        \prop_if_in:NVTF \g__sf_org_id_prop \l__sf_plan_a_tl
+          { \sf_problem:x { duplicate~ID~\exp_not:V \l__sf_plan_a_tl } }
+          { \prop_gput:NVn \g__sf_org_id_prop \l__sf_plan_a_tl {##1} }
+      }
+    \seq_map_indexed_inline:Nn \g__sf_org_seq { \__sf_org_link:nnnnn {##1} ##2 }
+    % layout: roots side by side
+    \fp_gzero:N \g__sf_org_next_fp
+    \clist_map_inline:Nn \g__sf_org_roots_clist
+      {
+        \__sf_org_width:n {##1}
+        \use:x { \__sf_org_place:nnn {##1} { \fp_use:N \g__sf_org_next_fp } { 0 } }
+        \fp_gadd:Nn \g__sf_org_next_fp { \prop_item:Nn \g__sf_org_w_prop {##1} }
+      }
+    % units never placed hang on a parent cycle
+    \seq_map_indexed_inline:Nn \g__sf_org_seq
+      {
+        \prop_if_in:NnF \g__sf_org_x_prop {##1}
+          { \sf_problem:x { \tl_item:nn {##2} { 1 } :~parent~cycle,~not~drawn } }
+      }
+    \begin{tikzpicture}
+      \seq_map_indexed_inline:Nn \g__sf_org_seq
+        { \prop_if_in:NnT \g__sf_org_x_prop {##1} { \__sf_org_node:nnnnn {##1} ##2 } }
+      \prop_map_inline:Nn \g__sf_org_kids_prop
+        {
+          \prop_if_in:NnT \g__sf_org_x_prop {##1}
+            {
+              \clist_map_inline:nn {##2}
+                {
+                  \prop_if_in:NnT \g__sf_org_x_prop {####1}
+                    {
+                      \draw [ sf/org/edge ] ( sfo##1.south ) -- ++ ( 0 , -0.3cm )
+                        -| ( sfo####1.north ) ;
+                    }
+                }
+            }
+        }
+      \sf_problems_draw:
+    \end{tikzpicture}
+  }
+\cs_new_protected:Npn \__sf_org_link:nnnnn #1#2#3#4#5   % n ID parent title people
+  {
+    \tl_if_blank:nTF {#3}
+      { \clist_gput_right:Nn \g__sf_org_roots_clist {#1} }
+      {
+        \prop_get:NnNTF \g__sf_org_id_prop {#3} \l__sf_plan_a_tl
+          {
+            \tl_if_eq:NnTF \l__sf_plan_a_tl {#1}
+              {
+                \sf_problem:n { #2:~is~its~own~parent }
+                \clist_gput_right:Nn \g__sf_org_roots_clist {#1}
+              }
+              {
+                \prop_get:NVNTF \g__sf_org_kids_prop \l__sf_plan_a_tl \l__sf_plan_b_tl
+                  { \tl_put_right:Nn \l__sf_plan_b_tl { , #1 } }
+                  { \tl_set:Nn \l__sf_plan_b_tl {#1} }
+                \prop_gput:NVV \g__sf_org_kids_prop \l__sf_plan_a_tl \l__sf_plan_b_tl
+              }
+          }
+          {
+            \sf_problem:n { #2:~unknown~parent~#3 }
+            \clist_gput_right:Nn \g__sf_org_roots_clist {#1}
+          }
+      }
+  }
+% subtree width of #1 in slots (post-order)
+\cs_new:Npn \__sf_org_wsum:n #1 { + \prop_item:Nn \g__sf_org_w_prop {#1} }
+\cs_new_protected:Npn \__sf_org_width:n #1
+  {
+    \prop_get:NnNTF \g__sf_org_kids_prop {#1} \l__sf_plan_b_tl
+      {
+        \clist_map_inline:Nn \l__sf_plan_b_tl { \__sf_org_width:n {##1} }
+        \prop_get:NnN \g__sf_org_kids_prop {#1} \l__sf_plan_b_tl
+        \prop_gput:Nnx \g__sf_org_w_prop {#1}
+          { \fp_eval:n { max ( 1 , 0 \clist_map_function:NN \l__sf_plan_b_tl \__sf_org_wsum:n ) } }
+      }
+      { \prop_gput:Nnn \g__sf_org_w_prop {#1} { 1 } }
+  }
+% place #1 and its subtree from slot #2 on, depth #3
+\cs_new_protected:Npn \__sf_org_place:nnn #1#2#3
+  {
+    \prop_gput:Nnx \g__sf_org_x_prop {#1}
+      { \fp_eval:n { #2 + \prop_item:Nn \g__sf_org_w_prop {#1} / 2 } }
+    \prop_gput:Nnn \g__sf_org_d_prop {#1} {#3}
+    \prop_gput:Nnx \g__sf_org_cur_prop {#1} { \fp_eval:n {#2} }
+    \prop_get:NnNT \g__sf_org_kids_prop {#1} \l__sf_plan_b_tl
+      {
+        \clist_map_inline:Nn \l__sf_plan_b_tl
+          {
+            \use:x
+              {
+                \__sf_org_place:nnn {##1}
+                  { \prop_item:Nn \g__sf_org_cur_prop {#1} } { \int_eval:n { #3 + 1 } }
+              }
+            \prop_gput:Nnx \g__sf_org_cur_prop {#1}
+              {
+                \fp_eval:n
+                  { \prop_item:Nn \g__sf_org_cur_prop {#1} + \prop_item:Nn \g__sf_org_w_prop {##1} }
+              }
+          }
+      }
+  }
+\cs_new_protected:Npn \__sf_org_node:nnnnn #1#2#3#4#5   % n ID parent title people
+  {
+    \tl_set:Nx \l__sf_plan_x_tl
+      { \fp_to_dim:n { \prop_item:Nn \g__sf_org_x_prop {#1} * \l_sf_xstep_dim } }
+    \tl_set:Nx \l__sf_plan_y_tl
+      { \fp_to_dim:n { - \prop_item:Nn \g__sf_org_d_prop {#1} * \l_sf_ystep_dim } }
+    \node [ sf/org/unit ] ( sfo#1 ) at ( \l__sf_plan_x_tl , \l__sf_plan_y_tl )
+      { \textbf{#4} \tl_if_blank:nF {#5} { \\ \footnotesize #5 } } ;
+  }
+
+% =============================================================================
+%  RACI matrix (a table): roles as columns, one row per activity
+% =============================================================================
+\clist_new:N \g__sf_raci_roles_clist
+\seq_new:N \g__sf_raci_rows_seq           % {activity}{assignments}
+\prop_new:N \l__sf_raci_row_prop          % role -> letters
+\tl_new:N \l__sf_raci_head_tl
+\tl_new:N \l__sf_raci_body_tl
+\tl_new:N \l__sf_raci_probs_tl
+\int_new:N \l__sf_raci_a_int
+\int_new:N \l__sf_raci_r_int
+\bool_new:N \l__sf_raci_ok_bool
+\bool_new:N \l__sf_raci_known_bool
+\NewDocumentEnvironment { sfRaci } { O{} }
+  {
+    \sf_begin:nnn { sfRaci } { } {#1}
+    \clist_gclear:N \g__sf_raci_roles_clist
+    \seq_gclear:N \g__sf_raci_rows_seq
+    \DeclareDocumentCommand \Roles { m } { \clist_gset:Nn \g__sf_raci_roles_clist {##1} }
+    \DeclareDocumentCommand \Activity { m m }
+      { \seq_gput_right:Nn \g__sf_raci_rows_seq { {##1} {##2} } }
+    \ignorespaces
+  }
+  { \__sf_raci_table: }
+
+\cs_new_protected:Npn \__sf_raci_letter:n #1     % one letter as a coloured box
+  {
+    \str_case:nnF {#1}
+      {
+        { A } { \colorbox { sfaccent } { \makebox [ 0.8em ] { \textcolor { white } { \textbf { A } } } } }
+        { R } { \colorbox { sfc1 !30 } { \makebox [ 0.8em ] { \textbf { R } } } }
+        { C } { \colorbox { sfc2 !30 } { \makebox [ 0.8em ] { C } } }
+        { I } { \colorbox { sfext } { \makebox [ 0.8em ] { I } } }
+      }
+      { \textcolor { sfwarn } { \textbf {#1} } }
+  }
+\cs_new_protected:Npn \__sf_raci_table:
+  {
+    \clist_if_empty:NT \g__sf_raci_roles_clist { \sf_problem:n { no~Roles~given } }
+    \tl_set:Nn \l__sf_raci_head_tl { \textbf { Activity } }
+    \clist_map_inline:Nn \g__sf_raci_roles_clist
+      { \tl_put_right:Nn \l__sf_raci_head_tl { & \textbf {##1} } }
+    \tl_clear:N \l__sf_raci_body_tl
+    \seq_map_inline:Nn \g__sf_raci_rows_seq { \__sf_raci_row:nn ##1 }
+    \seq_if_empty:NT \g__sf_raci_rows_seq
+      {
+        \tl_put_right:Nx \l__sf_raci_body_tl
+          {
+            \exp_not:N \multicolumn { \int_eval:n { \clist_count:N \g__sf_raci_roles_clist + 1 } } { l }
+              { \exp_not:N \textcolor { sfmuted } { \exp_not:N \textit { no~activities } } } \exp_not:N \\
+          }
+      }
+    \tl_clear:N \l__sf_raci_probs_tl
+    \seq_if_empty:NF \g__sf_problems_seq
+      {
+        \tl_clear:N \l__sf_plan_c_tl
+        \seq_map_indexed_inline:Nn \g__sf_problems_seq
+          {
+            \int_compare:nNnT {##1} > { 1 } { \tl_put_right:Nn \l__sf_plan_c_tl { \\ } }
+            \tl_put_right:Nn \l__sf_plan_c_tl {##2}
+          }
+        \tl_set:Nx \l__sf_raci_probs_tl
+          {
+            \exp_not:N \\
+            {
+              \exp_not:N \scriptsize \exp_not:N \color { sfwarn }
+              \exp_not:N \renewcommand \exp_not:N \arraystretch { 1 }
+              \exp_not:N \begin{tabular}[t]{@{}l@{}}
+                \exp_not:V \l__sf_plan_c_tl
+              \exp_not:N \end{tabular}
+            }
+          }
+      }
+    \seq_gclear:N \g__sf_problems_seq
+    \tl_set:Nx \l__sf_plan_a_tl
+      { @{} l \prg_replicate:nn { \clist_count:N \g__sf_raci_roles_clist } { c } @{} }
+    \begin{tabular}[t]{@{}l@{}}
+      \exp_args:NnV \begin{tabular} \l__sf_plan_a_tl
+        \toprule
+        \l__sf_raci_head_tl \\
+        \midrule
+        \l__sf_raci_body_tl
+        \bottomrule
+      \end{tabular}
+      \l__sf_raci_probs_tl
+    \end{tabular}
+  }
+\cs_new_protected:Npn \__sf_raci_row:nn #1#2   % activity, assignments
+  {
+    \prop_clear:N \l__sf_raci_row_prop
+    \int_zero:N \l__sf_raci_a_int
+    \int_zero:N \l__sf_raci_r_int
+    \clist_map_inline:nn {#2}
+      {
+        \seq_set_split:Nnn \l__sf_plan_seq { = } {##1}
+        \int_compare:nNnTF { \seq_count:N \l__sf_plan_seq } = { 2 }
+          {
+            \tl_set:Nx \l__sf_plan_a_tl { \seq_item:Nn \l__sf_plan_seq { 1 } }
+            \tl_set:Nx \l__sf_plan_b_tl { \seq_item:Nn \l__sf_plan_seq { 2 } }
+            \tl_remove_all:Nn \l__sf_plan_b_tl { / }
+            \tl_remove_all:Nn \l__sf_plan_b_tl { ~ }
+            \clist_if_in:NVTF \g__sf_raci_roles_clist \l__sf_plan_a_tl
+              { \bool_set_true:N \l__sf_raci_known_bool }
+              {
+                \bool_set_false:N \l__sf_raci_known_bool
+                \sf_problem:x { \exp_not:n {#1} :~unknown~role~\l__sf_plan_a_tl }
+              }
+            \tl_map_inline:Nn \l__sf_plan_b_tl
+              {
+                \str_case:nnF {####1}
+                  {
+                    { A } { \bool_if:NT \l__sf_raci_known_bool { \int_incr:N \l__sf_raci_a_int } }
+                    { R } { \bool_if:NT \l__sf_raci_known_bool { \int_incr:N \l__sf_raci_r_int } }
+                    { C } { }
+                    { I } { }
+                  }
+                  { \sf_problem:n { #1:~`####1'~is~not~R,~A,~C~or~I } }
+              }
+            \prop_put:NVV \l__sf_raci_row_prop \l__sf_plan_a_tl \l__sf_plan_b_tl
+          }
+          { \tl_if_blank:nF {##1} { \sf_problem:n { #1:~`##1'~is~not~role=letter } } }
+      }
+    \bool_set_true:N \l__sf_raci_ok_bool
+    \int_compare:nNnF \l__sf_raci_a_int = { 1 }
+      {
+        \bool_set_false:N \l__sf_raci_ok_bool
+        \sf_problem:x
+          { \exp_not:n {#1} :~\int_use:N \l__sf_raci_a_int \c_space_tl A~(exactly~one~needed) }
+      }
+    \int_compare:nNnT \l__sf_raci_r_int = { 0 }
+      { \bool_set_false:N \l__sf_raci_ok_bool \sf_problem:n { #1:~no~R } }
+    \bool_if:NTF \l__sf_raci_ok_bool
+      { \tl_put_right:Nn \l__sf_raci_body_tl {#1} }
+      { \tl_put_right:Nn \l__sf_raci_body_tl { \textcolor { sfwarn } {#1} } }
+    \clist_map_inline:Nn \g__sf_raci_roles_clist
+      {
+        \tl_put_right:Nn \l__sf_raci_body_tl { & }
+        \prop_get:NnNT \l__sf_raci_row_prop {##1} \l__sf_plan_b_tl
+          {
+            \tl_map_inline:Nn \l__sf_plan_b_tl
+              { \tl_put_right:Nn \l__sf_raci_body_tl { \__sf_raci_letter:n {####1} } }
+          }
+      }
+    \tl_put_right:Nn \l__sf_raci_body_tl { \\ }
+  }
+\ExplSyntaxOff
+\endinput
