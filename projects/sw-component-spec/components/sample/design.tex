@@ -1,0 +1,57 @@
+% Design view of the component -- three free-text sections of the Component
+% chapter. Any LaTeX works inside (subsubsections, formulas, tables, TikZ,
+% verbatim). Write each \end{...} on its own line; a missing block shows a
+% placeholder. Blocks of the same kind are printed in order.
+%
+%   \begin{StaticArchitecture}  -> x.x Static Architecture (after the units table and diagram)
+%   \begin{DynamicBehavior}     -> x.x Dynamic Behavior (modes, sequences, scheduling, timing)
+%   \begin{ErrorHandling}       -> x.x Error Handling (faults, reactions, safety mechanisms)
+
+\begin{StaticArchitecture}
+All three units are ASIL B; no freedom-from-interference argument is needed
+inside the component. \texttt{heat\_pi} is the only unit called by the
+scheduler and the only one that writes an output. \texttt{setpoint\_ctrl} and
+\texttt{temp\_filter} hold their own static state and do not call each other.
+Only the interfaces in the API header are visible outside the component.
+\end{StaticArchitecture}
+
+\begin{DynamicBehavior}
+\texttt{HeaterCtrl\_MainFunction()} runs in the 10 ms task. One cycle reads the
+inputs, regulates and writes the output in a fixed order
+(Figure~\ref{fig:main-cycle}). \texttt{SetpointCtrl\_Set()} is called from the
+100 ms HMI task. The effective setpoint is read once per cycle, so a set
+request takes effect in the next 10 ms cycle at the latest.
+
+% Figure code (TikZ) in this component's figures/main_cycle.tex.
+\begin{figure}[htbp]
+  \centering
+  \InputFigure{main_cycle}
+  \caption{One 10 ms cycle of \texttt{HeaterCtrl\_MainFunction()}.}
+  \label{fig:main-cycle}
+\end{figure}
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Mode} & \textbf{Entered when} & \textbf{Heater duty} \\ \midrule
+  NORMAL   & after \texttt{HeaterCtrl\_Init()} & PI output, $0 \le d \le 1000$ \\
+  DEGRADED & NvM read failed                   & PI output, setpoint 20 \\
+  SAFE     & temperature implausible           & $d = 0$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\end{DynamicBehavior}
+
+\begin{ErrorHandling}
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  \textbf{Fault} & \textbf{Detected by} & \textbf{Reaction} \\ \midrule
+  NvM read fails         & \texttt{setpoint\_ctrl} & default setpoint 20, \texttt{DEM\_E\_NVM\_READ} \\
+  Temperature implausible & \texttt{temp\_filter}  & SAFE mode within one cycle, \texttt{DEM\_E\_TEMP\_SENSOR} \\
+  Setpoint out of range  & \texttt{setpoint\_ctrl} & request rejected, \texttt{E\_NOT\_OK} \\
+  \bottomrule
+\end{tabular}
+\end{center}
+SAFE mode is left only by \texttt{HeaterCtrl\_Init()} (next ignition cycle).
+\end{ErrorHandling}

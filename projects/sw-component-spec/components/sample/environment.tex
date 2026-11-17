@@ -1,0 +1,11 @@
+% Test environment: {item}{description}{version}
+\Tool{Execution platform}{SIL: host x86_64 (Linux), 10 ms task simulated}{}
+\Tool{Compiler / flags}{gcc \code{-O0 -g --coverage}}{14.2}
+\Tool{Test framework}{GoogleTest}{1.15}
+\Tool{Coverage tool}{gcov + lcov (function and call coverage)}{2.1}
+\Tool{Target build}{Cross compiler for the resource check (linker map)}{12.3}
+
+\ToolQualification{
+  Tool confidence level TCL1 for all tools (ISO 26262-8 clause 11); no
+  qualification needed.
+}

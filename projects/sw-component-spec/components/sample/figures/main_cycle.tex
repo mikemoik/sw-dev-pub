@@ -1,0 +1,17 @@
+% One cycle of HeaterCtrl_MainFunction() -- a bare tikzpicture (no preamble).
+% Write \_ in node text here: figure code is read like a FreeText block.
+\begin{tikzpicture}[mc unit/.style={draw=accent, fill=swcsunit, minimum width=2.6cm,
+                     minimum height=0.8cm, font=\small\ttfamily},
+                    mc msg/.style={->, >={Stealth}, accent},
+                    mc lbl/.style={above, font=\scriptsize\ttfamily}]
+  \node[mc unit] (h1) at (0, 0)  {heat\_pi};
+  \node[mc unit] (h2) at (4, 0)  {temp\_filter};
+  \node[mc unit] (h3) at (8, 0)  {setpoint\_ctrl};
+  \node[mc unit, fill=white] (h4) at (12, 0) {IoHwAb};
+  \foreach \h in {h1, h2, h3, h4}
+    \draw[accent, dashed] (\h.south) -- ++(0, -3.6);
+  \draw[mc msg] (0, -0.9) -- node[mc lbl] {TempFilter\_Get()} (4, -0.9);
+  \draw[mc msg] (4, -1.5) -- node[mc lbl] {IoHwAb\_GetCabinTemp()} (12, -1.5);
+  \draw[mc msg] (0, -2.2) -- node[mc lbl] {SetpointCtrl\_GetEffective()} (8, -2.2);
+  \draw[mc msg] (0, -3.0) -- node[mc lbl, pos=0.75] {IoHwAb\_SetHeaterDuty(d)} (12, -3.0);
+\end{tikzpicture}

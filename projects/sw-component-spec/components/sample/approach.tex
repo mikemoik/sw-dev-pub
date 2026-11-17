@@ -1,0 +1,47 @@
+% Test approach.
+
+% {method}{yes / no}{remark}
+\VerificationMethod{Requirements-based test}{yes}{}
+\VerificationMethod{Interface test}{yes}{provided and internal interfaces}
+\VerificationMethod{Fault injection test}{yes}{NvM and sensor faults}
+\VerificationMethod{Resource usage evaluation}{yes}{RAM/ROM from the linker map; timing by analysis}
+\VerificationMethod{Back-to-back test (model vs.\ code)}{no}{no model}
+
+% How the units are put together; the steps follow.
+\IntegrationStrategy{
+  Bottom-up: the units come from their unit verification (\DocRef{suts-spc},
+  \DocRef{suts-tf}, \DocRef{suts-pi}). Step IS-1 integrates the control path,
+  step IS-2 adds the setpoint handling and is the complete component.
+}
+
+% {ID}{units integrated so far}{description} -- test cases refer to it with \Integration{ID}
+\IntegrationStep{IS-1}{temp_filter, heat_pi}{Control path; setpoint_ctrl replaced by a stub with a fixed setpoint}
+\IntegrationStep{IS-2}{temp_filter, heat_pi, setpoint_ctrl}{Complete component}
+
+% one line per technique
+\DerivationTechnique{analysis of requirements and of the architecture}
+\DerivationTechnique{equivalence class partitioning of inputs and modes}
+\DerivationTechnique{analysis of the interfaces between the units}
+\DerivationTechnique{error guessing}
+
+% {metric}{target}{justification if not met} -- plain numbers get a % sign
+\Coverage{Function}{100}{review of uncalled functions}
+\Coverage{Call}{100}{review of unexecuted calls}
+
+\EntryCriterion{All units passed their unit verification; component baseline \TheBaseline\ built without warnings.}
+\EntryCriterion{Requirements \DocRef{srs} and architecture \DocRef{arch} are reviewed.}
+\ExitCriterion{All test cases executed; all passed or deviations accepted.}
+\ExitCriterion{Coverage targets reached or gaps justified; resource budgets met.}
+
+\PassFailCriteria{
+  A test case passes if every step yields the expected result and no
+  unexpected diagnostic event, assertion or timeout occurs.
+}
+
+% Free text example: shared figure code from the root figures/ folder.
+\begin{FreeText}
+\subsection{Verification Process}
+\begin{center}
+\InputFigure{test_process}
+\end{center}
+\end{FreeText}

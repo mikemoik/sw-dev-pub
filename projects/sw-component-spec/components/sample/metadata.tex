@@ -1,0 +1,23 @@
+% Document and component data. Just replace the text inside the braces.
+% Underscores may be typed as is (heater_ctrl). Escape only: \& \% \# \$
+\DocID{SWCS-HC-001}
+\DocVersion{0.2}
+\DocStatus{In Review}          % Draft / In Review / Released
+% \DocDate{2026-11-17}         % default: today
+\ProjectName{Example Heater Controller}
+\Company{Example Corp / Software Engineering}
+
+\Author{Jane Doe}
+\Reviewer{John Roe}
+\Approver{Alex Poe}
+
+\ComponentName{heater_ctrl}
+\ComponentBaseline{git: 8c41d07 (tag heater_ctrl-v2.1.0)}
+\IntegrityLevel{ASIL B}        % QM / ASIL A--D / SIL n / n.a.
+\SourceFiles{src/heater_ctrl/ (3 units), include/heater_ctrl.h}
+\Language{C99, MISRA C:2012}
+\ArchitectureReference{\DocRef{arch}, section 3.4}
+
+% One line per document version: {version}{date}{author}{change}
+\Revision{0.1}{2026-11-10}{Jane Doe}{Initial draft}
+\Revision{0.2}{2026-11-17}{Jane Doe}{Sensor fault test and resource budgets added after review}

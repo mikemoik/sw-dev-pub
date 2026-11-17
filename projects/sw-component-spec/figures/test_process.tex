@@ -1,0 +1,19 @@
+% Component verification process of the project -- shared figure code (root
+% figures/), used by every component via \InputFigure{test_process}. A
+% component's own figures/test_process.tex would take precedence. Only a
+% tikzpicture: no preamble, no \begin{document}.
+\begin{tikzpicture}[node distance=0.9cm,
+    tp proc/.style={draw=accent, fill=swcsunit, rounded corners, align=center,
+                 minimum width=3.0cm, minimum height=1.1cm, font=\small},
+    tp out/.style={font=\scriptsize\itshape, text=accent, align=center}]
+  \node[tp proc] (units) {Units verified\\(unit tests)};
+  \node[tp proc, right=of units] (int) {Integrate\\step by step};
+  \node[tp proc, right=of int] (exec) {Execute\\component tests};
+  \node[tp proc, right=of exec] (rep) {Report and\\review};
+  \foreach \a/\b in {units/int, int/exec, exec/rep}
+    \draw[->, >={Stealth}, accent, thick] (\a) -- (\b);
+  \node[tp out, below=0.25cm of units] {unit test specs};
+  \node[tp out, below=0.25cm of int] {this specification};
+  \node[tp out, below=0.25cm of exec] {logs, coverage};
+  \node[tp out, below=0.25cm of rep] {test report};
+\end{tikzpicture}

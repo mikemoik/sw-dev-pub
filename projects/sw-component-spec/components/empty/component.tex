@@ -1,0 +1,39 @@
+% The component: what it does, its units, interfaces and resources.
+% Identification data comes from metadata.tex.
+% Example: components/sample/component.tex.
+
+% \FunctionalDescription{
+%   \TheComponent\ ...
+% }
+
+% Units of the component: {unit}{responsibility}{unit verification}
+% \Unit{}{}{}
+
+% Requirements realised by each unit: {unit}{REQ, REQ}
+% \Allocate{}{}
+
+% Provided interfaces: [unit that realises it]{name}{type / range / timing}{description}
+% \ProvidedInterface[]{}{}{}
+
+% Required interfaces: [providing component]{name}{description}{replaced by}{behaviour in test}
+% [component] is optional: interfaces of one component share a box in the diagrams.
+% \RequiredInterface[]{}{}{Stub}{}
+
+% Use relations for the structure diagram: {unit}{unit or component}{interfaces}
+% \Uses{}{}{}
+
+% Who uses the component: {component}{interfaces it calls}
+% \Caller{}{}
+
+% Resource budgets: {resource}{budget}{verified by}
+% \Resource{RAM}{}{}
+
+% Configuration parameters: {name}{values / default}{description}
+% \ConfigParameter{}{}{}
+
+% Free text: any LaTeX, printed at the end of this chapter. Source files of the
+% component go to code/ and are listed with \InputCode{file}.
+% \begin{FreeText}
+% \subsection{Public API (excerpt)}
+% \InputCode{component.h}
+% \end{FreeText}

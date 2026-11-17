@@ -1,0 +1,41 @@
+% Introduction. Plain text; empty lines start a new paragraph.
+
+% Optional: replace the default purpose text.
+% \Purpose{This document ...}
+
+\Scope{
+  In scope: the component \TheComponent\ with its three units in the series
+  configuration: its provided interfaces, the interaction of its units, its
+  error handling and its resource budgets.
+
+  Out of scope: the internals of each unit (verified by their unit test
+  specifications), the NvM, Dem and IoHwAb modules (basic software), and the
+  heater power stage (system integration test).
+}
+
+% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
+% in this order. internal = your organisation's documents, external = standards,
+% guidelines, supplier documents. Cite them anywhere with \DocRef{key}.
+\Reference{srs}{internal}{Software Requirements Specification, SRS-SPC-001}{1.3}
+\Reference{arch}{internal}{Software Architecture Description, SAD-HC-002}{2.0}
+\Reference{suts-spc}{internal}{Software Unit Test Specification setpoint_ctrl, SUTS-SPC-001}{0.2}
+\Reference{suts-tf}{internal}{Software Unit Test Specification temp_filter, SUTS-TF-001}{1.0}
+\Reference{suts-pi}{internal}{Software Unit Test Specification heat_pi, SUTS-PI-001}{1.1}
+\Reference{plan}{internal}{Software Verification Plan, SVP-PRJ-002}{2.0}
+\Reference{29119}{external}{ISO/IEC/IEEE 29119-3 -- Test documentation}{2021}
+\Reference{aspice}{external}{Automotive SPICE PAM -- SWE.2, SWE.5}{4.0}
+\Reference{26262}{external}{ISO 26262-6 -- Clauses 7 and 10}{2018}
+
+% Stakeholders and use cases (optional; usually taken over from the SRS).
+% {use case}{actor, actor} -- actors are collected automatically.
+\UseCaseNote{System-level use cases the component contributes to, from \DocRef{srs}.}
+\UseCase{Set cabin temperature}{Vehicle occupant}
+\UseCase{Heat the cabin to the setpoint}{Vehicle occupant}
+\UseCase{Read controller state}{Service technician, Diagnostic tester}
+
+% {term}{definition}
+\Term{CUT}{Component Under Test}
+\Term{TC}{Test Case}
+\Term{IS}{Integration Step}
+\Term{WCET}{Worst-Case Execution Time}
+\Term{NvM, Dem, IoHwAb}{Non-volatile Memory manager, Diagnostic event manager, I/O Hardware Abstraction}

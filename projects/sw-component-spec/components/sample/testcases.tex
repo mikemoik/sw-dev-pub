@@ -1,0 +1,75 @@
+% Test cases. \TestGroup starts a sub-heading. Inside a TestCase all fields
+% are optional and can be in any order; they are always printed in the same order.
+%   \Objective  \Verifies{REQ, REQ}  \Integration{step}  \Method  \Priority
+%   \Preconditions  \InputData{free text}  \InputValue{name}{value}{class}
+%   \Step{action}{expected result}  (one per step)  \Postconditions  \Implementation
+
+\TestGroup{Control Path (IS-1)}
+
+\begin{TestCase}{TC-HC-001}{Controller reaches the setpoint}
+  \Objective{Filtered temperature and controller work together in closed loop.}
+  \Verifies{SWR-0100, CR-010, CR-011}
+  \Integration{IS-1}
+  \Method{Requirements-based; interface test}
+  \Priority{High}
+  \Preconditions{setpoint_ctrl stub returns 22.0; IoHwAb fake plays a plant model starting at 15.0.}
+  \Step{Call HeaterCtrl_Init().}{No Dem event reported.}
+  \Step{Call HeaterCtrl_MainFunction() 60000 times (10 min).}{IoHwAb_SetHeaterDuty() called once per call.}
+  \Step{Evaluate the temperature of the last 60 s.}{Within 21.0 .. 23.0.}
+  \Implementation{test/heater_ctrl_test.cpp: ControlPath.ReachesSetpoint}
+\end{TestCase}
+
+\begin{TestCase}{TC-HC-002}{Implausible temperature switches the heater off}
+  \Objective{Sensor fault detected in temp_filter leads to duty 0 in heat_pi.}
+  \Verifies{SWR-0200}
+  \Integration{IS-1}
+  \Method{Fault injection}
+  \Priority{High}
+  \Preconditions{Running as in TC-HC-001, duty above 0.}
+  \InputValue{IoHwAb_GetCabinTemp()}{-500 (= -50.0)}{below plausible range}
+  \Step{Inject the value and call HeaterCtrl_MainFunction() 10 times.}{Duty 0 from the first call on.}
+  \Step{Check the Dem mock.}{DEM_E_TEMP_SENSOR reported once.}
+  \Implementation{test/heater_ctrl_test.cpp: ControlPath.SensorFault}
+\end{TestCase}
+
+\TestGroup{Complete Component (IS-2)}
+
+\begin{TestCase}{TC-HC-003}{Setpoint change is ramped at the duty}
+  \Objective{Ramp of setpoint_ctrl seen through heat_pi (not testable in the unit test).}
+  \Verifies{SWR-0130, SWR-0110}
+  \Integration{IS-2}
+  \Method{Requirements-based}
+  \Priority{Medium}
+  \Preconditions{Component initialised; NvM stub returns setpoint 20.}
+  \InputValue{sp}{100}{max (valid)}
+  \InputValue{sp}{101}{max+1 (invalid)}
+  \Step{SetpointCtrl_Set(100), then 1000 calls of HeaterCtrl_MainFunction().}{Returns E_OK; effective setpoint 40 after 10 s ($\pm 0.1$).}
+  \Step{SetpointCtrl_Set(101)}{Returns E_NOT_OK; ramp continues towards 100.}
+  \Implementation{test/heater_ctrl_test.cpp: Component.SetpointRamp}
+\end{TestCase}
+
+\begin{TestCase}{TC-HC-004}{NvM failure regulates to the default setpoint}
+  \Objective{Degraded setpoint of setpoint_ctrl is used by the controller.}
+  \Verifies{SWR-0120}
+  \Integration{IS-2}
+  \Method{Fault injection}
+  \Priority{High}
+  \Preconditions{NvM stub returns E_NOT_OK.}
+  \Step{Call HeaterCtrl_Init().}{SetpointCtrl_GetState() returns DEGRADED; DEM_E_NVM_READ reported once.}
+  \Step{Run 10 min as in TC-HC-001.}{Temperature of the last 60 s within 19.0 .. 21.0.}
+  \Implementation{test/heater_ctrl_test.cpp: Component.NvmFailure}
+\end{TestCase}
+
+\TestGroup{Resource Usage}
+
+\begin{TestCase}{TC-HC-005}{RAM and ROM within budget}
+  \Objective{Static memory of the component in the target build.}
+  \Verifies{CR-021}
+  \Integration{IS-2}
+  \Method{Resource usage evaluation}
+  \Priority{Medium}
+  \Preconditions{Target build of the baseline with its linker map.}
+  \Step{Sum the .bss and .data sections of src/heater_ctrl/.}{At most 512 bytes.}
+  \Step{Sum the .text and .rodata sections of src/heater_ctrl/.}{At most 6144 bytes.}
+  \Implementation{ci/check_resources.py --component heater_ctrl}
+\end{TestCase}

@@ -1,0 +1,50 @@
+% Requirements of the component, in four groups. Kind: functional | non-functional
+%
+% Software requirements -- allocated to the component from the SRS:
+%   \SoftwareRequirement{ID}{kind}{text}{source}
+% Component requirements -- derived from software requirements or from the
+% architecture (interfaces, timing, resources):
+%   \ComponentRequirement{ID}{kind}{text}{derived from: ID, ID}
+% Both are verified by the test cases (\Verifies in testcases.tex). Tables,
+% "verified by" and traceability are generated. Allocation to the units:
+% \Allocate in component.tex.
+
+% --- software, functional
+\SoftwareRequirement{SWR-0100}{functional}
+  {In steady state the cabin temperature stays within $\pm 1$ K of the effective setpoint.}
+  {\DocRef{srs}}
+\SoftwareRequirement{SWR-0110}{functional}
+  {Setpoints outside 0..100 are rejected with E_NOT_OK; the previous setpoint is kept.}
+  {\DocRef{srs}}
+\SoftwareRequirement{SWR-0120}{functional}
+  {If NvM cannot be read, the controller regulates to the default setpoint 20 and reports DEM_E_NVM_READ.}
+  {\DocRef{srs}}
+\SoftwareRequirement{SWR-0200}{functional}
+  {On an implausible cabin temperature the heater duty is set to 0 within 100 ms and DEM_E_TEMP_SENSOR is reported.}
+  {\DocRef{srs}, safety concept}
+
+% --- software, non-functional
+\SoftwareRequirement{SWR-0130}{non-functional}
+  {The effective setpoint changes by at most 2 K/s.}
+  {\DocRef{srs}}
+
+% --- component, functional
+\ComponentRequirement{CR-010}{functional}
+  {HeaterCtrl_MainFunction() reads the filtered temperature and the effective setpoint of the same 10 ms cycle.}
+  {SWR-0100}
+\ComponentRequirement{CR-011}{functional}
+  {The heater duty is written exactly once per HeaterCtrl_MainFunction() call.}
+  {SWR-0100, SWR-0200}
+
+% --- component, non-functional
+\ComponentRequirement{CR-020}{non-functional}
+  {HeaterCtrl_MainFunction() needs at most 200 us per call on the target.}
+  {}
+\ComponentRequirement{CR-021}{non-functional}
+  {The component uses at most 512 bytes of RAM and 6 KiB of ROM.}
+  {}
+
+% Requirements without a component test: {ID}{rationale / where verified instead}
+\NotComponentTested{CR-020}{Target timing measurement, see timing analysis report TAR-HC-001}
+
+% Free text here is printed at the end of the Requirements chapter.
