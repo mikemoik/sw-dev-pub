@@ -42,6 +42,17 @@ python3 scripts/clean.py -n           # only list what would be removed
 
 Removes the PDFs and LaTeX intermediates of `build.py` (`build/`) and of IDE or `latexmk` builds in the root folder (`<manual>.*`, `sw_project_manual.*`). The committed preview `sw_project_manual.pdf` is kept.
 
+## Open point list from GitLab
+
+```sh
+python3 scripts/gitlab_opl.py brake_mon issues.csv --date 2026-11-30               # -> manuals/brake_mon/opl.tex
+python3 scripts/gitlab_opl.py brake_mon issues.csv --date 2026-11-30 --comment Milestone
+```
+
+Input: the CSV of *Issues → Export as CSV*. Conventions: label `workflow::in progress` marks in-progress issues, `top::1` … `top::5` the top 5. Closed issues take the date of *Closed At*. `--date` is the export date (default today); due dates before it are marked overdue. The script rewrites `opl.tex` on every run. It refuses to overwrite one that has open points it did not write, unless you pass `--force`.
+
+Exports that don't follow the conventions: `--slim issues_slim.csv` keeps only the needed columns, then use the LLM chat below with `opl` (`--add issues_slim.csv`).
+
 ## Chat with an LLM
 
 Guides in `llm/` tell a chat model how the template works, so it can help fill in a manual's content files ("add a risk for a late supplier release"). The model asks for missing facts and answers with LaTeX lines to paste.

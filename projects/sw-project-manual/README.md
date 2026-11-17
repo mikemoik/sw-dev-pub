@@ -17,6 +17,7 @@ sw_project_manual.pdf     the sample manual, built: a preview of what the templa
 scripts/new_manual.py     creates manuals/<manual>/ from manuals/empty/
 scripts/build.py          builds manuals into build/<manual>.pdf
 scripts/clean.py          removes build output (build/ and root LaTeX files)
+scripts/gitlab_opl.py     writes a manual's opl.tex from a GitLab issue CSV export
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a manual's file
 llm/                      the guides it uses: general rules + one per content file
 scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)

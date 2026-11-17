@@ -22,6 +22,17 @@ Chapter 10: the project's open point list, converted from an export of the tool 
 6. **Order.** One line per point, in the order of the export. The template does the sorting.
 7. **Answer** with the whole file: the comment lines of the command reference, `\OpenPointExport`, then all `\OpenPoint` lines. This replaces the old `opl.tex`. With more than about 40 points, convert 40 per answer and continue when the engineer says "next".
 
+## GitLab issue exports
+
+A GitLab export that follows the project conventions is converted by `scripts/gitlab_opl.py` without you. You get GitLab exports only when they don't follow them; the engineer usually gives you the reduced file from `gitlab_opl.py --slim`. Use the same mapping as the script, and ask about anything that deviates:
+
+- ID: `\#` + Issue ID (e.g. `\#142`); topic: Title; responsible: Assignee.
+- status: State `Closed` → `closed`; label `workflow::in progress` → `in progress`; otherwise `open`. Ask how other labels (e.g. `Doing`, `workflow::review`) map.
+- top rank: label `top::1` … `top::5`.
+- date: Due Date; for closed issues the date part of Closed At.
+- comment: empty, unless the engineer names a column (e.g. Milestone).
+- as-of date: ask for the export date; source: `GitLab issue export <file name>`.
+
 ## Things you can do
 
 - Point out open or in-progress points without a responsible or a due date, and top-5 points that are closed.
