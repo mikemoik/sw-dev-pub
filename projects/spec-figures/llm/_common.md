@@ -35,9 +35,9 @@ Keep answers short. No explanations of TikZ or Mermaid unless asked.
 
 # Mermaid rules
 
-- First line: a `%%` comment saying what the figure shows. Then the diagram keyword of the guide.
+- First line: a `%%` comment saying what the figure shows (charts: right after the `---` config block of the example). Then the diagram keyword of the guide.
 - IDs without spaces or special characters; never `end` as an ID. Put labels with spaces, punctuation, `:` `;` `#` `<` `>` or brackets in double quotes: `a["Duty := 0"]`.
-- Use only the syntax of the guide and the example. No HTML (exception: `<br/>` for a line break inside a label, where the guide allows it), no `%%{init}%%` theme blocks, no icons or emoji. Styling only with `classDef` as in the example.
+- Use only the syntax of the guide and the example. No HTML (exceptions: the `---` config block of the chart examples, and `<br/>` for a line break inside a label, where the guide allows it), no `%%{init}%%` theme blocks, no icons or emoji. Styling only with `classDef` as in the example.
 - Mermaid has no automatic consistency checks: check yourself that every ID in a connection is declared.
 
 # Writing style

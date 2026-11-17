@@ -13,6 +13,7 @@ One or more series of values over ordered categories (sprints, builds, releases,
 
 ## Mermaid: `xychart-beta`
 
+- Start with the `---` config block of the example (series colours; the default colours are too pale), then the `%%` comment line.
 - `x-axis [S1, S2, …]`, `y-axis "title" 0 --> max`, one `line [v1, v2, …]` per series.
 - There is no legend: name the series in the `title` in the order of the `line` lines. A threshold is a flat line `line [90, 90, …]` with one value per category.
 - Numbers only in the data lists; quote category names that contain spaces or special characters.

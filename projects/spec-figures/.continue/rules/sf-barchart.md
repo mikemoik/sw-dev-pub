@@ -20,6 +20,7 @@ Values per category as bars, one series or several series side by side. Typical 
 
 ## Mermaid: `xychart-beta`
 
+- Start with the `---` config block of the example (bar colour; the default is too pale), then the `%%` comment line.
 - `x-axis ["a", "b", …]` with categories in quotes, `y-axis "title" 0 --> max`, then `bar [v1, v2, …]`.
 - One `bar` line per chart: several `bar` lines are drawn on top of each other, not side by side, and there is no legend. For several series make one chart each, or use the TikZ form.
 - Numbers only in the data lists, no units; put units into the axis title.
@@ -45,6 +46,12 @@ Values per category as bars, one series or several series side by side. Typical 
 ## Mermaid / Markdown example (mermaid/barchart.mmd)
 
 ```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#0072B2, #E69F00, #009E73, #CC79A7"
+---
 %% Bar chart: passed unit test cases per unit of heater_ctrl (one series)
 xychart-beta
     title "Passed unit test cases per unit"
