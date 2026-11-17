@@ -32,6 +32,16 @@ python3 scripts/build.py --all              # all components except components/e
 
 PDFs go to `build/<component>.pdf` (gitignored, safe to delete). At the end you get a summary of each component's warnings and errors. If a component fails, its PDF is removed and the script exits non-zero.
 
+## Clean
+
+```sh
+python3 scripts/clean.py              # everything
+python3 scripts/clean.py sample       # one component
+python3 scripts/clean.py -n           # only list what would be removed
+```
+
+Removes the PDFs and LaTeX intermediates of `build.py` (`build/`) and of IDE or `latexmk` builds in the root folder (`<component>.*`, `sw_component_spec.*`). Without arguments this includes the committed preview `sw_component_spec.pdf`: rebuild it or `git checkout` it.
+
 ## Chat with an LLM
 
 Guides in `llm/` tell a chat model how the template works, so it can help fill in a component's content files ("add a test case for a sensor fault"). The model asks for missing facts and answers with LaTeX lines to paste.

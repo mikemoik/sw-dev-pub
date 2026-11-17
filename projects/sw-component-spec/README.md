@@ -27,6 +27,7 @@ sty/                      packages TeX Live does not have, found without install
 sw_component_spec.pdf     the sample component, built: a preview of what the template produces
 scripts/new_component.py  creates components/<component>/ from components/empty/
 scripts/build.py          builds components into build/<component>.pdf
+scripts/clean.py          removes build output (build/ and root LaTeX files) for a clean build
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a component's file
 llm/                      the guides it uses: general rules + one per content file
 scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)
