@@ -4,13 +4,15 @@
     python3 scripts/llm_prompt.py <manual> <file> [--add PATH ...] [-o OUT]
 
 <file> is a content file name without .tex (metadata, introduction, organization,
-lifecycle, workproducts, configuration, quality, risks, environment, development).
+lifecycle, workproducts, configuration, quality, risks, environment, development,
+opl).
 The prompt is llm/_common.md + llm/<file>.md + the command reference
 (manuals/empty/<file>.tex) + a worked example (manuals/sample/<file>.tex, left
 out with --no-example or when working on the sample) + the manual's file and the
-related files it needs + any --add files (e.g. a process handbook or offer
-excerpt). Paste it as the first message of a new chat; models without a system
-role (e.g. Gemma) work the same way. Standard library only.
+related files it needs + any --add files (e.g. a process handbook, an offer
+excerpt, or the open point export for opl). Paste it as the first message of
+a new chat; models without a system role (e.g. Gemma) work the same way.
+Standard library only.
 """
 
 import argparse
@@ -35,6 +37,7 @@ RELATED = {
     "risks": ["organization"],
     "environment": ["metadata"],
     "development": ["environment", "configuration"],
+    "opl": [],
 }
 
 CHARS_PER_TOKEN = 3.5  # rough estimate for English text and LaTeX
@@ -98,7 +101,7 @@ def main(argv=None) -> int:
         default=[],
         type=Path,
         metavar="PATH",
-        help="extra file to include, e.g. a process handbook or offer excerpt (repeatable)",
+        help="extra file to include, e.g. a process handbook or the open point export (repeatable)",
     )
     parser.add_argument(
         "-o", "--output", type=Path, help="write to a file instead of stdout"

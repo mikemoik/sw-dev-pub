@@ -1,6 +1,6 @@
 # sw-project-manual
 
-LaTeX template for a **Software Project Manual**: one document per project that develops one software component. It holds the project plan (organisation and roles, process and tailoring, milestones and releases, work products and reviews, configuration and change management, quality assurance, risks, tools) and a developer manual (engineering rules, CI pipeline, Definition of Done, step-by-step how-tos). It covers the plans expected by Automotive SPICE 4.0 MAN.3, MAN.5, SUP.1, SUP.8, SUP.9 and SUP.10. The functional safety plan (ISO 26262-2) is a separate document. The template addresses those processes; it does not make a project compliant: content, reviews and evidence remain the project's job.
+LaTeX template for a **Software Project Manual**: one document per project that develops one software component. It holds the project plan (organisation and roles, process and tailoring, milestones and releases, work products and reviews, configuration and change management, quality assurance, risks, tools) and a developer manual (engineering rules, CI pipeline, Definition of Done, step-by-step how-tos), and ends with the project's open point list, converted from an export (e.g. by a chat LLM). It covers the plans expected by Automotive SPICE 4.0 MAN.3, MAN.5, SUP.1, SUP.8, SUP.9 and SUP.10. The functional safety plan (ISO 26262-2) is a separate document. The template addresses those processes; it does not make a project compliant: content, reviews and evidence remain the project's job.
 
 Sister of [`sw-unit-test-spec`](../sw-unit-test-spec/) and [`sw-component-spec`](../sw-component-spec/), with the same content model, tooling and rules. Content is written as plain data commands in `manuals/<manual>/*.tex`, and all layout lives in `swpm.cls`. Tables, diagrams and the responsibility matrix are generated, and inconsistencies show in red. The manual lists the project's specifications as work products.
 
@@ -43,6 +43,7 @@ manuals/
 | `risks.tex` | 7 Risk Management: risk matrix, risk register |
 | `environment.tex` | 8 Tools and Environment: tools, classification, tool qualification |
 | `development.tex` | 9 Developer Manual: engineering rules, CI pipeline, Definition of Done, how-tos |
+| `opl.tex` | 10 Open Point List: top 5 (repeated), in progress, open, closed; top-5 points highlighted |
 
 ## Build
 
@@ -150,6 +151,8 @@ The text commands `\Purpose`, `\Scope`, `\Communication`, `\ProcessReference`, `
 | | `\CIStage{stage}{does / checks}{tools}{blocking yes/no}` | pipeline chain and row |
 | | `\DoneCriterion{text}` | Definition of Done item |
 | | `\begin{HowTo}{ID}{title}` … `\end{HowTo}` with `\Goal{}` `\Tools{tools}` `\Step{action}{command}` | how-to subsection, numbered steps |
+| opl | `\OpenPointExport{date}{source}` | as-of date (overdue check) and source line |
+| | `\OpenPoint[top 1–5]{ID}{topic}{open / in progress / closed}{responsible}{due or closed date}{comment}` | row in Top 5 (by rank) and in its status list |
 | any | `\InputFigure[max width]{name}` `\InputCode[options]{file}` `\ManualDir` `FreeText` | as in `sw-unit-test-spec` |
 | main file | `\LoadManual{manual}` | loads `manuals/<manual>/` (overridden by `\SpecManual`) |
 
@@ -161,14 +164,15 @@ Consistency checks, shown in red in the PDF:
 - an applied process (`yes`/`tailored`) without a work product
 - a milestone or release date that is not YYYY-MM-DD
 - a risk without mitigation or owner
+- an open point with an unknown status, a top rank not 1–5, given twice or on a closed point, no responsible or due date (open, in progress), a date that is not YYYY-MM-DD, a due date before the as-of date (`\OpenPointExport`, else `\DocDate`)
 - a tool without classification when the integrity level is an ASIL
 - `\DocRef` to an unknown key, a missing figure or code file
 
-LaTeX warnings: duplicate IDs (roles, processes, milestones, work products, risks, tools), an unknown `[reports to]` role (drawn as a top role), an unknown process scope or risk level, an unknown reference type, a text command given twice.
+LaTeX warnings: duplicate IDs (roles, processes, milestones, work products, risks, tools, open points), an unknown `[reports to]` role (drawn as a top role), an unknown process scope or risk level, an unknown reference type, a text command given twice.
 
 ## Customizing
 
-In `sw_project_manual.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecOrganization`, `\SpecLifecycle`, `\SpecWorkProducts`, `\SpecConfiguration`, `\SpecQuality`, `\SpecRisks`, `\SpecEnvironment`, `\SpecDevelopment`), load your own packages and add own sections. Class options go to `article`.
+In `sw_project_manual.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecOrganization`, `\SpecLifecycle`, `\SpecWorkProducts`, `\SpecConfiguration`, `\SpecQuality`, `\SpecRisks`, `\SpecEnvironment`, `\SpecDevelopment`, `\SpecOpenPoints`), load your own packages and add own sections. Class options go to `article`.
 
 ## Test
 

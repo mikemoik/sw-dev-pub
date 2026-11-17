@@ -5,7 +5,8 @@
 %  what (organisation), which process is followed and how it is tailored,
 %  milestones and releases, work products and reviews, configuration and
 %  change management, quality assurance, risks, tools -- plus a developer
-%  manual (engineering rules, CI pipeline, Definition of Done, how-tos).
+%  manual (engineering rules, CI pipeline, Definition of Done, how-tos)
+%  and the open point list (generated from an export, e.g. by an LLM).
 %  Covers the plans expected by Automotive SPICE 4.0 MAN.3, MAN.5, SUP.1,
 %  SUP.8, SUP.9 and SUP.10. Sister of swcs.cls (sw-component-spec) and
 %  suts.cls (sw-unit-test-spec), same content model.
@@ -26,7 +27,8 @@
 % ---------------------------------------------------------------- packages ---
 \RequirePackage[T1]{fontenc}
 \RequirePackage{lmodern}
-\RequirePackage{tikz}
+\PassOptionsToPackage{table}{xcolor}   % \rowcolor (top-5 open points); before tikz,
+\RequirePackage{tikz}                  % which loads xcolor itself on older pgf
 \usetikzlibrary{arrows.meta,positioning,fit,calc,shapes.geometric}
 \RequirePackage{microtype}
 \DisableLigatures[-]{family=tt*}      % --preset stays two hyphens in code
@@ -58,6 +60,7 @@
 \definecolor{risklow}{HTML}{D9EAD3}
 \definecolor{riskmed}{HTML}{FFF2CC}
 \definecolor{riskhigh}{HTML}{F4CCCC}
+\definecolor{optop}{HTML}{FFF2CC}       % top-5 open points in the status lists
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.5em}
@@ -566,6 +569,55 @@
   { }
 
 % =============================================================================
+%  Input commands: open point list  (opl.tex)
+% =============================================================================
+% \OpenPointExport{date YYYY-MM-DD}{source}   -- as-of date of the list
+% \OpenPoint[top rank 1-5]{ID}{topic}{status}{responsible}{date}{comment}
+%   status: open | in progress | closed; date: due date (open, in progress)
+%   or closing date (closed)
+\seq_new:N \g__swpm_ops_seq                % {rank}{rank note}{status}{raw}{ID}{topic}{resp}{date}{comment}
+\prop_new:N \g__swpm_op_prop               % ID -> {} (duplicate check)
+\str_new:N \l__swpm_op_str
+\tl_new:N \l__swpm_op_note_tl
+\int_new:N \l__swpm_op_rank_int
+\NewDocumentCommand \OpenPointExport { m +m }
+  {
+    \prop_gput:Nnn \g__swpm_meta_prop { OPLDate } {#1}
+    \prop_gput:Nnn \g__swpm_meta_prop { OPLSource } {#2}
+  }
+\NewDocumentCommand \OpenPoint { o m +m m m m +m }
+  {
+    \prop_if_in:NnTF \g__swpm_op_prop {#2}
+      { \msg_warning:nnnn { swpm } { duplicate } { Open~point } {#2} }
+      { \prop_gput:Nnn \g__swpm_op_prop {#2} { } }
+    % status: o open, p in progress, c closed, x unknown
+    \str_set:Nx \l__swpm_op_str { \str_lowercase:n {#4} }
+    \str_remove_all:Nn \l__swpm_op_str { ~ }
+    \str_remove_all:Nn \l__swpm_op_str { - }
+    \str_case:VnF \l__swpm_op_str
+      {
+        {open}       { \str_set:Nn \l__swpm_op_str { o } }
+        {inprogress} { \str_set:Nn \l__swpm_op_str { p } }
+        {closed}     { \str_set:Nn \l__swpm_op_str { c } }
+      }
+      { \str_set:Nn \l__swpm_op_str { x } }
+    % top rank: 1..5, else 0 and a red note
+    \int_zero:N \l__swpm_op_rank_int
+    \tl_clear:N \l__swpm_op_note_tl
+    \IfValueT {#1}
+      {
+        \regex_match:nnTF { \A \s* [1-5] \s* \Z } {#1}
+          { \int_set:Nn \l__swpm_op_rank_int {#1} }
+          { \tl_set:Nn \l__swpm_op_note_tl { \__swpm_warn:n { #1~(not~1--5) } } }
+      }
+    \seq_gput_right:Nx \g__swpm_ops_seq
+      {
+        { \int_use:N \l__swpm_op_rank_int } { \exp_not:V \l__swpm_op_note_tl }
+        { \l__swpm_op_str } \exp_not:n { {#4} {#2} {#3} {#5} {#6} {#7} }
+      }
+  }
+
+% =============================================================================
 %  Loading content
 % =============================================================================
 % \LoadManual{name}: loads the folder manuals/name (see \LoadContent).
@@ -581,7 +633,7 @@
 %   data and code are also added to LaTeX's \input@path. \ManualDir expands to dir.
 \clist_const:Nn \c__swpm_files_clist
   { metadata, introduction, organization, lifecycle, workproducts,
-    configuration, quality, risks, environment, development }
+    configuration, quality, risks, environment, development, opl }
 \tl_new:N \g__swpm_dir_tl
 \tl_new:N \l__swpm_found_tl
 \cs_new:Npn \ManualDir { \g__swpm_dir_tl }
@@ -1553,6 +1605,211 @@
     \seq_if_empty:NTF \g__swpm_howtos_seq { \ph{none} }
       { \seq_map_inline:Nn \g__swpm_howtos_seq { \__swpm_howto:nnn ##1 } }
     \__swpm_free:n { development }
+  }
+% ---- 10 Open Point List --------------------------------------------------------
+\int_new:N \l__swpm_asof_int               % as-of date YYYYMMDD, 0: unknown
+\int_new:N \l__swpm_op_r_int               % rank of the top-5 row being built
+\str_new:N \l__swpm_op_want_str            % status of the list being built
+\prop_new:N \l__swpm_rank_prop             % rank -> number of active points
+\int_new:N \l__swpm_op_o_int
+\int_new:N \l__swpm_op_p_int
+\int_new:N \l__swpm_op_c_int
+% #2 := #1 as integer YYYYMMDD, 0 if #1 is not YYYY-MM-DD
+\cs_new_protected:Npn \__swpm_ymd:nN #1#2
+  {
+    \regex_extract_once:nnNTF { \A \s* (\d{4}) - (\d{1,2}) - (\d{1,2}) \s* \Z } {#1} \l__swpm_date_seq
+      {
+        \int_set:Nn #2
+          {
+            \seq_item:Nn \l__swpm_date_seq { 2 } * 10000
+            + \seq_item:Nn \l__swpm_date_seq { 3 } * 100 + \seq_item:Nn \l__swpm_date_seq { 4 }
+          }
+      }
+      { \int_zero:N #2 }
+  }
+\cs_generate_variant:Nn \__swpm_ymd:nN { VN }
+\cs_new_protected:Npn \__swpm_op_asof:
+  {
+    \int_zero:N \l__swpm_asof_int
+    \clist_map_inline:nn { OPLDate, DocDate }
+      {
+        \int_compare:nNnT \l__swpm_asof_int = 0
+          {
+            \prop_get:NnNT \g__swpm_meta_prop {##1} \l__swpm_tmp_tl
+              { \__swpm_ymd:VN \l__swpm_tmp_tl \l__swpm_asof_int }
+          }
+      }
+  }
+% status cell, responsible \l__swpm_a_tl, date \l__swpm_b_tl
+% (#1 status code, #2 raw status, #3 responsible, #4 date)
+\cs_new_protected:Npn \__swpm_op_cells:nnnn #1#2#3#4
+  {
+    \str_case:nnF {#1}
+      {
+        {o} { \tl_set:Nn \l__swpm_c_tl { open } }
+        {p} { \tl_set:Nn \l__swpm_c_tl { in~progress } }
+        {c} { \tl_set:Nn \l__swpm_c_tl { closed } }
+      }
+      { \tl_set:Nn \l__swpm_c_tl { \__swpm_warn:n { #2~(unknown~status) } } }
+    \bool_set:Nn \l_tmpa_bool { \str_if_eq_p:nn {#1} { c } }
+    \tl_if_blank:nTF {#3}
+      {
+        \bool_if:NTF \l_tmpa_bool { \tl_set:Nn \l__swpm_a_tl { -- } }
+          { \tl_set:Nn \l__swpm_a_tl { \__swpm_warn:n { responsible~missing } } }
+      }
+      { \tl_set:Nn \l__swpm_a_tl {#3} }
+    \tl_if_blank:nTF {#4}
+      {
+        \bool_if:NTF \l_tmpa_bool { \tl_set:Nn \l__swpm_b_tl { -- } }
+          { \tl_set:Nn \l__swpm_b_tl { \__swpm_warn:n { due~date~missing } } }
+      }
+      {
+        \__swpm_ymd:nN {#4} \l_tmpa_int
+        \int_compare:nNnTF \l_tmpa_int = 0
+          { \tl_set:Nn \l__swpm_b_tl { \__swpm_warn:n { #4 \newline (not~a~date) } } }
+          {
+            \bool_lazy_and:nnTF
+              { ! \l_tmpa_bool }
+              { \int_compare_p:nNn \l__swpm_asof_int > \l_tmpa_int }
+              { \tl_set:Nn \l__swpm_b_tl { \__swpm_warn:n { #4 \newline (overdue) } } }
+              { \tl_set:Nn \l__swpm_b_tl {#4} }
+          }
+      }
+  }
+% "rank N given twice" if more than one active point has rank #1
+\cs_new_protected:Npn \__swpm_op_rank_cell:n #1
+  {
+    \prop_get:NnNF \l__swpm_rank_prop {#1} \l__swpm_tmp_tl { \tl_set:Nn \l__swpm_tmp_tl { 0 } }
+    \int_compare:nNnTF \l__swpm_tmp_tl > 1
+      { \tl_set:Nn \l__swpm_d_tl { \__swpm_warn:n { \textbf{#1}~(twice) } } }
+      { \tl_set:Nn \l__swpm_d_tl { \textbf{#1} } }
+  }
+% pass 1: counts, ranks of the active points
+\cs_new_protected:Npn \__swpm_op_count:nnnnnnnnn #1#2#3#4#5#6#7#8#9
+  {
+    \str_if_eq:nnTF {#3} { c } { \int_incr:N \l__swpm_op_c_int }
+      {
+        \str_if_eq:nnTF {#3} { p } { \int_incr:N \l__swpm_op_p_int } { \int_incr:N \l__swpm_op_o_int }
+        \int_compare:nNnT {#1} > 0
+          {
+            \prop_get:NnNF \l__swpm_rank_prop {#1} \l__swpm_tmp_tl { \tl_set:Nn \l__swpm_tmp_tl { 0 } }
+            \prop_put:Nnx \l__swpm_rank_prop {#1} { \int_eval:n { \l__swpm_tmp_tl + 1 } }
+          }
+      }
+  }
+% top-5 table row: active points of rank \l__swpm_op_r_int
+\cs_new_protected:Npn \__swpm_op_top_row:nnnnnnnnn #1#2#3#4#5#6#7#8#9
+  {
+    \bool_lazy_and:nnT
+      { \int_compare_p:nNn {#1} = \l__swpm_op_r_int }
+      { ! \str_if_eq_p:nn {#3} { c } }
+      {
+        \__swpm_op_cells:nnnn {#3} {#4} {#7} {#8}
+        \__swpm_op_rank_cell:n {#1}
+        \tl_put_right:Nx \l__swpm_rows_tl
+          {
+            \exp_not:V \l__swpm_d_tl & \exp_not:n { #5 & #6 & } \exp_not:V \l__swpm_c_tl
+            & \exp_not:V \l__swpm_a_tl & \exp_not:V \l__swpm_b_tl \exp_not:n { & #9 } \exp_not:N \\
+          }
+      }
+  }
+% status list row: points of status \l__swpm_op_want_str (open also takes
+% unknown statuses); top-5 points highlighted
+\cs_new_protected:Npn \__swpm_op_row:nnnnnnnnn #1#2#3#4#5#6#7#8#9
+  {
+    \bool_lazy_or:nnT
+      { \str_if_eq_p:Vn \l__swpm_op_want_str {#3} }
+      { \bool_lazy_and_p:nn { \str_if_eq_p:Vn \l__swpm_op_want_str { o } } { \str_if_eq_p:nn {#3} { x } } }
+      {
+        \__swpm_op_cells:nnnn {#3} {#4} {#7} {#8}
+        \int_compare:nNnTF {#1} > 0
+          { \__swpm_op_rank_cell:n {#1} \tl_put_left:Nn \l__swpm_d_tl { \rowcolor{optop} } }
+          { \tl_set:Nn \l__swpm_d_tl {#2} }
+        \tl_set:Nn \l__swpm_x_tl {#6}
+        \str_if_eq:nnT {#3} { x }
+          { \tl_put_right:Nx \l__swpm_x_tl { \exp_not:N \newline \exp_not:V \l__swpm_c_tl } }
+        \tl_put_right:Nx \l__swpm_rows_tl
+          {
+            \exp_not:V \l__swpm_d_tl \exp_not:n { & #5 & } \exp_not:V \l__swpm_x_tl & \exp_not:V \l__swpm_a_tl
+            & \exp_not:V \l__swpm_b_tl \exp_not:n { & #9 } \exp_not:N \\
+          }
+      }
+  }
+% closed list row: a top rank on a closed point is red
+\cs_new_protected:Npn \__swpm_op_closed_row:nnnnnnnnn #1#2#3#4#5#6#7#8#9
+  {
+    \str_if_eq:nnT {#3} { c }
+      {
+        \__swpm_op_cells:nnnn {#3} {#4} {#7} {#8}
+        \int_compare:nNnTF {#1} > 0
+          { \tl_set:Nn \l__swpm_d_tl { #5 \newline \__swpm_warn:n { (closed,~top~#1) } } }
+          { \tl_set:Nn \l__swpm_d_tl { #5 #2 } }
+        \tl_put_right:Nx \l__swpm_rows_tl
+          {
+            \exp_not:V \l__swpm_d_tl \exp_not:n { & #6 & } \exp_not:V \l__swpm_a_tl
+            & \exp_not:V \l__swpm_b_tl \exp_not:n { & #9 } \exp_not:N \\
+          }
+      }
+  }
+\cs_new_protected:Npn \__swpm_op_list:nn #1#2   % status, subsection title
+  {
+    \Needspace{6\baselineskip}
+    \subsection{#2}
+    \str_set:Nn \l__swpm_op_want_str {#1}
+    \tl_clear:N \l__swpm_rows_tl
+    \seq_map_inline:Nn \g__swpm_ops_seq { \__swpm_op_row:nnnnnnnnn ##1 }
+    \__swpm_table:nnnN { @{}l L{1.5cm} Y L{2.4cm} L{1.9cm} Y@{} } {6}
+      {
+        \textbf{Top} & \textbf{ID} & \textbf{Topic} & \textbf{Responsible} & \textbf{Due}
+        & \textbf{Comment}
+      }
+      \l__swpm_rows_tl
+  }
+\NewDocumentCommand \SpecOpenPoints {}
+  {
+    \clearpage
+    \section{Open~Point~List}\label{swpm:opl}
+    \__swpm_op_asof:
+    \prop_clear:N \l__swpm_rank_prop
+    \int_zero:N \l__swpm_op_o_int
+    \int_zero:N \l__swpm_op_p_int
+    \int_zero:N \l__swpm_op_c_int
+    \seq_map_inline:Nn \g__swpm_ops_seq { \__swpm_op_count:nnnnnnnnn ##1 }
+    Status~as~of~
+    \prop_get:NnNTF \g__swpm_meta_prop { OPLDate } \l__swpm_tmp_tl
+      { \tl_use:N \l__swpm_tmp_tl } { \__swpm_meta:n { DocDate } }
+    \prop_get:NnNT \g__swpm_meta_prop { OPLSource } \l__swpm_tmp_tl
+      { ,~source:~\tl_use:N \l__swpm_tmp_tl }
+    .~\int_eval:n { \l__swpm_op_p_int + \l__swpm_op_o_int + \l__swpm_op_c_int }~points:~
+    \int_use:N \l__swpm_op_p_int \c_space_tl in~progress,~
+    \int_use:N \l__swpm_op_o_int \c_space_tl open,~
+    \int_use:N \l__swpm_op_c_int \c_space_tl closed.~
+    The~top~5~are~repeated~first~and~highlighted~in~the~status~lists.~A~due~date~
+    before~the~as-of~date~is~marked~overdue.
+    \Needspace{6\baselineskip}
+    \subsection{Top~5}
+    \tl_clear:N \l__swpm_rows_tl
+    \int_step_inline:nn { 5 }
+      {
+        \int_set:Nn \l__swpm_op_r_int {##1}
+        \seq_map_inline:Nn \g__swpm_ops_seq { \__swpm_op_top_row:nnnnnnnnn ####1 }
+      }
+    \__swpm_table:nnnN { @{}l L{1.5cm} Y l L{2.2cm} L{1.9cm} Y@{} } {7}
+      {
+        \textbf{Top} & \textbf{ID} & \textbf{Topic} & \textbf{Status} & \textbf{Responsible}
+        & \textbf{Due} & \textbf{Comment}
+      }
+      \l__swpm_rows_tl
+    \__swpm_op_list:nn { p } { In~Progress }
+    \__swpm_op_list:nn { o } { Open }
+    \Needspace{6\baselineskip}
+    \subsection{Closed}
+    \tl_clear:N \l__swpm_rows_tl
+    \seq_map_inline:Nn \g__swpm_ops_seq { \__swpm_op_closed_row:nnnnnnnnn ##1 }
+    \__swpm_table:nnnN { @{}L{1.5cm} Y L{2.4cm} L{1.9cm} Y@{} } {5}
+      { \textbf{ID} & \textbf{Topic} & \textbf{Responsible} & \textbf{Closed} & \textbf{Result} }
+      \l__swpm_rows_tl
+    \__swpm_free:n { opl }
   }
 \ExplSyntaxOff
 

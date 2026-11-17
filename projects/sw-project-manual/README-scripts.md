@@ -53,6 +53,7 @@ Guides in `llm/` tell a chat model how the template works, so it can help fill i
 ```sh
 python3 scripts/llm_prompt.py brake_mon risks -o build/prompt.md
 python3 scripts/llm_prompt.py brake_mon development --add ../.gitlab-ci.yml -o build/prompt.md   # with extra input
+python3 scripts/llm_prompt.py brake_mon opl --add opl_export.csv -o build/prompt.md                 # open point list from an export
 ```
 
 The prompt is about 2.5K–4.5K tokens plus `--add` files. Above 32000 it warns (`--max-tokens`). `--no-example` leaves out the worked example from `manuals/sample/`.
