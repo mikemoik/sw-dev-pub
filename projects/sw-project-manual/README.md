@@ -11,7 +11,8 @@ Sister of [`sw-unit-test-spec`](../sw-unit-test-spec/) and [`sw-component-spec`]
 ```
 sw_project_manual.tex     main file: chapter order, default manual
 swpm.cls                  the template: all formatting and input commands
-latexmkrc                 latexmk settings: -c also removes the free-text helper files
+latexmkrc                 latexmk settings: -c also removes the free-text helper files, sty/ on TEXINPUTS
+sty/                      packages found without install: specfig*.sty (optional, see Diagrams)
 sw_project_manual.pdf     the sample manual, built: a preview of what the template produces
 scripts/new_manual.py     creates manuals/<manual>/ from manuals/empty/
 scripts/build.py          builds manuals into build/<manual>.pdf
@@ -101,6 +102,10 @@ Generated with TikZ from the data you already enter. Each diagram only appears w
 | **CI pipeline**: stages left to right with their tools | 9.2 | `\CIStage` |
 
 Tables generated beyond the plain lists: work products per process (3.2), the RACI matrix (4.3).
+
+### specfig (optional)
+
+[`spec-figures`](../spec-figures/) draws sequence, state, activity, class, component and block diagrams, Gantt charts, timelines, risk matrices, timing diagrams and charts from plain data commands, with problems in red. Its packages are shipped in `sty/specfig*.sty`, and its chat rules in `.continue/rules/sf-*.md`; refresh both from there with `scripts/vendor.py`. Add `\usepackage{specfig}` after `\documentclass{swpm}` in `sw_project_manual.tex`, then write a figure as `figures/<type>_<name>.tex` (e.g. `figures/sequence_cycle.tex`) and include it with `\InputFigure{sequence_cycle}`. Command reference: the spec-figures guides and catalogue.
 
 ## Free text, figures, code and data
 

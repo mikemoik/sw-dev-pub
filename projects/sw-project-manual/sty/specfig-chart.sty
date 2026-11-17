@@ -1,0 +1,883 @@
+% =============================================================================
+%  specfig-chart.sty -- specfig charts: risk matrix, timing diagram, bar and
+%  line charts. Loaded by specfig.sty; uses its core (\sf_begin:nnn,
+%  \sf_problem:n, \sf_problems_draw:, options, colours).
+%
+%  Plain TikZ (no pgfplots, no tikz-timing), TeX Live 2022 and newer.
+%  MIT license (repo root).
+% =============================================================================
+\NeedsTeXFormat{LaTeX2e}[2022-06-01]
+\ProvidesPackage{specfig-chart}[2026/11/17 v0.1 specfig charts: risk matrix, timing, bar and line charts]
+
+% ----------------------------------------------------------------- styles ---
+\tikzset{
+  sfc/cell/.style       = {draw=white, line width=1.5pt, align=center, font=\small\bfseries,
+                           inner sep=2pt},
+  sfc/target/.style     = {draw=sfmuted, dashed, -{Stealth[length=2mm]},
+                           shorten <=3.5mm, shorten >=3.5mm},
+  sfc/level/.style      = {font=\scriptsize, inner sep=2pt, align=center},
+  sfc/title/.style      = {font=\small\bfseries, inner sep=2pt},
+  sfc/legend/.style     = {font=\scriptsize, align=left, inner sep=0pt},
+  sfc/wave/.style       = {draw=sfaccent, thick, line join=round},
+  sfc/wavebus/.style    = {sfc/wave, fill=white},
+  sfc/waveunknown/.style = {sfc/wave, fill=sfmuted!35},
+  sfc/wavez/.style      = {draw=sfaccent!70, thick},
+  sfc/wavename/.style   = {font=\small, anchor=east, inner sep=2pt},
+  sfc/wavevalue/.style  = {font=\scriptsize, inner sep=0pt},
+  sfc/tgrid/.style      = {draw=sfmuted!25, very thin},
+  sfc/marker/.style     = {draw=sfwarn, dashed},
+  sfc/markerlabel/.style = {font=\scriptsize, text=sfwarn, anchor=south, inner sep=1.5pt},
+  sfc/span/.style       = {draw=sfline, {Stealth[length=1.6mm]}-{Stealth[length=1.6mm]}},
+  sfc/spanlabel/.style  = {font=\scriptsize, anchor=south, inner sep=1pt},
+  sfc/axis/.style       = {draw=sfline},
+  sfc/ygrid/.style      = {draw=sfmuted!30, very thin},
+  sfc/tick/.style       = {font=\scriptsize, anchor=east, inner sep=2pt},
+  sfc/cat/.style        = {font=\scriptsize, anchor=north, align=center, inner sep=2pt},
+  sfc/value/.style      = {font=\tiny, inner sep=1pt},
+  sfc/threshold/.style  = {draw=sfwarn, dashed, thick},
+  sfc/thresholdlabel/.style = {font=\scriptsize, text=sfwarn, anchor=south west, inner sep=1.5pt, fill=white, fill opacity=0.8, text opacity=1},
+}
+
+\ExplSyntaxOn
+% ---- shared helpers ----------------------------------------------------------
+\tl_new:N \l__sf_chart_a_tl
+\tl_new:N \l__sf_chart_b_tl
+\tl_new:N \l__sf_chart_c_tl
+\tl_new:N \l__sf_chart_d_tl
+\tl_new:N \l__sf_chart_txt_tl
+\dim_new:N \l__sf_chart_dim
+% cm value of a dimension (fp expression)
+\cs_new:Npn \__sf_chart_cm:n #1 { ( \dim_to_fp:n {#1} / 28.45274 ) }
+% x / y (in cm) of the current bounding box's west / south side
+\cs_new_protected:Npn \__sf_chart_bbox:nN #1#2   % {west|south} \tl
+  {
+    \str_if_eq:nnTF {#1} { west }
+      { \pgfextractx \l__sf_chart_dim { \pgfpointanchor { current~bounding~box } { west } } }
+      { \pgfextracty \l__sf_chart_dim { \pgfpointanchor { current~bounding~box } { south } } }
+    \tl_set:Nx #2 { \fp_eval:n { \__sf_chart_cm:n { \l__sf_chart_dim } } }
+  }
+
+% =============================================================================
+%  Risk matrix: probability (rows, bottom up) x impact (columns)
+% =============================================================================
+\seq_new:N \g__sf_risk_seq               % {ID}{p}{i}{title}  (p = 0: not placed)
+\prop_new:N \g__sf_risk_prop             % ID -> {p}{i}
+\seq_new:N \g__sf_risk_target_seq        % {ID}{p}{i}
+\clist_new:N \g__sf_risk_plevels_clist
+\clist_new:N \g__sf_risk_ilevels_clist
+\prop_new:N \l__sf_risk_cell_prop        % p,i -> content
+\bool_new:N \l__sf_risk_ok_bool
+
+\NewDocumentEnvironment { sfRiskMatrix } { O{} }
+  {
+    \sf_begin:nnn { sfRiskMatrix } { levels = 5 , xlabel = Impact , ylabel = Probability } {#1}
+    \bool_lazy_or:nnT
+      { \int_compare_p:nNn \l_sf_levels_int < { 3 } }
+      { \int_compare_p:nNn \l_sf_levels_int > { 5 } }
+      {
+        \sf_problem:x { levels~=~\int_use:N \l_sf_levels_int \c_space_tl is~not~3,~4~or~5;~5~used }
+        \int_set:Nn \l_sf_levels_int { 5 }
+      }
+    \seq_gclear:N \g__sf_risk_seq
+    \prop_gclear:N \g__sf_risk_prop
+    \seq_gclear:N \g__sf_risk_target_seq
+    \clist_gclear:N \g__sf_risk_plevels_clist
+    \clist_gclear:N \g__sf_risk_ilevels_clist
+    \DeclareDocumentCommand \Risk { m m m m } { \__sf_risk_add:nnnn {##1} {##2} {##3} {##4} }
+    \DeclareDocumentCommand \Target { m m m }
+      { \seq_gput_right:Nn \g__sf_risk_target_seq { {##1} {##2} {##3} } }
+    \DeclareDocumentCommand \Levels { m } { \clist_gset:Nn \g__sf_risk_plevels_clist {##1} }
+    \DeclareDocumentCommand \ImpactLevels { m } { \clist_gset:Nn \g__sf_risk_ilevels_clist {##1} }
+    \ignorespaces
+  }
+  { \__sf_risk_draw: }
+
+% the bool is cleared if #1 is not a whole number 1..levels (+ problem)
+\cs_new_protected:Npn \__sf_risk_check:nnn #1#2#3   % value what ID
+  {
+    \regex_match:nnTF { \A \s* \d+ \s* \Z } {#1}
+      {
+        \bool_lazy_or:nnT
+          { \int_compare_p:nNn {#1} < { 1 } }
+          { \int_compare_p:nNn {#1} > \l_sf_levels_int }
+          {
+            \bool_set_false:N \l__sf_risk_ok_bool
+            \sf_problem:x
+              {
+                \tl_to_str:n {#3} :~#2~`\tl_to_str:n {#1}'~is~not~in~
+                1..\int_use:N \l_sf_levels_int
+              }
+          }
+      }
+      {
+        \bool_set_false:N \l__sf_risk_ok_bool
+        \sf_problem:x { \tl_to_str:n {#3} :~#2~`\tl_to_str:n {#1}'~is~not~a~number }
+      }
+  }
+\cs_new_protected:Npn \__sf_risk_add:nnnn #1#2#3#4
+  {
+    \bool_set_true:N \l__sf_risk_ok_bool
+    \__sf_risk_check:nnn {#2} { probability } {#1}
+    \__sf_risk_check:nnn {#3} { impact } {#1}
+    \prop_if_in:NnT \g__sf_risk_prop {#1}
+      {
+        \bool_set_false:N \l__sf_risk_ok_bool
+        \sf_problem:x { duplicate~risk~ID~\tl_to_str:n {#1} }
+      }
+    \bool_if:NTF \l__sf_risk_ok_bool
+      {
+        \prop_gput:Nnx \g__sf_risk_prop {#1} { { \int_eval:n {#2} } { \int_eval:n {#3} } }
+        \seq_gput_right:Nx \g__sf_risk_seq
+          { { \exp_not:n {#1} } { \int_eval:n {#2} } { \int_eval:n {#3} } { \exp_not:n {#4} } }
+      }
+      { \seq_gput_right:Nn \g__sf_risk_seq { {#1} {0} {0} {#4} } }
+  }
+% colour of the cell with score p * i
+\cs_new:Npn \__sf_risk_colour:n #1
+  {
+    \int_compare:nNnTF {#1} >
+      { \int_case:nn { \l_sf_levels_int } { {3} {2} {4} {3} {5} {4} } }
+      {
+        \int_compare:nNnTF {#1} <
+          { \int_case:nn { \l_sf_levels_int } { {3} {6} {4} {8} {5} {15} } }
+          { sfmed } { sfhigh }
+      }
+      { sflow }
+  }
+\cs_new:Npn \__sf_risk_default_level:n #1
+  {
+    \int_case:nn { \l_sf_levels_int }
+      {
+        {3} { \clist_item:nn { low , medium , high } {#1} }
+        {4} { \clist_item:nn { low , medium , high , very~high } {#1} }
+        {5} { \clist_item:nn { very~low , low , medium , high , very~high } {#1} }
+      }
+  }
+% name of level #2 on axis #1 (clist of user names, or the default)
+\cs_new:Npn \__sf_risk_level:Nn #1#2
+  {
+    \int_compare:nNnTF { \clist_count:N #1 } = \l_sf_levels_int
+      { \clist_item:Nn #1 {#2} } { \__sf_risk_default_level:n {#2} }
+  }
+% cell (p,i) += #3
+\cs_new_protected:Npn \__sf_risk_cell_add:nnn #1#2#3
+  {
+    \prop_get:NnNTF \l__sf_risk_cell_prop { #1,#2 } \l__sf_chart_a_tl
+      { \tl_put_right:Nn \l__sf_chart_a_tl { ,\ #3 } }
+      { \tl_set:Nn \l__sf_chart_a_tl {#3} }
+    \prop_put:NnV \l__sf_risk_cell_prop { #1,#2 } \l__sf_chart_a_tl
+  }
+\cs_generate_variant:Nn \__sf_risk_cell_add:nnn { nnx , xxx }
+\cs_new_protected:Npn \__sf_risk_levels_check:Nn #1#2
+  {
+    \int_compare:nNnF { \clist_count:N #1 } = { 0 }
+      {
+        \int_compare:nNnF { \clist_count:N #1 } = \l_sf_levels_int
+          {
+            \sf_problem:x
+              { #2~needs~\int_use:N \l_sf_levels_int \c_space_tl names;~defaults~used }
+          }
+      }
+  }
+\fp_new:N \l__sf_risk_w_fp
+\fp_new:N \l__sf_risk_h_fp
+\cs_new_protected:Npn \__sf_risk_draw:
+  {
+    \fp_set:Nn \l__sf_risk_w_fp { min ( 3.2 , 11 / \l_sf_levels_int ) }
+    \fp_set:Nn \l__sf_risk_h_fp { min ( 1.4 , 5 / \l_sf_levels_int ) }
+    \__sf_risk_levels_check:Nn \g__sf_risk_plevels_clist { Levels }
+    \__sf_risk_levels_check:Nn \g__sf_risk_ilevels_clist { ImpactLevels }
+    % cell contents: risk IDs, then target IDs in grey
+    \prop_clear:N \l__sf_risk_cell_prop
+    \seq_map_inline:Nn \g__sf_risk_seq { \__sf_risk_place:nnnn ##1 }
+    \seq_map_inline:Nn \g__sf_risk_target_seq { \__sf_risk_target_place:nnn ##1 }
+    \begin{tikzpicture}
+      \int_step_inline:nn { \l_sf_levels_int }
+        { \int_step_inline:nn { \l_sf_levels_int } { \__sf_risk_cell:nn {##1} {####1} } }
+      % axis level names
+      \int_step_inline:nn { \l_sf_levels_int }
+        {
+          \node [ sfc/level , anchor = north , text~width = \fp_eval:n { \l__sf_risk_w_fp - 0.1 } cm ]
+            at ( \fp_eval:n { (##1 - 0.5) * \l__sf_risk_w_fp } cm , -0.05cm )
+            { \__sf_risk_level:Nn \g__sf_risk_ilevels_clist {##1} } ;
+          \node [ sfc/level , anchor = east ]
+            at ( -0.05cm , \fp_eval:n { (##1 - 0.5) * \l__sf_risk_h_fp } cm )
+            { \__sf_risk_level:Nn \g__sf_risk_plevels_clist {##1} } ;
+        }
+      \__sf_chart_bbox:nN { south } \l__sf_chart_b_tl
+      \node [ sfc/title , anchor = north ]
+        at ( \fp_eval:n { \l_sf_levels_int * \l__sf_risk_w_fp / 2 } cm , \l__sf_chart_b_tl cm )
+        { \l_sf_xlabel_tl } ;
+      \__sf_chart_bbox:nN { west } \l__sf_chart_b_tl
+      \node [ sfc/title , anchor = south , rotate = 90 ]
+        at ( \l__sf_chart_b_tl cm , \fp_eval:n { \l_sf_levels_int * \l__sf_risk_h_fp / 2 } cm )
+        { \l_sf_ylabel_tl } ;
+      % residual risk arrows
+      \seq_map_inline:Nn \g__sf_risk_target_seq { \__sf_risk_arrow:nnn ##1 }
+      % legend: ID title, ...
+      \tl_clear:N \l__sf_chart_txt_tl
+      \seq_map_inline:Nn \g__sf_risk_seq { \__sf_risk_legend:nnnn ##1 }
+      \tl_if_empty:NF \l__sf_chart_txt_tl
+        {
+          \__sf_chart_bbox:nN { south } \l__sf_chart_b_tl
+          \__sf_chart_bbox:nN { west } \l__sf_chart_c_tl
+          \node [ sfc/legend , anchor = north~west ,
+                  text~width = \fp_eval:n { \l_sf_levels_int * \l__sf_risk_w_fp - \l__sf_chart_c_tl } cm ]
+            at ( \l__sf_chart_c_tl cm , \fp_eval:n { \l__sf_chart_b_tl - 0.2 } cm )
+            { \raggedright \l__sf_chart_txt_tl } ;
+        }
+      \sf_problems_draw:
+    \end{tikzpicture}
+  }
+\cs_new_protected:Npn \__sf_risk_place:nnnn #1#2#3#4
+  { \int_compare:nNnF {#2} = { 0 } { \__sf_risk_cell_add:nnn {#2} {#3} {#1} } }
+\cs_new_protected:Npn \__sf_risk_target_place:nnn #1#2#3
+  {
+    \bool_set_true:N \l__sf_risk_ok_bool
+    \prop_if_in:NnF \g__sf_risk_prop {#1}
+      {
+        \bool_set_false:N \l__sf_risk_ok_bool
+        \sf_problem:x { Target~for~unknown~risk~\tl_to_str:n {#1} }
+      }
+    \__sf_risk_check:nnn {#2} { target~probability } {#1}
+    \__sf_risk_check:nnn {#3} { target~impact } {#1}
+    \bool_if:NT \l__sf_risk_ok_bool
+      {
+        \__sf_risk_cell_add:xxx { \int_eval:n {#2} } { \int_eval:n {#3} }
+          { \exp_not:N \textcolor { sfmuted } { \exp_not:n {#1} } }
+      }
+  }
+\cs_new_protected:Npn \__sf_risk_cell:nn #1#2   % p i
+  {
+    \prop_get:NnNF \l__sf_risk_cell_prop { #1,#2 } \l__sf_chart_a_tl
+      { \tl_clear:N \l__sf_chart_a_tl }
+    \tl_set:Nx \l__sf_chart_b_tl { \__sf_risk_colour:n { #1 * #2 } }
+    \node [ sfc/cell , fill = \l__sf_chart_b_tl ,
+            minimum~width = \fp_eval:n { \l__sf_risk_w_fp } cm ,
+            minimum~height = \fp_eval:n { \l__sf_risk_h_fp } cm ,
+            text~width = \fp_eval:n { \l__sf_risk_w_fp - 0.25 } cm ]
+      at ( \fp_eval:n { (#2 - 0.5) * \l__sf_risk_w_fp } cm ,
+           \fp_eval:n { (#1 - 0.5) * \l__sf_risk_h_fp } cm )
+      { \l__sf_chart_a_tl } ;
+  }
+% dashed arrow from the risk's cell to its target cell (both already checked)
+\cs_new_protected:Npn \__sf_risk_arrow:nnn #1#2#3
+  {
+    \prop_get:NnNT \g__sf_risk_prop {#1} \l__sf_chart_a_tl
+      {
+        \regex_match:nnT { \A \s* \d+ \s* \, \s* \d+ \s* \Z } { #2 , #3 }
+          {
+            \tl_set:Nx \l__sf_chart_c_tl { \tl_item:Nn \l__sf_chart_a_tl { 1 } }
+            \tl_set:Nx \l__sf_chart_d_tl { \tl_item:Nn \l__sf_chart_a_tl { 2 } }
+            \bool_lazy_and:nnF
+              { \int_compare_p:nNn { \l__sf_chart_c_tl } = {#2} }
+              { \int_compare_p:nNn { \l__sf_chart_d_tl } = {#3} }
+              {
+                \bool_lazy_any:nF
+                  {
+                    { \int_compare_p:nNn {#2} > \l_sf_levels_int }
+                    { \int_compare_p:nNn {#3} > \l_sf_levels_int }
+                    { \int_compare_p:nNn {#2} < { 1 } }
+                    { \int_compare_p:nNn {#3} < { 1 } }
+                  }
+                  {
+                    \draw [ sfc/target ]
+                      ( \fp_eval:n { (\l__sf_chart_d_tl - 0.5) * \l__sf_risk_w_fp } cm ,
+                        \fp_eval:n { (\l__sf_chart_c_tl - 0.5) * \l__sf_risk_h_fp } cm )
+                      -- ( \fp_eval:n { (#3 - 0.5) * \l__sf_risk_w_fp } cm ,
+                           \fp_eval:n { (#2 - 0.5) * \l__sf_risk_h_fp } cm ) ;
+                  }
+              }
+          }
+      }
+  }
+\cs_new_protected:Npn \__sf_risk_legend:nnnn #1#2#3#4
+  {
+    \tl_if_blank:nF {#4}
+      {
+        \tl_put_right:Nn \l__sf_chart_txt_tl
+          { \mbox { \textbf {#1} } \nobreakspace #4 \hskip 1.2em plus 0.4em \relax }
+      }
+  }
+
+% =============================================================================
+%  Timing diagram: signals as rows, time to the right
+% =============================================================================
+\seq_new:N \g__sf_timing_rows_seq        % {name}{waveform}
+\seq_new:N \g__sf_timing_marks_seq       % {time}{label}
+\seq_new:N \g__sf_timing_spans_seq       % {name}{from}{to}{label}
+\NewDocumentEnvironment { sfTiming } { O{} }
+  {
+    \sf_begin:nnn { sfTiming } { step = 0.9cm , width = 13cm } {#1}
+    \seq_gclear:N \g__sf_timing_rows_seq
+    \seq_gclear:N \g__sf_timing_marks_seq
+    \seq_gclear:N \g__sf_timing_spans_seq
+    \DeclareDocumentCommand \Signal { m m }
+      { \seq_gput_right:Nn \g__sf_timing_rows_seq { {##1} {##2} } }
+    \DeclareDocumentCommand \Clock { m m } { \__sf_timing_clock:nn {##1} {##2} }
+    \DeclareDocumentCommand \Marker { m m }
+      { \seq_gput_right:Nn \g__sf_timing_marks_seq { {##1} {##2} } }
+    \DeclareDocumentCommand \Span { m m m m }
+      { \seq_gput_right:Nn \g__sf_timing_spans_seq { {##1} {##2} {##3} {##4} } }
+    \ignorespaces
+  }
+  { \__sf_timing_draw: }
+\cs_new_protected:Npn \__sf_timing_clock:nn #1#2
+  {
+    \regex_match:nnTF { \A \s* \d+ \s* \Z } {#2}
+      {
+        \seq_gput_right:Nx \g__sf_timing_rows_seq
+          { { \exp_not:n {#1} } { \prg_replicate:nn {#2} { H0.5 ~ L0.5 ~ } } }
+      }
+      {
+        \sf_problem:x
+          { clock~\tl_to_str:n {#1} :~periods~`\tl_to_str:n {#2}'~is~not~a~whole~number }
+      }
+  }
+
+% parse waveform #2 of signal #1 into \l__sf_timing_segs_tl
+% ({type}{duration}{value} items) and its length into \l__sf_timing_len_fp
+\tl_new:N \l__sf_timing_segs_tl
+\fp_new:N \l__sf_timing_len_fp
+\seq_new:N \l__sf_timing_tok_seq
+\seq_new:N \l__sf_timing_m_seq
+\cs_new_protected:Npn \__sf_timing_parse:nn #1#2
+  {
+    \tl_clear:N \l__sf_timing_segs_tl
+    \fp_zero:N \l__sf_timing_len_fp
+    \seq_set_split:Nnn \l__sf_timing_tok_seq { ~ } {#2}
+    \seq_map_inline:Nn \l__sf_timing_tok_seq
+      {
+        \tl_if_blank:nF {##1}
+          {
+            \regex_extract_once:nnNTF
+              { \A ([HLZXD]) ([0-9.]*) (?: \cB. (.*) \cE. )? \Z } {##1} \l__sf_timing_m_seq
+              {
+                \tl_set:Nx \l__sf_chart_a_tl { \seq_item:Nn \l__sf_timing_m_seq { 3 } }
+                \tl_if_empty:NT \l__sf_chart_a_tl { \tl_set:Nn \l__sf_chart_a_tl { 1 } }
+                \exp_args:NV \sf_if_number:nTF \l__sf_chart_a_tl
+                  {
+                    \fp_compare:nNnTF { \l__sf_chart_a_tl } > { 0 }
+                      {
+                        \tl_put_right:Nx \l__sf_timing_segs_tl
+                          {
+                            {
+                              { \seq_item:Nn \l__sf_timing_m_seq { 2 } }
+                              { \l__sf_chart_a_tl }
+                              { \exp_not:f { \seq_item:Nn \l__sf_timing_m_seq { 4 } } }
+                            }
+                          }
+                        \fp_add:Nn \l__sf_timing_len_fp { \l__sf_chart_a_tl }
+                      }
+                      { \__sf_timing_bad:nn {#1} {##1} }
+                  }
+                  { \__sf_timing_bad:nn {#1} {##1} }
+              }
+              { \__sf_timing_bad:nn {#1} {##1} }
+          }
+      }
+  }
+\cs_new_protected:Npn \__sf_timing_bad:nn #1#2
+  {
+    \sf_problem:x
+      {
+        signal~\tl_to_str:n {#1} :~bad~token~`\tl_to_str:n {#2}'~
+        (use~H2,~L1,~Z1,~X1,~D2\c_left_brace_str value\c_right_brace_str)
+      }
+  }
+\fp_new:N \l__sf_timing_max_fp
+\fp_new:N \l__sf_timing_u_fp             % cm per time unit
+\fp_new:N \l__sf_timing_t_fp             % current time
+\fp_new:N \l__sf_timing_step_fp          % row pitch in cm
+\tl_new:N \l__sf_timing_prev_tl          % y (cm) where the last segment ended, or empty
+\tl_new:N \l__sf_timing_lo_tl
+\tl_new:N \l__sf_timing_hi_tl
+\tl_new:N \l__sf_timing_mid_tl
+\prop_new:N \l__sf_timing_row_prop       % name -> row number
+\prop_new:N \l__sf_timing_segs_prop      % row number -> segments
+\int_new:N \l__sf_timing_rows_int
+\cs_new_protected:Npn \__sf_timing_draw:
+  {
+    % pass 1: parse, longest signal
+    \fp_zero:N \l__sf_timing_max_fp
+    \prop_clear:N \l__sf_timing_row_prop
+    \prop_clear:N \l__sf_timing_segs_prop
+    \seq_clear:N \l__sf_timing_names_seq
+    \int_zero:N \l__sf_timing_rows_int
+    \seq_map_inline:Nn \g__sf_timing_rows_seq
+      {
+        \__sf_timing_row:nn ##1
+      }
+    \seq_map_inline:Nn \g__sf_timing_marks_seq { \__sf_timing_time_max:nn ##1 }
+    \seq_map_inline:Nn \g__sf_timing_spans_seq { \__sf_timing_span_max:nnnn ##1 }
+    \fp_compare:nNnT \l__sf_timing_max_fp = { 0 } { \fp_set:Nn \l__sf_timing_max_fp { 1 } }
+    \fp_set:Nn \l__sf_timing_u_fp
+      { max ( 0.1 , \__sf_chart_cm:n { \l_sf_width_dim } - 2.4 ) / \l__sf_timing_max_fp }
+    \fp_set:Nn \l__sf_timing_step_fp { \__sf_chart_cm:n { \l_sf_step_dim } }
+    \begin{tikzpicture}
+      % time grid, one line per time unit
+      \fp_compare:nNnF \l__sf_timing_max_fp > { 60 }
+        {
+          \int_step_inline:nnn { 0 } { \fp_eval:n { floor ( \l__sf_timing_max_fp ) } }
+            {
+              \draw [ sfc/tgrid ]
+                ( \fp_eval:n { ##1 * \l__sf_timing_u_fp } cm , \__sf_timing_top: cm )
+                -- ( \fp_eval:n { ##1 * \l__sf_timing_u_fp } cm , \__sf_timing_bottom: cm ) ;
+            }
+        }
+      % signals
+      \int_step_inline:nn { \l__sf_timing_rows_int }
+        {
+          \tl_set:Nx \l__sf_timing_lo_tl { \fp_eval:n { - (##1 - 1) * \l__sf_timing_step_fp } }
+          \tl_set:Nx \l__sf_timing_hi_tl
+            { \fp_eval:n { \l__sf_timing_lo_tl + 0.55 * \l__sf_timing_step_fp } }
+          \tl_set:Nx \l__sf_timing_mid_tl
+            { \fp_eval:n { \l__sf_timing_lo_tl + 0.275 * \l__sf_timing_step_fp } }
+          \node [ sfc/wavename ] at ( -0.15cm , \l__sf_timing_mid_tl cm )
+            { \seq_item:Nn \l__sf_timing_names_seq {##1} } ;
+          \fp_zero:N \l__sf_timing_t_fp
+          \tl_clear:N \l__sf_timing_prev_tl
+          \prop_get:NnN \l__sf_timing_segs_prop {##1} \l__sf_timing_segs_tl
+          \tl_map_inline:Nn \l__sf_timing_segs_tl { \__sf_timing_seg:nnn ####1 }
+        }
+      % spans and markers
+      \seq_map_inline:Nn \g__sf_timing_spans_seq { \__sf_timing_span:nnnn ##1 }
+      \seq_map_inline:Nn \g__sf_timing_marks_seq { \__sf_timing_marker:nn ##1 }
+      \sf_problems_draw:
+    \end{tikzpicture}
+  }
+\cs_generate_variant:Nn \prop_put:Nnn { NxV , Nxx }
+\seq_new:N \l__sf_timing_names_seq
+\cs_new_protected:Npn \__sf_timing_row:nn #1#2
+  {
+    \int_incr:N \l__sf_timing_rows_int
+    \__sf_timing_parse:nn {#1} {#2}
+    \prop_put:NxV \l__sf_timing_segs_prop { \int_use:N \l__sf_timing_rows_int }
+      \l__sf_timing_segs_tl
+    \prop_if_in:NxT \l__sf_timing_row_prop { \tl_to_str:n {#1} }
+      { \sf_problem:x { duplicate~signal~\tl_to_str:n {#1} } }
+    \prop_put:Nxx \l__sf_timing_row_prop { \tl_to_str:n {#1} } { \int_use:N \l__sf_timing_rows_int }
+    \seq_put_right:Nn \l__sf_timing_names_seq {#1}
+    \fp_set:Nn \l__sf_timing_max_fp { max ( \l__sf_timing_max_fp , \l__sf_timing_len_fp ) }
+  }
+\cs_generate_variant:Nn \prop_if_in:NnT { NxT }
+\cs_new:Npn \__sf_timing_top: { \fp_eval:n { 0.55 * \l__sf_timing_step_fp + 0.15 } }
+\cs_new:Npn \__sf_timing_bottom:
+  { \fp_eval:n { - ( \l__sf_timing_rows_int - 1 ) * \l__sf_timing_step_fp - 0.15 } }
+\cs_new_protected:Npn \__sf_timing_time_max:nn #1#2
+  {
+    \sf_if_number:nTF {#1}
+      { \fp_set:Nn \l__sf_timing_max_fp { max ( \l__sf_timing_max_fp , #1 ) } }
+      { \sf_problem:x { marker~\tl_to_str:n {#2} :~time~`\tl_to_str:n {#1}'~is~not~a~number } }
+  }
+\cs_new_protected:Npn \__sf_timing_span_max:nnnn #1#2#3#4
+  {
+    \sf_if_number:nTF {#2}
+      {
+        \sf_if_number:nTF {#3}
+          { \fp_set:Nn \l__sf_timing_max_fp { max ( \l__sf_timing_max_fp , #2 , #3 ) } }
+          { \sf_problem:x { span~\tl_to_str:n {#4} :~time~`\tl_to_str:n {#3}'~is~not~a~number } }
+      }
+      { \sf_problem:x { span~\tl_to_str:n {#4} :~time~`\tl_to_str:n {#2}'~is~not~a~number } }
+  }
+% one segment: #1 type, #2 duration, #3 bus value
+\cs_new_protected:Npn \__sf_timing_seg:nnn #1#2#3
+  {
+    \tl_set:Nx \l__sf_chart_a_tl { \fp_eval:n { \l__sf_timing_t_fp * \l__sf_timing_u_fp } }          % x1
+    \tl_set:Nx \l__sf_chart_b_tl { \fp_eval:n { ( \l__sf_timing_t_fp + #2 ) * \l__sf_timing_u_fp } } % x2
+    \tl_set:Nx \l__sf_chart_c_tl                                                                   % slew
+      { \fp_eval:n { min ( 0.12 , 0.25 * #2 * \l__sf_timing_u_fp ) } }
+    \tl_set:Nx \l__sf_chart_d_tl                                                                   % start y
+      {
+        \str_case:nnF {#1}
+          { { H } { \l__sf_timing_hi_tl } { L } { \l__sf_timing_lo_tl } }
+          { \l__sf_timing_mid_tl }
+      }
+    % vertical edge from where the last segment ended
+    \tl_if_empty:NF \l__sf_timing_prev_tl
+      {
+        \fp_compare:nNnF { \l__sf_timing_prev_tl } = { \l__sf_chart_d_tl }
+          {
+            \draw [ sfc/wave ] ( \l__sf_chart_a_tl cm , \l__sf_timing_prev_tl cm )
+              -- ( \l__sf_chart_a_tl cm , \l__sf_chart_d_tl cm ) ;
+          }
+      }
+    \str_case:nn {#1}
+      {
+        { H } { \__sf_timing_level:n { wave } }
+        { L } { \__sf_timing_level:n { wave } }
+        { Z } { \__sf_timing_level:n { wavez } }
+        { D }
+          {
+            \__sf_timing_hexagon:n { wavebus }
+            \tl_if_blank:nF {#3}
+              {
+                \node [ sfc/wavevalue ]
+                  at ( \fp_eval:n { ( \l__sf_chart_a_tl + \l__sf_chart_b_tl ) / 2 } cm ,
+                       \l__sf_timing_mid_tl cm ) {#3} ;
+              }
+          }
+        { X } { \__sf_timing_hexagon:n { waveunknown } }
+      }
+    \tl_set_eq:NN \l__sf_timing_prev_tl \l__sf_chart_d_tl
+    \fp_add:Nn \l__sf_timing_t_fp {#2}
+  }
+\cs_new_protected:Npn \__sf_timing_level:n #1
+  {
+    \draw [ sfc/#1 ] ( \l__sf_chart_a_tl cm , \l__sf_chart_d_tl cm )
+      -- ( \l__sf_chart_b_tl cm , \l__sf_chart_d_tl cm ) ;
+  }
+\cs_new_protected:Npn \__sf_timing_hexagon:n #1
+  {
+    \draw [ sfc/#1 ]
+      ( \l__sf_chart_a_tl cm , \l__sf_timing_mid_tl cm )
+      -- ( \fp_eval:n { \l__sf_chart_a_tl + \l__sf_chart_c_tl } cm , \l__sf_timing_hi_tl cm )
+      -- ( \fp_eval:n { \l__sf_chart_b_tl - \l__sf_chart_c_tl } cm , \l__sf_timing_hi_tl cm )
+      -- ( \l__sf_chart_b_tl cm , \l__sf_timing_mid_tl cm )
+      -- ( \fp_eval:n { \l__sf_chart_b_tl - \l__sf_chart_c_tl } cm , \l__sf_timing_lo_tl cm )
+      -- ( \fp_eval:n { \l__sf_chart_a_tl + \l__sf_chart_c_tl } cm , \l__sf_timing_lo_tl cm )
+      -- cycle ;
+  }
+\cs_new_protected:Npn \__sf_timing_marker:nn #1#2
+  {
+    \sf_if_number:nT {#1}
+      {
+        \draw [ sfc/marker ] ( \fp_eval:n { (#1) * \l__sf_timing_u_fp } cm , \__sf_timing_top: cm )
+          -- ( \fp_eval:n { (#1) * \l__sf_timing_u_fp } cm , \__sf_timing_bottom: cm ) ;
+        \node [ sfc/markerlabel ]
+          at ( \fp_eval:n { (#1) * \l__sf_timing_u_fp } cm , \__sf_timing_top: cm ) {#2} ;
+      }
+  }
+% dimension arrow between two times, just above signal #1
+\cs_new_protected:Npn \__sf_timing_span:nnnn #1#2#3#4
+  {
+    \prop_get:NxNTF \l__sf_timing_row_prop { \tl_to_str:n {#1} } \l__sf_chart_a_tl
+      {
+        \sf_if_number:nT {#2}
+          {
+            \sf_if_number:nT {#3}
+              {
+                \tl_set:Nx \l__sf_chart_b_tl
+                  {
+                    \fp_eval:n
+                      { - ( \l__sf_chart_a_tl - 1 ) * \l__sf_timing_step_fp
+                        + 0.55 * \l__sf_timing_step_fp + 0.1 }
+                  }
+                \draw [ sfc/span ]
+                  ( \fp_eval:n { (#2) * \l__sf_timing_u_fp } cm , \l__sf_chart_b_tl cm )
+                  -- ( \fp_eval:n { (#3) * \l__sf_timing_u_fp } cm , \l__sf_chart_b_tl cm )
+                  node [ sfc/spanlabel , midway ] {#4} ;
+              }
+          }
+      }
+      { \sf_problem:x { span~\tl_to_str:n {#4} :~unknown~signal~\tl_to_str:n {#1} } }
+  }
+\cs_generate_variant:Nn \prop_get:NnNTF { NxNTF }
+
+% =============================================================================
+%  Bar and line charts: categories along x, value axis with nice ticks
+% =============================================================================
+\clist_new:N \g__sf_chart_cats_clist
+\seq_new:N \g__sf_chart_series_seq       % {name}{v1, v2, ...}
+\seq_new:N \g__sf_chart_bars_seq         % {label}{value}
+\seq_new:N \g__sf_chart_thr_seq          % {value}{label}
+\tl_new:N \g__sf_chart_kind_tl           % bar | line
+\cs_new_protected:Npn \__sf_chart_begin:n #1   % kind
+  {
+    \tl_gset:Nn \g__sf_chart_kind_tl {#1}
+    \clist_gclear:N \g__sf_chart_cats_clist
+    \seq_gclear:N \g__sf_chart_series_seq
+    \seq_gclear:N \g__sf_chart_bars_seq
+    \seq_gclear:N \g__sf_chart_thr_seq
+    \DeclareDocumentCommand \Categories { m } { \clist_gset:Nn \g__sf_chart_cats_clist {##1} }
+    \DeclareDocumentCommand \Series { m m }
+      { \seq_gput_right:Nn \g__sf_chart_series_seq { {##1} {##2} } }
+    \DeclareDocumentCommand \Threshold { m m }
+      { \seq_gput_right:Nn \g__sf_chart_thr_seq { {##1} {##2} } }
+  }
+\NewDocumentEnvironment { sfBarChart } { O{} }
+  {
+    \sf_begin:nnn { sfBarChart } { width = 12cm , height = 5.5cm } {#1}
+    \__sf_chart_begin:n { bar }
+    \DeclareDocumentCommand \Bar { m m }
+      { \seq_gput_right:Nn \g__sf_chart_bars_seq { {##1} {##2} } }
+    \ignorespaces
+  }
+  { \__sf_chart_draw: }
+\NewDocumentEnvironment { sfLineChart } { O{} }
+  {
+    \sf_begin:nnn { sfLineChart } { width = 12cm , height = 5.5cm } {#1}
+    \__sf_chart_begin:n { line }
+    \ignorespaces
+  }
+  { \__sf_chart_draw: }
+
+\fp_new:N \l__sf_chart_lo_fp
+\fp_new:N \l__sf_chart_hi_fp
+\fp_new:N \l__sf_chart_step_fp
+\fp_new:N \l__sf_chart_w_fp
+\fp_new:N \l__sf_chart_h_fp
+\fp_new:N \l__sf_chart_slot_fp
+\fp_new:N \l__sf_chart_base_fp
+\int_new:N \l__sf_chart_n_int            % categories
+\int_new:N \l__sf_chart_m_int            % series
+\int_new:N \l__sf_chart_s_int            % current series
+\clist_new:N \l__sf_chart_vals_clist
+\tl_new:N \l__sf_chart_path_tl
+\tl_new:N \l__sf_chart_marks_tl
+
+\cs_new:Npn \__sf_chart_y:n #1   % value -> y in cm
+  {
+    \fp_eval:n
+      { ( (#1) - \l__sf_chart_lo_fp ) / ( \l__sf_chart_hi_fp - \l__sf_chart_lo_fp ) * \l__sf_chart_h_fp }
+  }
+\cs_new:Npn \__sf_chart_colour:n #1 { sfc \int_eval:n { \int_mod:nn { #1 - 1 } { 6 } + 1 } }
+
+\cs_new_protected:Npn \__sf_chart_draw:
+  {
+    % \Bar data become one unnamed series
+    \seq_if_empty:NF \g__sf_chart_bars_seq
+      {
+        \seq_if_empty:NTF \g__sf_chart_series_seq
+          {
+            \clist_gclear:N \g__sf_chart_cats_clist
+            \tl_clear:N \l__sf_chart_a_tl
+            \seq_map_inline:Nn \g__sf_chart_bars_seq { \__sf_chart_bar_data:nn ##1 }
+            \seq_gput_right:Nx \g__sf_chart_series_seq { { } { \exp_not:V \l__sf_chart_a_tl } }
+          }
+          { \sf_problem:n { use~either~Bar~or~Series~and~Categories;~Bar~lines~ignored } }
+      }
+    \int_set:Nn \l__sf_chart_n_int { \clist_count:N \g__sf_chart_cats_clist }
+    \int_set:Nn \l__sf_chart_m_int { \seq_count:N \g__sf_chart_series_seq }
+    \int_compare:nNnT \l__sf_chart_n_int = { 0 }
+      { \sf_problem:n { no~categories } }
+    \int_compare:nNnT \l__sf_chart_m_int > { 6 }
+      { \sf_problem:n { more~than~6~series:~colours~repeat } }
+    % value range: all valid values, thresholds and 0
+    \fp_zero:N \l__sf_chart_lo_fp
+    \fp_zero:N \l__sf_chart_hi_fp
+    \seq_map_inline:Nn \g__sf_chart_series_seq { \__sf_chart_check:nn ##1 }
+    \seq_map_inline:Nn \g__sf_chart_thr_seq { \__sf_chart_range_thr:nn ##1 }
+    \__sf_chart_nice:
+    \fp_set:Nn \l__sf_chart_w_fp { \__sf_chart_cm:n { \l_sf_width_dim } }
+    \fp_set:Nn \l__sf_chart_h_fp { \__sf_chart_cm:n { \l_sf_height_dim } }
+    \fp_set:Nn \l__sf_chart_slot_fp { \l__sf_chart_w_fp / max ( 1 , \l__sf_chart_n_int ) }
+    \fp_set:Nn \l__sf_chart_base_fp
+      { \__sf_chart_y:n { max ( \l__sf_chart_lo_fp , min ( 0 , \l__sf_chart_hi_fp ) ) } }
+    \begin{tikzpicture}
+      % grid and tick labels
+      \int_step_inline:nnn { 0 }
+        { \fp_eval:n { round ( ( \l__sf_chart_hi_fp - \l__sf_chart_lo_fp ) / \l__sf_chart_step_fp ) } }
+        {
+          \tl_set:Nx \l__sf_chart_a_tl
+            { \fp_eval:n { round ( \l__sf_chart_lo_fp + ##1 * \l__sf_chart_step_fp , 6 ) } }
+          \tl_set:Nx \l__sf_chart_b_tl { \__sf_chart_y:n { \l__sf_chart_a_tl } }
+          \draw [ sfc/ygrid ] ( 0 , \l__sf_chart_b_tl cm )
+            -- ( \fp_eval:n { \l__sf_chart_w_fp } cm , \l__sf_chart_b_tl cm ) ;
+          \node [ sfc/tick ] at ( -0.05cm , \l__sf_chart_b_tl cm ) { \l__sf_chart_a_tl } ;
+        }
+      % data
+      \int_zero:N \l__sf_chart_s_int
+      \seq_map_inline:Nn \g__sf_chart_series_seq
+        {
+          \int_incr:N \l__sf_chart_s_int
+          \use:c { __sf_chart_ \g__sf_chart_kind_tl :nn } ##1
+        }
+      % thresholds
+      \seq_map_inline:Nn \g__sf_chart_thr_seq { \__sf_chart_thr:nn ##1 }
+      % axes
+      \draw [ sfc/axis ] ( 0 , 0 ) -- ( 0 , \fp_eval:n { \l__sf_chart_h_fp } cm ) ;
+      \draw [ sfc/axis ] ( 0 , \fp_eval:n { \l__sf_chart_base_fp } cm )
+        -- ( \fp_eval:n { \l__sf_chart_w_fp } cm , \fp_eval:n { \l__sf_chart_base_fp } cm ) ;
+      % category labels
+      \int_zero:N \l__sf_chart_s_int
+      \clist_map_inline:Nn \g__sf_chart_cats_clist
+        {
+          \int_incr:N \l__sf_chart_s_int
+          \node [ sfc/cat , text~width = \fp_eval:n { max ( 0.5 , \l__sf_chart_slot_fp - 0.1 ) } cm ]
+            at ( \fp_eval:n { ( \l__sf_chart_s_int - 0.5 ) * \l__sf_chart_slot_fp } cm , -0.05cm ) {##1} ;
+        }
+      % axis titles
+      \tl_if_blank:VF \l_sf_xlabel_tl
+        {
+          \__sf_chart_bbox:nN { south } \l__sf_chart_b_tl
+          \node [ sfc/title , anchor = north ]
+            at ( \fp_eval:n { \l__sf_chart_w_fp / 2 } cm , \l__sf_chart_b_tl cm ) { \l_sf_xlabel_tl } ;
+        }
+      \tl_if_blank:VF \l_sf_ylabel_tl
+        {
+          \__sf_chart_bbox:nN { west } \l__sf_chart_b_tl
+          \node [ sfc/title , anchor = south , rotate = 90 ]
+            at ( \l__sf_chart_b_tl cm , \fp_eval:n { \l__sf_chart_h_fp / 2 } cm ) { \l_sf_ylabel_tl } ;
+        }
+      % legend
+      \int_compare:nNnT \l__sf_chart_m_int > { 1 }
+        {
+          \tl_clear:N \l__sf_chart_txt_tl
+          \int_zero:N \l__sf_chart_s_int
+          \seq_map_inline:Nn \g__sf_chart_series_seq { \__sf_chart_legend:nn ##1 }
+          \__sf_chart_bbox:nN { south } \l__sf_chart_b_tl
+          \node [ sfc/legend , anchor = north ]
+            at ( \fp_eval:n { \l__sf_chart_w_fp / 2 } cm , \fp_eval:n { \l__sf_chart_b_tl - 0.15 } cm )
+            { \l__sf_chart_txt_tl } ;
+        }
+      \sf_problems_draw:
+    \end{tikzpicture}
+  }
+\cs_generate_variant:Nn \tl_if_blank:nF { V }
+\cs_new_protected:Npn \__sf_chart_bar_data:nn #1#2
+  {
+    \clist_gput_right:Nn \g__sf_chart_cats_clist { {#1} }
+    \tl_if_empty:NF \l__sf_chart_a_tl { \tl_put_right:Nn \l__sf_chart_a_tl { , } }
+    \tl_put_right:Nn \l__sf_chart_a_tl {#2}
+  }
+% checks one series, widens the value range
+\cs_new_protected:Npn \__sf_chart_check:nn #1#2
+  {
+    \clist_set:Nn \l__sf_chart_vals_clist {#2}
+    \int_compare:nNnF { \clist_count:N \l__sf_chart_vals_clist } = \l__sf_chart_n_int
+      {
+        \sf_problem:x
+          {
+            series~`\tl_to_str:n {#1}':~\clist_count:N \l__sf_chart_vals_clist \c_space_tl
+            values~for~\int_use:N \l__sf_chart_n_int \c_space_tl categories
+          }
+      }
+    \clist_map_inline:Nn \l__sf_chart_vals_clist
+      {
+        \sf_if_number:nTF {##1}
+          {
+            \fp_set:Nn \l__sf_chart_lo_fp { min ( \l__sf_chart_lo_fp , ##1 ) }
+            \fp_set:Nn \l__sf_chart_hi_fp { max ( \l__sf_chart_hi_fp , ##1 ) }
+          }
+          {
+            \sf_problem:x
+              { series~`\tl_to_str:n {#1}':~value~`\tl_to_str:n {##1}'~is~not~a~number }
+          }
+      }
+  }
+\cs_new_protected:Npn \__sf_chart_range_thr:nn #1#2
+  {
+    \sf_if_number:nTF {#1}
+      {
+        \fp_set:Nn \l__sf_chart_lo_fp { min ( \l__sf_chart_lo_fp , #1 ) }
+        \fp_set:Nn \l__sf_chart_hi_fp { max ( \l__sf_chart_hi_fp , #1 ) }
+      }
+      { \sf_problem:x { threshold~`\tl_to_str:n {#1}'~is~not~a~number } }
+  }
+% axis from a multiple of a nice step (1, 2, 5 x 10^k, about 5 ticks)
+\fp_new:N \l__sf_chart_raw_fp
+\fp_new:N \l__sf_chart_mag_fp
+\cs_new_protected:Npn \__sf_chart_nice:
+  {
+    \fp_compare:nNnT { \l__sf_chart_hi_fp - \l__sf_chart_lo_fp } = { 0 }
+      { \fp_set:Nn \l__sf_chart_hi_fp { \l__sf_chart_lo_fp + 1 } }
+    \fp_set:Nn \l__sf_chart_raw_fp { ( \l__sf_chart_hi_fp - \l__sf_chart_lo_fp ) / 5 }
+    \fp_set:Nn \l__sf_chart_mag_fp
+      { 10 ^ ( floor ( ln ( \l__sf_chart_raw_fp ) / ln ( 10 ) ) ) }
+    \fp_set:Nn \l__sf_chart_raw_fp { \l__sf_chart_raw_fp / \l__sf_chart_mag_fp }
+    \fp_set:Nn \l__sf_chart_step_fp
+      {
+        \l__sf_chart_mag_fp *
+        ( \l__sf_chart_raw_fp <= 1.0000001 ? 1 :
+          ( \l__sf_chart_raw_fp <= 2.0000001 ? 2 :
+            ( \l__sf_chart_raw_fp <= 5.0000001 ? 5 : 10 ) ) )
+      }
+    \fp_set:Nn \l__sf_chart_lo_fp
+      { floor ( \l__sf_chart_lo_fp / \l__sf_chart_step_fp ) * \l__sf_chart_step_fp }
+    \fp_set:Nn \l__sf_chart_hi_fp
+      { ceil ( \l__sf_chart_hi_fp / \l__sf_chart_step_fp ) * \l__sf_chart_step_fp }
+  }
+% bars of series number \l__sf_chart_s_int
+\cs_new_protected:Npn \__sf_chart_bar:nn #1#2
+  {
+    \clist_set:Nn \l__sf_chart_vals_clist {#2}
+    \tl_set:Nx \l__sf_chart_d_tl { \fp_eval:n { 0.72 * \l__sf_chart_slot_fp / \l__sf_chart_m_int } }
+    \int_step_inline:nn { \int_min:nn { \clist_count:N \l__sf_chart_vals_clist } { \l__sf_chart_n_int } }
+      {
+        \tl_set:Nx \l__sf_chart_c_tl { \clist_item:Nn \l__sf_chart_vals_clist {##1} }
+        \exp_args:NV \sf_if_number:nT \l__sf_chart_c_tl
+          {
+            \tl_set:Nx \l__sf_chart_a_tl
+              {
+                \fp_eval:n
+                  { (##1 - 1) * \l__sf_chart_slot_fp + 0.14 * \l__sf_chart_slot_fp
+                    + ( \l__sf_chart_s_int - 1 ) * \l__sf_chart_d_tl }
+              }
+            \tl_set:Nx \l__sf_chart_b_tl { \__sf_chart_y:n { \l__sf_chart_c_tl } }
+            \tl_set:Nx \l__sf_chart_txt_tl { \__sf_chart_colour:n { \l__sf_chart_s_int } }
+            \fill [ fill = \l__sf_chart_txt_tl ]
+              ( \l__sf_chart_a_tl cm , \fp_eval:n { \l__sf_chart_base_fp } cm )
+              rectangle ( \fp_eval:n { \l__sf_chart_a_tl + \l__sf_chart_d_tl } cm , \l__sf_chart_b_tl cm ) ;
+            \int_compare:nNnT \l__sf_chart_m_int = { 1 }
+              {
+                \tl_set:Nx \l__sf_chart_txt_tl
+                  { \fp_compare:nNnTF { \l__sf_chart_c_tl } < { 0 } { north } { south } }
+                \node [ sfc/value , anchor = \l__sf_chart_txt_tl ]
+                  at ( \fp_eval:n { \l__sf_chart_a_tl + \l__sf_chart_d_tl / 2 } cm , \l__sf_chart_b_tl cm )
+                  { \l__sf_chart_c_tl } ;
+              }
+          }
+      }
+  }
+% line of series number \l__sf_chart_s_int (non-numbers are skipped)
+\cs_new_protected:Npn \__sf_chart_line:nn #1#2
+  {
+    \clist_set:Nn \l__sf_chart_vals_clist {#2}
+    \tl_clear:N \l__sf_chart_path_tl
+    \tl_clear:N \l__sf_chart_marks_tl
+    \int_step_inline:nn { \int_min:nn { \clist_count:N \l__sf_chart_vals_clist } { \l__sf_chart_n_int } }
+      {
+        \tl_set:Nx \l__sf_chart_c_tl { \clist_item:Nn \l__sf_chart_vals_clist {##1} }
+        \exp_args:NV \sf_if_number:nT \l__sf_chart_c_tl
+          {
+            \tl_set:Nx \l__sf_chart_a_tl
+              {
+                ( \fp_eval:n { (##1 - 0.5) * \l__sf_chart_slot_fp } cm ,
+                  \__sf_chart_y:n { \l__sf_chart_c_tl } cm )
+              }
+            \tl_if_empty:NF \l__sf_chart_path_tl { \tl_put_right:Nn \l__sf_chart_path_tl { -- } }
+            \tl_put_right:NV \l__sf_chart_path_tl \l__sf_chart_a_tl
+            \tl_put_right:Nx \l__sf_chart_marks_tl { \l__sf_chart_a_tl circle ( 1.7pt ) }
+          }
+      }
+    \tl_set:Nx \l__sf_chart_b_tl { \__sf_chart_colour:n { \l__sf_chart_s_int } }
+    \tl_if_empty:NF \l__sf_chart_path_tl
+      {
+        \use:x
+          {
+            \exp_not:N \draw [ draw = \l__sf_chart_b_tl , thick , line~join = round ]
+              \exp_not:V \l__sf_chart_path_tl ;
+            \exp_not:N \fill [ fill = \l__sf_chart_b_tl ] \exp_not:V \l__sf_chart_marks_tl ;
+          }
+      }
+  }
+\cs_new_protected:Npn \__sf_chart_thr:nn #1#2
+  {
+    \sf_if_number:nT {#1}
+      {
+        \tl_set:Nx \l__sf_chart_b_tl { \__sf_chart_y:n {#1} }
+        \draw [ sfc/threshold ] ( 0 , \l__sf_chart_b_tl cm )
+          -- ( \fp_eval:n { \l__sf_chart_w_fp } cm , \l__sf_chart_b_tl cm ) ;
+        \tl_if_blank:nF {#2}
+          {
+            \node [ sfc/thresholdlabel ] at ( 0.05cm , \l__sf_chart_b_tl cm ) {#2} ;
+          }
+      }
+  }
+\cs_new_protected:Npn \__sf_chart_legend:nn #1#2
+  {
+    \int_incr:N \l__sf_chart_s_int
+    \tl_put_right:Nx \l__sf_chart_txt_tl
+      {
+        \exp_not:N \textcolor { \__sf_chart_colour:n { \l__sf_chart_s_int } }
+          {
+            \str_if_eq:VnTF \g__sf_chart_kind_tl { line }
+              { \exp_not:N \rule [ 0.55ex ] { 4mm } { 1.2pt } }
+              { \exp_not:N \rule { 2.2mm } { 2.2mm } }
+          }
+        \exp_not:N \nobreakspace \exp_not:n {#1} \exp_not:N \hspace { 1.2em }
+      }
+  }
+\ExplSyntaxOff
+\endinput
