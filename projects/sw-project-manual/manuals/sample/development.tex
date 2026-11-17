@@ -1,0 +1,59 @@
+% Developer manual: rules, CI pipeline, Definition of Done, how-tos.
+% Tools are named exactly as in environment.tex.
+
+% Rules: {area}{rule}{enforced by: tools, empty = review}
+\Rule{Language}{C99; MISRA C:2012 \DocRef{misra}, deviations only with a permit in \code{doc/deviations.md}}{cppcheck}
+\Rule{Formatting}{\code{.clang-format} of the repository, checked in CI}{clang-format}
+\Rule{Naming}{\code{<Unit>_<Function>} for API functions, \code{snake_case} for files}{}
+\Rule{Tests}{Every requirement allocated to a unit has a unit test; every bug fix adds a test that failed before}{GoogleTest}
+\Rule{Reviews}{Every merge request has one approval by a developer who did not write it}{GitLab CI}
+
+% CI stages: {stage}{does / checks}{tools}{blocking: yes | no}
+\CIStage{Format}{Formatting of changed files}{clang-format}{yes}
+\CIStage{Build}{Host and target build without warnings}{CMake, GCC, Target compiler}{yes}
+\CIStage{Static analysis}{MISRA check, new violations fail}{cppcheck}{yes}
+\CIStage{Unit tests}{All unit and component tests, coverage report}{GoogleTest, gcov/lcov}{yes}
+\CIStage{Docs}{Build of the specifications}{}{no}
+
+% Definition of Done, one line per criterion
+\DoneCriterion{Code, tests and specifications are changed in one merge request that names the ticket.}
+\DoneCriterion{The pipeline is green; coverage did not drop.}
+\DoneCriterion{The merge request is approved; review comments are resolved.}
+\DoneCriterion{The ticket links the changed requirements and test cases.}
+
+% How-tos: \begin{HowTo}{ID}{title} with \Goal{text}, \Tools{tool, tool} and
+% one \Step{action}{command, may be empty} per step. Escape # $ % & ~ in commands
+% (\#, \$, \%, \&, \textasciitilde).
+\begin{HowTo}{HT-SETUP}{Set up the workspace}
+  \Goal{A fresh clone that builds and runs the tests on a Linux host.}
+  \Tools{GCC, CMake, GoogleTest}
+  \Step{Clone the repository with its submodules.}{git clone --recurse-submodules git.example.com/heater/heater_ctrl}
+  \Step{Configure the host build.}{cmake --preset host}
+  \Step{Build and run all tests; all must pass.}{cmake --build --preset host \&\& ctest --preset host}
+\end{HowTo}
+
+\begin{HowTo}{HT-CHANGE}{Make a change}
+  \Goal{From a ticket to a merged change.}
+  \Tools{clang-format, GitLab CI}
+  \Step{Create a branch named after the ticket.}{git switch -c feature/HC-142-ramp}
+  \Step{Change code, tests and specifications; format the changed files.}{clang-format -i src/setpoint_ctrl/*.c}
+  \Step{Push and open a merge request; wait for the green pipeline and the approval.}{git push -u origin HEAD}
+  \Step{Merge with squash; the ticket moves to Implemented.}{}
+\end{HowTo}
+
+\begin{HowTo}{HT-RELEASE}{Create a release}
+  \Goal{A tagged release with release note, for the configuration manager.}
+  \Tools{GitLab CI}
+  \Step{Check that all CRs and PRs of the release are Verified.}{}
+  \Step{Tag the last green commit of \code{main}.}{git tag -a heater_ctrl-v1.0.0 -m "heater_ctrl v1.0.0"}
+  \Step{Push the tag; the release pipeline builds the binary and the release note.}{git push origin heater_ctrl-v1.0.0}
+  \Step{Fill in the release checklist; get the approval of the project lead.}{}
+\end{HowTo}
+
+% Free text: any LaTeX, printed at the end of this chapter. Files from the
+% manual's code/ folder are listed with \InputCode{file}.
+\begin{FreeText}
+\subsection{CI Configuration (excerpt)}
+From \texttt{.gitlab-ci.yml} of the repository, copied to the manual's \texttt{code/} folder:
+\InputCode[lastline=12]{gitlab-ci.yml}
+\end{FreeText}

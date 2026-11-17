@@ -1,0 +1,37 @@
+% Process reference, tailoring, milestones, releases.
+
+\ProcessReference{
+  The project follows the company software process \DocRef{process}, which
+  implements Automotive SPICE 4.0 \DocRef{aspice}. Target: capability level 2
+  for every process in scope. Development runs in two-week sprints; the
+  milestones below are the gates towards the customer.
+}
+
+% Processes: {ID}{name}{yes | no | tailored}{rationale}
+% A process that is applied (yes / tailored) needs at least one \WorkProduct.
+\Process{MAN.3}{Project management}{yes}{}
+\Process{MAN.5}{Risk management}{yes}{Risk register in this manual}
+\Process{SWE.1}{Software requirements analysis}{yes}{}
+\Process{SWE.2}{Software architectural design}{yes}{}
+\Process{SWE.3}{Software detailed design and unit construction}{yes}{}
+\Process{SWE.4}{Software unit verification}{yes}{}
+\Process{SWE.5}{Software component verification and integration verification}{yes}{}
+\Process{SWE.6}{Software verification}{tailored}{Qualification test on the system team's HIL; we provide the specification}
+\Process{SUP.1}{Quality assurance}{yes}{}
+\Process{SUP.8}{Configuration management}{yes}{}
+\Process{SUP.9}{Problem resolution management}{yes}{}
+\Process{SUP.10}{Change request management}{yes}{}
+\Process{SYS.2}{System requirements analysis}{no}{Customer's system team}
+\Process{HWE.1}{Hardware requirements analysis}{no}{No hardware development}
+
+% Milestones: {ID}{date YYYY-MM-DD}{name}{exit criteria: work product IDs}
+\Milestone{M0}{2026-11-02}{Kick-off}{WP-PM}
+\Milestone{M1}{2026-12-18}{Requirements baseline}{WP-SRS}
+\Milestone{M2}{2027-02-12}{Architecture released}{WP-SWCS}
+\Milestone{M3}{2027-05-07}{C-sample software}{WP-SUTS, WP-REL}
+\Milestone{M4}{2027-09-24}{SOP release}{WP-QT, WP-QAR, WP-REL}
+
+% Releases: {version}{date YYYY-MM-DD}{content}{milestone}
+\Release{v0.9}{2027-03-19}{Control path, no NvM}{}
+\Release{v1.0}{2027-05-07}{Feature complete}{M3}
+\Release{v2.0}{2027-09-24}{All CRs of the SOP scope, all tests passed}{M4}

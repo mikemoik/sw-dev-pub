@@ -27,6 +27,7 @@ sw-dev-pub/
 | [`cbor`](projects/cbor/) | CBOR codec twins: C++17 single header (CMake target `cbor::cbor`) + MATLAB/Octave, RFC 8746 typed arrays, cbor2 interop check | swdevos | stable, tested |
 | [`matlab-json-config`](projects/matlab-json-config/) | Typed JSON config pattern for MATLAB (validated class properties from `jsondecode`) | swdevos | example, untested (MATLAB only) |
 | [`sw-component-spec`](projects/sw-component-spec/) | LaTeX SW Component Specification template: requirements, architecture and integration/component test of one component (ASPICE 4.0 SWE.2/SWE.5, ISO 26262-6 §7/§10); spin-off of `sw-unit-test-spec` | swdevos | new, builds clean |
+| [`sw-project-manual`](projects/sw-project-manual/) | LaTeX SW Project Manual template: project plan (roles, process tailoring, milestones, work products/RACI, CM, QA, risks, tools) + developer manual for a project developing one component (ASPICE 4.0 MAN.3/MAN.5/SUP.1/SUP.8–10) | swdevos | new, builds clean |
 | [`sw-unit-test-spec`](projects/sw-unit-test-spec/) | LaTeX SW Unit Test Specification template (ISO/IEC/IEEE 29119-3, ASPICE SWE.4, ISO 26262-6 §9) | swdevos | stable, builds clean |
 | [`windows`](projects/windows/) | Windows setup snippets: Git Bash `.bashrc` with one shared ssh-agent for all windows | sokrates | tested on Linux, not yet on Windows |
 

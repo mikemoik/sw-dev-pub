@@ -1,0 +1,16 @@
+stages: [format, build, analysis, test, docs]
+
+format:
+  stage: format
+  script: git diff --name-only origin/main | grep -E '\.[ch]$' | xargs -r clang-format --dry-run --Werror
+
+build:
+  stage: build
+  script:
+    - cmake --preset host && cmake --build --preset host
+    - cmake --preset target && cmake --build --preset target
+
+unit-tests:
+  stage: test
+  script: ctest --preset host --output-junit report.xml
+  coverage: '/lines\.*: (\d+\.\d+)%/'

@@ -1,0 +1,38 @@
+% Roles, team, stakeholders, meetings.
+
+% Roles: [reports to]{ID}{name}{responsibility} -- the [reports to] role
+% draws the organisation chart. Work products, reviews, meetings and risks
+% name roles by their ID.
+\Role{PL}{Project lead}{Plan, budget, schedule, customer contact, risks; approves the plans}
+\Role[PL]{SWA}{Software architect}{Requirements analysis, architecture, technical decisions}
+\Role[PL]{QA}{Quality assurance}{Independent process and product audits, escalation}
+\Role[SWA]{DEV}{Developer}{Detailed design, code, unit tests}
+\Role[SWA]{TST}{Tester}{Component and qualification tests, test reports}
+\Role[PL]{CM}{Configuration manager}{Repositories, baselines, releases, CI}
+
+% Team: {name}{role IDs}{organisation / contact}
+\Member{Jane Doe}{PL}{Example Corp, SW Engineering}
+\Member{John Roe}{SWA}{Example Corp, SW Engineering}
+\Member{Kim Moe}{DEV}{Example Corp, SW Engineering}
+\Member{Lee Noe}{DEV, CM}{Example Corp, SW Engineering}
+\Member{Max Koe}{TST}{Example Corp, Test Center}
+\Member{Sam Loe}{QA}{Example Corp, Quality (independent of the project)}
+
+% Stakeholders: {stakeholder}{interest / interface}{contact role}
+\Stakeholder{Customer}{Requirements, releases, change requests, status reports}{PL}
+\Stakeholder{System team}{System requirements, system integration of the releases}{SWA}
+\Stakeholder{Platform team}{Basic software (NvM, Dem, IoHwAb), its releases}{SWA}
+\Stakeholder{Safety manager}{Safety plan, safety analyses, confirmation measures}{PL}
+
+% Meetings: {meeting}{cadence}{participant roles}{purpose / output}
+\Meeting{Daily}{daily, 15 min}{DEV, TST, SWA}{Progress and impediments}
+\Meeting{Sprint review}{every 2 weeks}{PL, SWA, DEV, TST, CM}{Demo of done items, sprint backlog}
+\Meeting{Change board}{weekly}{PL, SWA, CM}{Decisions on CRs and PRs}
+\Meeting{Steering}{monthly}{PL, QA}{Status, red risks, escalations; minutes to the customer}
+
+\Communication{
+  The project lead reports status (schedule, effort, open CRs/PRs, red risks)
+  monthly to the customer and the department head. Decisions are recorded in
+  the minutes of the meeting in which they were made. Project language is
+  English.
+}

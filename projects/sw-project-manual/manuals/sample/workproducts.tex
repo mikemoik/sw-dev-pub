@@ -1,0 +1,26 @@
+% Work products, reviews, responsibility matrix (RACI, generated).
+
+% {ID}{name}{process IDs}{responsible role}{template / location}
+\WorkProduct{WP-PM}{Project manual (this document) incl. risk register}{MAN.3, MAN.5}{PL}{sw-project-manual template}
+\WorkProduct{WP-SRS}{Software requirements specification}{SWE.1}{SWA}{Requirements tool, module SRS-SPC}
+\WorkProduct{WP-SWCS}{Software component specification}{SWE.2, SWE.5}{SWA}{sw-component-spec template}
+\WorkProduct{WP-CODE}{Detailed design and code}{SWE.3}{DEV}{Repository, src/ and doc/}
+\WorkProduct{WP-SUTS}{Software unit test specifications and reports}{SWE.4}{DEV}{sw-unit-test-spec template}
+\WorkProduct{WP-QT}{Qualification test specification}{SWE.6}{TST}{Test management tool}
+\WorkProduct{WP-QAR}{QA reports}{SUP.1}{QA}{QA folder of the project}
+\WorkProduct{WP-REL}{Release (binary, release note, baseline)}{SUP.8}{CM}{Release page of the repository}
+\WorkProduct{WP-CR}{Change requests and problem reports}{SUP.9, SUP.10}{PL}{Issue tracker, project HC}
+
+% Reviews: {work product}{method}{reviewer roles}{approver role}
+\Review{WP-PM}{Walkthrough with the team, then QA review}{SWA, QA}{PL}
+\Review{WP-SRS}{Inspection with checklist CL-SRS}{DEV, TST}{PL}
+\Review{WP-SWCS}{Inspection with checklist CL-ARCH}{DEV, TST, QA}{PL}
+\Review{WP-CODE}{Merge request review, one reviewer}{DEV}{SWA}
+\Review{WP-SUTS}{Merge request review}{TST}{SWA}
+\Review{WP-QT}{Review with the system team}{SWA}{PL}
+\Review{WP-REL}{Release checklist}{TST, QA}{PL}
+
+% Informed roles: {work product}{roles}
+\Informed{WP-SRS}{CM}
+\Informed{WP-REL}{SWA, DEV}
+\Informed{WP-QAR}{PL}

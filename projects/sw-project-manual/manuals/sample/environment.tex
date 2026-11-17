@@ -1,0 +1,17 @@
+% Tools: {name}{purpose}{version}{classification (ISO 26262-8 clause 11)}
+% Rules, CI stages and how-tos in development.tex refer to tools by name.
+\Tool{GCC}{Host build for unit and component tests}{14.2}{TI1, TD1: TCL1}
+\Tool{Target compiler}{Series build for the target ECU}{12.3}{TI2, TD2: TCL2, qualified by the supplier}
+\Tool{CMake}{Build configuration}{3.30}{TI1: TCL1}
+\Tool{GoogleTest}{Unit and component test framework}{1.15}{TI2, TD1: TCL1}
+\Tool{gcov/lcov}{Structural coverage}{2.1}{TI2, TD2: TCL2, validated by sample review}
+\Tool{cppcheck}{MISRA C:2012 static analysis}{2.16}{TI2, TD2: TCL2, validated by sample review}
+\Tool{clang-format}{Code formatting}{19}{TI1: TCL1}
+\Tool{GitLab CI}{Pipeline, merge requests, releases}{17}{TI1: TCL1}
+
+\ToolQualification{
+  Tool classification after ISO 26262-8 clause 11 is done once per tool and
+  version; the qualification evidence for TCL2 tools is kept in the safety
+  case (\DocRef{safety}). A new tool version needs a new classification before
+  it is used for a release.
+}

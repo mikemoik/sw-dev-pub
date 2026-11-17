@@ -1,0 +1,20 @@
+# sw_project_manual.pdf IS tracked (preview of the example, see README)
+
+# scripts/build.py output: build/<manual>.pdf, intermediates in build/.aux/
+build/
+
+# LaTeX intermediates
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.xdv
+
+# FreeText blocks, written at build time
+*.free-*.tex
+
+# Python bytecode (scripts/ import each other)
+__pycache__/

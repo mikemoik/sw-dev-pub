@@ -1,0 +1,41 @@
+% Introduction. Plain text; empty lines start a new paragraph.
+
+% Optional: replace the default purpose text.
+% \Purpose{This manual ...}
+
+\Scope{
+  The series development of the software component \TheComponent\ (three
+  units) from the software requirements to the software release for the start
+  of production, for one ECU variant.
+
+  Out of scope: system and hardware development, the basic software (NvM, Dem,
+  IoHwAb, supplied by the platform team) and the functional safety plan, which
+  is a separate document (\DocRef{safety}).
+}
+
+% One line per objective.
+\ProjectObjective{Release \TheComponent\ v2.0 for the start of production on 2027-09-24.}
+\ProjectObjective{Automotive SPICE capability level 2 for the processes in scope (chapter 3).}
+\ProjectObjective{No open findings of severity A or B at the SOP release.}
+
+% {deliverable}{recipient}{milestone}
+\Deliverable{Software release (binary, release note, A2L)}{Customer, system integration}{M3, M4}
+\Deliverable{Software component specification \DocRef{swcs}}{Customer}{M2}
+\Deliverable{Test reports (unit, component, qualification)}{Customer, QA}{M4}
+
+% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
+% in this order. Cite them anywhere with \DocRef{key}.
+\Reference{offer}{internal}{Project offer and statement of work, SOW-PRJ-0815}{1.2}
+\Reference{srs}{internal}{Software Requirements Specification, SRS-SPC-001}{1.3}
+\Reference{swcs}{internal}{Software Component Specification heater_ctrl, SWCS-HC-001}{0.2}
+\Reference{safety}{internal}{Safety Plan heater_ctrl, SP-HC-001}{1.0}
+\Reference{process}{internal}{Company software process handbook, PH-SW-003}{4.1}
+\Reference{aspice}{external}{Automotive SPICE PAM}{4.0}
+\Reference{misra}{external}{MISRA C:2012 (with Amendments 1--4)}{2023}
+
+% {term}{definition}
+\Term{CR}{Change Request}
+\Term{PR}{Problem Report}
+\Term{MR}{Merge Request}
+\Term{SOP}{Start Of Production}
+\Term{RACI}{Responsible, Accountable (approves), Consulted, Informed}
