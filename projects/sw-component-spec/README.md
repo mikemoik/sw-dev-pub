@@ -23,7 +23,7 @@ Spin-off of [`sw-unit-test-spec`](../sw-unit-test-spec/) one level up. It uses t
 sw_component_spec.tex     main file: chapter order, default component
 swcs.cls                  the template: all formatting and input commands
 latexmkrc                 latexmk settings: sty/ on TeX's search path, -c also removes the free-text helper files
-sty/                      packages TeX Live does not have, found without install: tikz-uml.sty
+sty/                      packages TeX Live does not have, found without install: tikz-uml.sty, specfig*.sty
 sw_component_spec.pdf     the sample component, built: a preview of what the template produces
 scripts/new_component.py  creates components/<component>/ from components/empty/
 scripts/build.py          builds components into build/<component>.pdf
@@ -119,7 +119,7 @@ Generated with TikZ from the data you already enter. Each diagram only appears w
 | **Internal structure**: units inside the component boundary; provided interfaces enter from the left, unit → unit uses on lanes, uses of other components fan out to their boxes on the right | 3.x *Static Architecture* | `\Unit`, `\ProvidedInterface[unit]`, `\Uses` |
 | **Test harness**: test driver → `«CUT»` (all units real) → test doubles of the required interfaces | top of 5 *Test Environment* | `\ProvidedInterface` + `\RequiredInterface` |
 
-Units appear in the order of their `\Unit` lines, and the boxes of other components in the order of the mean position of their users. Sequence diagrams and other figures go into a `FreeText` or design block (see `figures/main_cycle.tex` of the sample). `sty/tikz-uml.sty` is shipped as in `sw-unit-test-spec`.
+Units appear in the order of their `\Unit` lines, and the boxes of other components in the order of the mean position of their users. Sequence diagrams and other figures go into a `FreeText` or design block (see `figures/main_cycle.tex` of the sample). `sty/tikz-uml.sty` is shipped as in `sw-unit-test-spec`. Likewise `sty/specfig*.sty` (spec-figures, optional): `\usepackage{specfig}` after `\documentclass{swcs}`, figures as `figures/<type>_<name>.tex` with `\InputFigure`, refreshed with spec-figures' `scripts/vendor.py`.
 
 ## Free text, figures, code and data
 
