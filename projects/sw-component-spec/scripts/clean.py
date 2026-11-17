@@ -15,8 +15,7 @@ Covers both ways of building:
   that component).
 
 Removes only files with these job names and extensions, nothing else.
-Without arguments this includes sw_component_spec.pdf, the committed preview:
-rebuild it (latexmk -pdf sw_component_spec.tex) or `git checkout` it.
+Never removes sw_component_spec.pdf, the committed preview.
 Standard library only.
 """
 
@@ -30,6 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 COMPONENTS = ROOT / "components"
 BUILD = ROOT / "build"
 MAIN = "sw_component_spec.tex"
+PREVIEW = ROOT / (Path(MAIN).stem + ".pdf")  # committed, kept
 DEFAULT_RE = re.compile(r"^\s*\\LoadComponent\{([^}]*)\}", re.MULTILINE)
 NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 # Output of pdflatex/latexmk/SyncTeX and the template's helper files.
@@ -126,7 +126,7 @@ def main(argv=None) -> int:
         for job in sorted(jobs):
             targets += job_files(job)
 
-    found = [p for p in dict.fromkeys(targets) if p.exists()]
+    found = [p for p in dict.fromkeys(targets) if p.exists() and p != PREVIEW]
     for path in found:
         remove(path, args.dry_run)
     if not found:
