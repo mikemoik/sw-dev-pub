@@ -32,6 +32,16 @@ python3 scripts/build.py --all            # all units except units/empty
 
 PDFs go to `build/<unit>.pdf` (gitignored, safe to delete). At the end you get a summary of each unit's warnings and errors. If a unit fails, its PDF is removed and the script exits non-zero.
 
+## Clean
+
+```sh
+python3 scripts/clean.py              # everything
+python3 scripts/clean.py sample       # one unit
+python3 scripts/clean.py -n           # only list what would be removed
+```
+
+Removes the PDFs and LaTeX intermediates of `build.py` (`build/`) and of IDE or `latexmk` builds in the root folder (`<unit>.*`, `sw_unit_test_spec.*`). Without arguments this includes the committed preview `sw_unit_test_spec.pdf`: rebuild it or `git checkout` it.
+
 ## Chat with an LLM
 
 Guides in `llm/` tell a chat model how the template works, so it can help fill in a unit's content files ("add a test case for a setpoint of 101"). The model asks for missing facts and answers with LaTeX lines to paste.
