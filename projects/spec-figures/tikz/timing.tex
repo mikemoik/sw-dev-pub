@@ -1,0 +1,11 @@
+% Timing diagram: one 1 ms control cycle of heater_ctrl (time unit 100 us)
+\begin{sfTiming}
+  \Clock{Tick}{10}
+  \Signal{ADC start}{H1 L9}
+  \Signal{ADC busy}{L1 H3 L6}
+  \Signal{temp_dC}{X4 D6{215}}
+  \Signal{SPI CS}{H5 L2 H3}
+  \Signal{SPI MOSI}{Z5 D2{duty} Z3}
+  \Marker{4}{conversion done}
+  \Span{SPI CS}{5}{7}{200 us}
+\end{sfTiming}

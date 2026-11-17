@@ -1,0 +1,28 @@
+sfSequence: duplicate participant a
+sfSequence: unknown participant b
+sfSequence: Else outside a fragment
+sfSequence: Fragment without EndFragment
+sfStateMachine: unknown option `colour'
+sfStateMachine: s1: position [1;0] is not [column,row]
+sfStateMachine: duplicate ID s1
+sfStateMachine: unknown connection option `sideways'
+sfStateMachine: unknown ID s2 (s1 -> s2)
+sfClassDiagram: `- orphan: int' comes before any element
+sfClassDiagram: unknown ID base (c -> base)
+sfBlock: unknown ID ghost (group G)
+sfGantt: t1: date `2027-02-30x' is not YYYY-MM-DD
+sfGantt: t2: end 2027-03-01 is before start 2027-03-10
+sfGantt: no valid dates
+sfGantt: Depends t1 -> t9: unknown ID t9
+sfOrgChart: b: unknown parent zz
+sfRaci: Plan: 2 A (exactly one needed)
+sfRaci: Plan: no R
+sfRaci: Code: `X' is not R, A, C or I
+sfRaci: Code: unknown role QA
+sfRaci: Code: 0 A (exactly one needed)
+sfRaci: Code: no R
+sfRiskMatrix: R1: probability `4' is not in 1..3
+sfRiskMatrix: Target for unknown risk R9
+sfTiming: signal S: bad token `Q1' (use H2, L1, Z1, X1, D2{value})
+sfLineChart: series `s': 3 values for 2 categories
+sfLineChart: series `s': value `x' is not a number

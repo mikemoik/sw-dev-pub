@@ -1,0 +1,15 @@
+%% Use case diagram: heater_ctrl and its users (Mermaid has no use case diagram: flowchart)
+flowchart LR
+    drv["«actor» Driver"]
+    diag["«actor» Diagnostic tester"]
+    subgraph sys [heater_ctrl]
+        set([Set target temperature])
+        heat([Heat cabin])
+        fault([Report fault])
+        log([Store DTC])
+    end
+    drv --- set
+    drv --- heat
+    diag --- fault
+    fault -. "«include»" .-> log
+    heat -. "«extend»" .-> fault

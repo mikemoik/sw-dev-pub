@@ -1,0 +1,17 @@
+% State machine: operating modes of heater_ctrl
+\begin{sfStateMachine}
+  \Initial[0,0]{init}
+  \State[1,0]{off}{Off}{}
+  \State[2.5,0]{heat}{Heating}{}
+    \Activity{entry / enable PWM}
+    \Activity{do / PI control}
+  \State[2.5,1.4]{fault}{Fault}{}
+    \Activity{entry / duty = 0}
+  \Final[1,1.4]{end}
+  \Transition{init}{off}{}
+  \Transition[left]{off}{heat}{on [temp < target]}
+  \Transition[left]{heat}{off}{off}
+  \Transition{heat}{fault}{sensor fault}
+  \Transition{fault}{end}{power off}
+  \Transition{heat}{heat}{tick / update duty}
+\end{sfStateMachine}

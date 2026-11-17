@@ -1,0 +1,14 @@
+% Package diagram: repository layout of heater_ctrl
+\begin{sfPackage}
+  \Package[0,0]{app}{app}
+    \Element{heater_ctrl_main}
+    \Element{config}
+  \Package[1,0]{ctl}{control}
+    \Element{pi_controller}
+  \Package[2,0]{hal}{hal}
+    \Element{temp_sensor}
+    \Element{pwm_port}
+  \Import{app}{ctl}
+  \Import{ctl}{hal}
+  \Dependency[left]{app}{hal}{uses}
+\end{sfPackage}

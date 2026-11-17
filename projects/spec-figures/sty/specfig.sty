@@ -1,0 +1,990 @@
+% =============================================================================
+%  specfig.sty -- common figures for specifications and project manuals
+%
+%  Every figure is an environment sf<Type> whose body holds plain data
+%  commands (one command = one element). specfig computes the layout and draws
+%  a TikZ picture; problems (unknown IDs, bad dates, ...) are listed in red
+%  under the figure and given as LaTeX warnings. The data commands exist only
+%  inside their environment, so they never clash with a document's own
+%  commands of the same name (\Milestone, \Risk, ...).
+%
+%  This file: common core + UML and block diagrams (sequence, state machine,
+%  activity, flowchart, use case, class, component, deployment, package,
+%  block/context). Planning figures: specfig-plan.sty, charts:
+%  specfig-chart.sty (both loaded here).
+%
+%  Written for TeX Live 2022 and newer (LaTeX 2022-06, L3 2022-02-24,
+%  pgf 3.1.9a): no newer expl3 functions, no packages outside TeX Live.
+%  See README.md for the command reference. MIT license (repo root).
+% =============================================================================
+\NeedsTeXFormat{LaTeX2e}[2022-06-01]
+\ProvidesPackage{specfig}[2026/11/17 v0.1 Figures for specifications and project manuals]
+
+\RequirePackage{xcolor}
+\RequirePackage{tikz}
+\usetikzlibrary{arrows.meta,calc,fit,backgrounds,shapes.geometric,shapes.multipart,shapes.misc}
+
+% ---------------------------------------------------------------- colours ---
+\definecolor{sfaccent}{HTML}{1F4E79}   % lines and frames
+\definecolor{sffill}{HTML}{F4F7FB}     % box fill
+\definecolor{sfline}{HTML}{333333}     % arrows, text marks
+\definecolor{sfmuted}{HTML}{8A8A8A}    % lifelines, grid, secondary
+\definecolor{sfext}{HTML}{EDEDED}      % external elements
+\definecolor{sfnote}{HTML}{FFF8DC}     % notes
+\definecolor{sfwarn}{HTML}{B00020}     % problems
+\definecolor{sflow}{HTML}{D9EAD3}      % risk / status: low, ok
+\definecolor{sfmed}{HTML}{FFF2CC}      %                medium
+\definecolor{sfhigh}{HTML}{F4CCCC}     %                high
+% series colours (charts, Gantt groups): colour-blind safe (Okabe-Ito)
+\definecolor{sfc1}{HTML}{0072B2}
+\definecolor{sfc2}{HTML}{E69F00}
+\definecolor{sfc3}{HTML}{009E73}
+\definecolor{sfc4}{HTML}{CC79A7}
+\definecolor{sfc5}{HTML}{56B4E9}
+\definecolor{sfc6}{HTML}{D55E00}
+
+% ----------------------------------------------------------------- styles ---
+% (outside \ExplSyntaxOn: TikZ needs `:' and spaces with their normal catcodes)
+\tikzset{
+  sf/base/.style     = {font=\small, align=center, inner sep=4pt,
+                        execute at begin node={\hyphenpenalty=10000 }},
+  sf/box/.style      = {sf/base, draw=sfaccent, fill=sffill, rectangle,
+                        minimum width=2.4cm, minimum height=0.9cm},
+  sf/elabel/.style   = {font=\scriptsize, align=center, fill=white, inner sep=1pt},
+  sf/mlabel/.style   = {font=\scriptsize, inner sep=1.5pt},
+  sf/glabel/.style   = {font=\small\bfseries, anchor=south west, inner sep=2pt},
+  sf/problems/.style = {font=\scriptsize, text=sfwarn, align=left, inner sep=2pt,
+                        anchor=north west},
+  sf/arrow/.style    = {draw=sfline, -{Stealth[length=2.2mm]}},
+  sf/open/.style     = {draw=sfline, -{Straight Barb[length=2mm]}},
+  sf/line/.style     = {draw=sfline},
+  sf/group/.style    = {draw=sfaccent, rounded corners=3pt, inner sep=0.35cm},
+  % ---- state machine
+  sf/state/.style    = {sf/box, rounded corners=8pt},
+  sf/statex/.style   = {sf/state, rectangle split, rectangle split parts=2,
+                        rectangle split part align={center,left}},
+  sf/initial/.style  = {circle, fill=sfline, minimum size=0.35cm, inner sep=0pt},
+  sf/final/.style    = {circle, draw=sfline, thick, minimum size=0.45cm, inner sep=0pt,
+                        path picture={\fill[sfline] (path picture bounding box.center) circle (0.13cm);}},
+  sf/choice/.style   = {diamond, draw=sfaccent, fill=sffill, minimum size=0.6cm, inner sep=0pt},
+  sf/transition/.style = {sf/arrow},
+  % ---- activity
+  sf/action/.style   = {sf/box, rounded corners=6pt},
+  sf/object/.style   = {sf/box},
+  sf/decision/.style = {sf/base, diamond, aspect=2, draw=sfaccent, fill=sffill,
+                        minimum size=0.6cm, inner sep=1pt},
+  sf/merge/.style    = {sf/choice},
+  sf/bar/.style      = {rectangle, fill=sfline, minimum width=2.8cm, minimum height=4pt,
+                        inner sep=0pt},
+  sf/flow/.style     = {sf/arrow},
+  % ---- flowchart
+  sf/terminal/.style = {sf/box, rounded rectangle},
+  sf/process/.style  = {sf/box},
+  sf/subprocess/.style = {sf/box, inner xsep=10pt},
+  sf/io/.style       = {sf/box, trapezium, trapezium left angle=72, trapezium right angle=108,
+                        trapezium stretches body},
+  sf/store/.style    = {sf/box, cylinder, shape border rotate=90, aspect=0.2,
+                        minimum height=1.1cm},
+  % ---- use case
+  sf/usecase/.style  = {sf/base, ellipse, draw=sfaccent, fill=sffill, minimum width=2.8cm,
+                        minimum height=0.9cm, inner sep=1pt},
+  sf/actor/.style    = {rectangle, minimum width=0.6cm, minimum height=1.15cm, inner sep=0pt,
+                        path picture={
+                          \coordinate (sfh) at ($(path picture bounding box.north)+(0,-0.15cm)$);
+                          \draw[sfline, thick] (sfh) circle (0.13cm);
+                          \draw[sfline, thick] ($(sfh)+(0,-0.13cm)$) -- ++(0,-0.45cm)
+                            -- ++(-0.22cm,-0.4cm) ($(sfh)+(0,-0.58cm)$) -- ++(0.22cm,-0.4cm)
+                            ($(sfh)+(-0.27cm,-0.3cm)$) -- ++(0.54cm,0);}},
+  sf/actorlabel/.style = {font=\small, align=center, anchor=north, inner sep=2pt},
+  sf/assoc/.style    = {sf/line},
+  sf/include/.style  = {sf/open, dashed},
+  sf/generalization/.style = {draw=sfline, -{Triangle[open, length=2.6mm, width=2.6mm]}},
+  sf/system/.style   = {sf/group, rounded corners=0pt, inner sep=0.4cm},
+  % ---- class
+  sf/class/.style    = {sf/base, draw=sfaccent, fill=sffill, rectangle split,
+                        rectangle split parts=3, rectangle split part align={center,left,left},
+                        minimum width=2.8cm, inner sep=3pt},
+  sf/inherit/.style  = {sf/generalization},
+  sf/implement/.style = {sf/generalization, dashed},
+  sf/association/.style = {sf/line},
+  sf/directed/.style = {sf/open},
+  sf/dependency/.style = {sf/open, dashed},
+  sf/composition/.style = {draw=sfline, {Diamond[length=3mm, width=2mm]}-},
+  sf/aggregation/.style = {draw=sfline, {Diamond[open, length=3mm, width=2mm]}-},
+  % ---- component / deployment / package / block
+  sf/component/.style = {sf/box, minimum height=1.1cm, inner xsep=12pt},
+  sf/iface/.style    = {circle, draw=sfline, fill=white, thick, minimum size=0.32cm, inner sep=0pt},
+  sf/ifacelabel/.style = {font=\scriptsize, align=center, anchor=north, inner sep=2pt},
+  sf/provide/.style  = {sf/line, thick},
+  sf/require/.style  = {sf/open, dashed},
+  sf/connect/.style  = {sf/arrow},
+  sf/device/.style   = {sf/base, draw=sfaccent, fill=sffill, rectangle split, rectangle split parts=2,
+                        rectangle split part align={center,left}, minimum width=3cm, inner sep=4pt},
+  sf/link/.style     = {sf/line, thick},
+  sf/package/.style  = {sf/base, draw=sfaccent, fill=sffill, rectangle split, rectangle split parts=2,
+                        rectangle split part align={center,left}, minimum width=2.8cm, inner sep=3pt},
+  sf/import/.style   = {sf/open, dashed},
+  sf/block/.style    = {sf/box},
+  sf/external/.style = {sf/box, draw=sfmuted, fill=sfext},
+  sf/signal/.style   = {sf/arrow, thick},
+  sf/exchange/.style = {draw=sfline, thick, {Stealth[length=2.2mm]}-{Stealth[length=2.2mm]}},
+  % ---- sequence
+  sf/participant/.style = {sf/box, minimum width=2.2cm, minimum height=0.8cm},
+  sf/lifeline/.style = {draw=sfmuted, dashed},
+  sf/msg/.style      = {sf/arrow},
+  sf/async/.style    = {sf/open},
+  sf/reply/.style    = {sf/open, dashed},
+  sf/msglabel/.style = {font=\scriptsize, align=center, anchor=south, inner sep=1.5pt, fill=white},
+  sf/fragment/.style = {draw=sfmuted},
+  sf/fraglabel/.style = {font=\scriptsize\bfseries, anchor=north west, inner sep=2pt, draw=sfmuted,
+                         fill=white},
+  sf/guard/.style    = {font=\scriptsize, anchor=north west, inner sep=2pt},
+  sf/note/.style     = {sf/base, font=\scriptsize, draw=sfmuted, fill=sfnote, anchor=west,
+                        text width=3cm, align=left, inner sep=3pt},
+}
+
+\ExplSyntaxOn
+% =============================================================================
+%  Core: options, problems, dates
+% =============================================================================
+\tl_new:N \g__sf_type_tl                 % name of the figure being built
+\seq_new:N \g__sf_problems_seq
+\msg_new:nnn { specfig } { problem } { #2:~#1 }
+
+% sf_problem:n {text}: listed in red under the current figure + LaTeX warning
+\cs_new_protected:Npn \sf_problem:n #1
+  {
+    \seq_gput_right:Nn \g__sf_problems_seq {#1}
+    \use:x
+      {
+        \exp_not:N \msg_warning:nnnn { specfig } { problem }
+          { \tl_to_str:n {#1} } { \tl_use:N \g__sf_type_tl }
+      }
+  }
+\cs_generate_variant:Nn \sf_problem:n { x }
+% inside a tikzpicture: the problems as a red node under the picture
+\cs_new_protected:Npn \sf_problems_draw:
+  {
+    \seq_if_empty:NF \g__sf_problems_seq
+      {
+        \node [ sf/problems ] at ( $ (current~bounding~box.south~west) + (0,-0.15cm) $ )
+          { \seq_use:Nn \g__sf_problems_seq { \\ } } ;
+      }
+    \seq_gclear:N \g__sf_problems_seq
+  }
+
+% options of all figures (each figure uses the ones it needs)
+\dim_new:N \l_sf_xstep_dim
+\dim_new:N \l_sf_ystep_dim
+\dim_new:N \l_sf_step_dim
+\dim_new:N \l_sf_width_dim
+\dim_new:N \l_sf_height_dim
+\int_new:N \l_sf_levels_int
+\tl_new:N \l_sf_xlabel_tl
+\tl_new:N \l_sf_ylabel_tl
+\tl_new:N \l_sf_today_tl
+\keys_define:nn { specfig }
+  {
+    xstep   .dim_set:N = \l_sf_xstep_dim ,   % grid: column distance
+    ystep   .dim_set:N = \l_sf_ystep_dim ,   % grid: row distance
+    step    .dim_set:N = \l_sf_step_dim ,    % sequence / timing: row height
+    width   .dim_set:N = \l_sf_width_dim ,   % Gantt, timeline, charts
+    height  .dim_set:N = \l_sf_height_dim ,  % charts
+    levels  .int_set:N = \l_sf_levels_int ,  % risk matrix: 3, 4 or 5
+    xlabel  .tl_set:N  = \l_sf_xlabel_tl ,
+    ylabel  .tl_set:N  = \l_sf_ylabel_tl ,
+    today   .tl_set:N  = \l_sf_today_tl ,    % Gantt / timeline: "today" line
+    unknown .code:n    = { \sf_problem:x { unknown~option~`\l_keys_key_str' } } ,
+  }
+% sf_begin:nnn {figure name}{defaults}{user options}
+\cs_new_protected:Npn \sf_begin:nnn #1#2#3
+  {
+    \tl_gset:Nn \g__sf_type_tl {#1}
+    \seq_gclear:N \g__sf_problems_seq
+    \keys_set:nn { specfig }
+      { xstep = 3.6cm , ystep = 1.8cm , step = 0.75cm , width = 14cm , height = 6cm ,
+        levels = 5 , xlabel = {} , ylabel = {} , today = {} , #2 }
+    \keys_set:nn { specfig } {#3}
+    \sf_graph_clear:
+  }
+
+% ---- dates: \sf_day:nN {YYYY-MM-DD} \int  (day number; F branch: not a date)
+\seq_new:N \l__sf_date_seq
+\prg_new_protected_conditional:Npnn \sf_day:nN #1#2 { T , F , TF }
+  {
+    \regex_extract_once:nnNTF { \A \s* (\d{4}) - (\d{1,2}) - (\d{1,2}) \s* \Z }
+      {#1} \l__sf_date_seq
+      {
+        \bool_lazy_and:nnTF
+          { \int_compare_p:nNn { \seq_item:Nn \l__sf_date_seq { 3 } } < { 13 } }
+          {
+            \bool_lazy_and_p:nn
+              { \int_compare_p:nNn { \seq_item:Nn \l__sf_date_seq { 3 } } > { 0 } }
+              {
+                \bool_lazy_and_p:nn
+                  { \int_compare_p:nNn { \seq_item:Nn \l__sf_date_seq { 4 } } > { 0 } }
+                  { \int_compare_p:nNn { \seq_item:Nn \l__sf_date_seq { 4 } } < { 32 } }
+              }
+          }
+          {
+            \__sf_jdn:nnnN
+              { \seq_item:Nn \l__sf_date_seq { 2 } }
+              { \seq_item:Nn \l__sf_date_seq { 3 } }
+              { \seq_item:Nn \l__sf_date_seq { 4 } } #2
+            \prg_return_true:
+          }
+          { \prg_return_false: }
+      }
+      { \prg_return_false: }
+  }
+\cs_generate_variant:Nn \sf_day:nN { V }
+\cs_generate_variant:Nn \sf_day:nNT { V }
+\cs_generate_variant:Nn \sf_day:nNF { V }
+\cs_generate_variant:Nn \sf_day:nNTF { V }
+% Julian day number of y m d (proleptic Gregorian)
+\int_new:N \l__sf_a_int
+\int_new:N \l__sf_y_int
+\int_new:N \l__sf_m_int
+\cs_new_protected:Npn \__sf_jdn:nnnN #1#2#3#4
+  {
+    \int_set:Nn \l__sf_a_int { \int_div_truncate:nn { 14 - (#2) } { 12 } }
+    \int_set:Nn \l__sf_y_int { (#1) + 4800 - \l__sf_a_int }
+    \int_set:Nn \l__sf_m_int { (#2) + 12 * \l__sf_a_int - 3 }
+    \int_set:Nn #4
+      {
+        (#3) + \int_div_truncate:nn { 153 * \l__sf_m_int + 2 } { 5 }
+        + 365 * \l__sf_y_int + \int_div_truncate:nn { \l__sf_y_int } { 4 }
+        - \int_div_truncate:nn { \l__sf_y_int } { 100 }
+        + \int_div_truncate:nn { \l__sf_y_int } { 400 } - 32045
+      }
+  }
+% \sf_date_from_day:nN {day number} \tl -> YYYY-MM-DD (inverse of \sf_day:nN)
+\int_new:N \l__sf_b_int
+\int_new:N \l__sf_c_int
+\int_new:N \l__sf_d_int
+\int_new:N \l__sf_e_int
+\cs_new_protected:Npn \sf_date_from_day:nN #1#2
+  {
+    \int_set:Nn \l__sf_a_int { (#1) + 32044 }
+    \int_set:Nn \l__sf_b_int { \int_div_truncate:nn { 4 * \l__sf_a_int + 3 } { 146097 } }
+    \int_set:Nn \l__sf_c_int { \l__sf_a_int - \int_div_truncate:nn { 146097 * \l__sf_b_int } { 4 } }
+    \int_set:Nn \l__sf_d_int { \int_div_truncate:nn { 4 * \l__sf_c_int + 3 } { 1461 } }
+    \int_set:Nn \l__sf_e_int { \l__sf_c_int - \int_div_truncate:nn { 1461 * \l__sf_d_int } { 4 } }
+    \int_set:Nn \l__sf_m_int { \int_div_truncate:nn { 5 * \l__sf_e_int + 2 } { 153 } }
+    \tl_set:Nx #2
+      {
+        \int_eval:n { 100 * \l__sf_b_int + \l__sf_d_int - 4800
+                      + \int_div_truncate:nn { \l__sf_m_int } { 10 } }
+        -
+        \int_compare:nNnT { \l__sf_m_int + 3 - 12 * \int_div_truncate:nn { \l__sf_m_int } { 10 } } < { 10 } { 0 }
+        \int_eval:n { \l__sf_m_int + 3 - 12 * \int_div_truncate:nn { \l__sf_m_int } { 10 } }
+        -
+        \int_compare:nNnT
+          { \l__sf_e_int - \int_div_truncate:nn { 153 * \l__sf_m_int + 2 } { 5 } + 1 } < { 10 } { 0 }
+        \int_eval:n { \l__sf_e_int - \int_div_truncate:nn { 153 * \l__sf_m_int + 2 } { 5 } + 1 }
+      }
+  }
+
+% is #1 a number (int or decimal, optional sign)?
+\prg_new_protected_conditional:Npnn \sf_if_number:n #1 { T , F , TF }
+  {
+    \regex_match:nnTF { \A \s* [+\-]? (\d+ (\.\d*)? | \.\d+) \s* \Z } {#1}
+      { \prg_return_true: } { \prg_return_false: }
+  }
+
+% =============================================================================
+%  Graph engine: elements on a grid, connections between them
+%
+%  An element has a kind (its TikZ style sf/<kind>, or a drawer
+%  \__sf_draw_<kind>:nnnnn), an ID, a grid position [column,row] and a label.
+%  Without a position it goes next to the previous element of its lane
+%  (to the right or below, per lane). Connections refer to IDs; unknown IDs
+%  become problems. Node names are sfn<index>, so IDs may hold any character.
+% =============================================================================
+\prop_new:N \g__sf_id_prop               % ID -> index
+\seq_new:N \g__sf_nodes_seq              % {index}{kind}{col}{row}{label}
+\seq_new:N \g__sf_edges_seq              % {kind}{options}{from}{to}{label}
+\seq_new:N \g__sf_groups_seq             % {kind}{label}{IDs}
+\prop_new:N \g__sf_extra_prop            % index -> extra lines (attributes, ...)
+\prop_new:N \g__sf_extra_b_prop          % index -> second extra block (operations)
+\prop_new:N \g__sf_lane_prop             % lane -> {col}{row}{dir}
+\int_new:N \g__sf_n_int
+\tl_new:N \g__sf_last_tl                 % index of the last element
+\tl_new:N \l__sf_c_tl
+\tl_new:N \l__sf_r_tl
+\tl_new:N \l__sf_dir_tl
+\tl_new:N \l__sf_tmp_tl
+\tl_new:N \l__sf_a_tl
+\tl_new:N \l__sf_b_tl
+\seq_new:N \l__sf_pos_seq
+
+\cs_new_protected:Npn \sf_graph_clear:
+  {
+    \prop_gclear:N \g__sf_id_prop
+    \seq_gclear:N \g__sf_nodes_seq
+    \seq_gclear:N \g__sf_edges_seq
+    \seq_gclear:N \g__sf_groups_seq
+    \prop_gclear:N \g__sf_extra_prop
+    \prop_gclear:N \g__sf_extra_b_prop
+    \prop_gclear:N \g__sf_lane_prop
+    \int_gzero:N \g__sf_n_int
+    \tl_gclear:N \g__sf_last_tl
+  }
+% \sf_lane:nnnnn {lane}{first col}{first row}{right|down}{step}
+\cs_new_protected:Npn \sf_lane:nnnnn #1#2#3#4#5
+  { \prop_gput:Nnn \g__sf_lane_prop {#1} { {#2} {#3} {#4} {#5} } }
+\cs_new_protected:Npn \__sf_lane_get:n #1
+  {
+    \prop_get:NnNF \g__sf_lane_prop {#1} \l__sf_tmp_tl
+      { \tl_set:Nn \l__sf_tmp_tl { {0} {0} {right} {1} } }
+    \tl_set:Nx \l__sf_c_tl { \tl_item:Nn \l__sf_tmp_tl { 1 } }
+    \tl_set:Nx \l__sf_r_tl { \tl_item:Nn \l__sf_tmp_tl { 2 } }
+    \tl_set:Nx \l__sf_dir_tl { \tl_item:Nn \l__sf_tmp_tl { 3 } }
+    \tl_set:Nx \l__sf_step_tl { \tl_item:Nn \l__sf_tmp_tl { 4 } }
+  }
+\tl_new:N \l__sf_step_tl
+% \sf_node:nnnnn {kind}{lane}{position "c,r" or empty}{ID}{label}
+\cs_new_protected:Npn \sf_node:nnnnn #1#2#3#4#5
+  {
+    \__sf_lane_get:n {#2}
+    \tl_if_blank:nF {#3}
+      {
+        \regex_match:nnTF
+          { \A \s* [+\-]? (\d+(\.\d*)?|\.\d+) \s* , \s* [+\-]? (\d+(\.\d*)?|\.\d+) \s* \Z } {#3}
+          {
+            \seq_set_split:Nnn \l__sf_pos_seq { , } {#3}
+            \tl_set:Nx \l__sf_c_tl { \seq_item:Nn \l__sf_pos_seq { 1 } }
+            \tl_set:Nx \l__sf_r_tl { \seq_item:Nn \l__sf_pos_seq { 2 } }
+          }
+          { \sf_problem:n { #4:~position~[#3]~is~not~[column,row] } }
+      }
+    \int_gincr:N \g__sf_n_int
+    \tl_gset:Nx \g__sf_last_tl { \int_use:N \g__sf_n_int }
+    \tl_if_blank:nF {#4}
+      {
+        \prop_if_in:NnTF \g__sf_id_prop {#4}
+          { \sf_problem:n { duplicate~ID~#4 } }
+          { \prop_gput:NnV \g__sf_id_prop {#4} \g__sf_last_tl }
+      }
+    \seq_gput_right:Nx \g__sf_nodes_seq
+      { { \g__sf_last_tl } {#1} { \l__sf_c_tl } { \l__sf_r_tl } { \exp_not:n {#5} } }
+    % next element of this lane: right of / below this one
+    \str_if_eq:VnTF \l__sf_dir_tl { down }
+      { \tl_set:Nx \l__sf_r_tl { \fp_eval:n { \l__sf_r_tl + \l__sf_step_tl } } }
+      { \tl_set:Nx \l__sf_c_tl { \fp_eval:n { \l__sf_c_tl + \l__sf_step_tl } } }
+    \prop_gput:Nnx \g__sf_lane_prop {#2}
+      { { \l__sf_c_tl } { \l__sf_r_tl } { \l__sf_dir_tl } { \l__sf_step_tl } }
+  }
+% extra lines of the last element (attributes, artifacts, ...): a = first block
+\cs_new_protected:Npn \sf_extra:nn #1#2   % {a|b}{line}
+  {
+    \tl_if_empty:NTF \g__sf_last_tl
+      { \sf_problem:n { `#2'~comes~before~any~element } }
+      {
+        \tl_set:Nx \l__sf_a_tl { \str_if_eq:nnTF {#1} { a } { g__sf_extra_prop } { g__sf_extra_b_prop } }
+        \prop_get:cVNTF { \l__sf_a_tl } \g__sf_last_tl \l__sf_tmp_tl
+          { \tl_put_right:Nn \l__sf_tmp_tl { \\ #2 } }
+          { \tl_set:Nn \l__sf_tmp_tl {#2} }
+        \prop_gput:cVV { \l__sf_a_tl } \g__sf_last_tl \l__sf_tmp_tl
+      }
+  }
+\cs_generate_variant:Nn \prop_get:NnNTF { cVNTF }
+\cs_generate_variant:Nn \prop_gput:Nnn { cVV }
+% \sf_edge:nnnnn {kind}{options}{from ID}{to ID}{label}
+\cs_new_protected:Npn \sf_edge:nnnnn #1#2#3#4#5
+  { \seq_gput_right:Nn \g__sf_edges_seq { {#1} {#2} {#3} {#4} {#5} } }
+% \sf_group:nnn {kind}{label}{IDs, comma-separated}
+\cs_new_protected:Npn \sf_group:nnn #1#2#3
+  { \seq_gput_right:Nn \g__sf_groups_seq { {#1} {#2} {#3} } }
+
+% ---- drawing ---------------------------------------------------------------
+\tl_new:N \l__sf_x_tl
+\tl_new:N \l__sf_y_tl
+\cs_new_protected:Npn \sf_graph_draw:
+  {
+    \seq_map_inline:Nn \g__sf_nodes_seq { \__sf_draw_node:nnnnn ##1 }
+    \seq_map_inline:Nn \g__sf_edges_seq { \__sf_draw_edge:nnnnn ##1 }
+    \seq_map_inline:Nn \g__sf_groups_seq { \__sf_draw_group:nnn ##1 }
+  }
+\cs_new_protected:Npn \__sf_draw_node:nnnnn #1#2#3#4#5   % index kind col row label
+  {
+    \tl_set:Nx \l__sf_x_tl { \fp_to_dim:n { (#3) * \l_sf_xstep_dim } }
+    \tl_set:Nx \l__sf_y_tl { \fp_to_dim:n { - (#4) * \l_sf_ystep_dim } }
+    \cs_if_exist:cTF { __sf_draw_#2:nnnnn }
+      { \use:c { __sf_draw_#2:nnnnn } { sfn#1 } { \l__sf_x_tl } { \l__sf_y_tl } {#5} {#1} }
+      { \node [ sf/#2 ] ( sfn#1 ) at ( \l__sf_x_tl , \l__sf_y_tl ) {#5} ; }
+  }
+% the extra blocks of element #1 (or empty)
+\cs_new:Npn \__sf_extra_a:n #1
+  { \exp_args:Nf \__sf_lines:n { \prop_item:Nn \g__sf_extra_prop {#1} } }
+\cs_new:Npn \__sf_extra_b:n #1
+  { \exp_args:Nf \__sf_lines:n { \prop_item:Nn \g__sf_extra_b_prop {#1} } }
+\cs_new:Npn \__sf_lines:n #1
+  { \tl_if_blank:nF {#1} { \begin{tabular}{@{}l@{}} #1 \end{tabular} } }
+
+% edge options
+\tl_new:N \l__sf_route_tl
+\tl_new:N \l__sf_bend_tl
+\tl_new:N \l__sf_mfrom_tl
+\tl_new:N \l__sf_mto_tl
+\tl_new:N \l__sf_lpos_tl
+\keys_define:nn { specfig/edge }
+  {
+    hv     .code:n = { \tl_set:Nn \l__sf_route_tl { hv } } ,
+    vh     .code:n = { \tl_set:Nn \l__sf_route_tl { vh } } ,
+    left   .code:n = { \tl_set:Nn \l__sf_route_tl { bend } \tl_set:Nn \l__sf_bend_tl { left } } ,
+    right  .code:n = { \tl_set:Nn \l__sf_route_tl { bend } \tl_set:Nn \l__sf_bend_tl { right } } ,
+    m1     .tl_set:N = \l__sf_mfrom_tl ,
+    m2     .tl_set:N = \l__sf_mto_tl ,
+    pos    .tl_set:N = \l__sf_lpos_tl ,
+    unknown .code:n = { \sf_problem:x { unknown~connection~option~`\l_keys_key_str' } } ,
+  }
+\tl_new:N \l__sf_from_tl
+\tl_new:N \l__sf_to_tl
+\bool_new:N \l__sf_ok_bool
+% \l__sf_tmp_tl := node name of ID #1, or the bool is cleared (+ problem #2)
+\cs_new_protected:Npn \__sf_lookup:nn #1#2
+  {
+    \prop_get:NnNTF \g__sf_id_prop {#1} \l__sf_tmp_tl
+      { \tl_set:Nx \l__sf_tmp_tl { sfn \l__sf_tmp_tl } }
+      { \bool_set_false:N \l__sf_ok_bool \sf_problem:n { unknown~ID~#1~(#2) } }
+  }
+\cs_new_protected:Npn \__sf_draw_edge:nnnnn #1#2#3#4#5   % kind options from to label
+  {
+    \group_begin:
+    \tl_clear:N \l__sf_route_tl
+    \tl_clear:N \l__sf_mfrom_tl
+    \tl_clear:N \l__sf_mto_tl
+    \tl_set:Nn \l__sf_lpos_tl { 0.5 }
+    \keys_set:nn { specfig/edge } {#2}
+    \bool_set_true:N \l__sf_ok_bool
+    \__sf_lookup:nn {#3} { #3~->~#4 }
+    \tl_set_eq:NN \l__sf_from_tl \l__sf_tmp_tl
+    \__sf_lookup:nn {#4} { #3~->~#4 }
+    \tl_set_eq:NN \l__sf_to_tl \l__sf_tmp_tl
+    \bool_if:NT \l__sf_ok_bool
+      {
+        \tl_if_eq:NNT \l__sf_from_tl \l__sf_to_tl { \tl_set:Nn \l__sf_route_tl { loop } }
+        \str_case:VnF \l__sf_route_tl
+          {
+            { hv }
+              {
+                \tl_set:Nn \l__sf_lpos_tl { 0.25 }
+                \__sf_edge_path:nnnn {#1} { -| } {#5} { }
+              }
+            { vh }
+              {
+                \tl_set:Nn \l__sf_lpos_tl { 0.25 }
+                \__sf_edge_path:nnnn {#1} { |- } {#5} { }
+              }
+            { bend }
+              { \__sf_edge_path:nnnn {#1} { to } {#5} { bend~\l__sf_bend_tl = 25 } }
+            { loop }
+              { \__sf_edge_path:nnnn {#1} { to } {#5} { loop~above , min~distance=8mm } }
+          }
+          { \__sf_edge_path:nnnn {#1} { -- } {#5} { } }
+      }
+    \group_end:
+  }
+\cs_new_protected:Npn \__sf_edge_path:nnnn #1#2#3#4   % kind path-op label to-options
+  {
+    \use:x
+      {
+        \exp_not:N \draw [ sf/#1 ] ( \l__sf_from_tl ) #2
+        \tl_if_blank:nF {#4} { [ #4 ] }
+        \tl_if_empty:NF \l__sf_mfrom_tl
+          { node [ sf/mlabel , pos = 0.1 , auto ] { \exp_not:V \l__sf_mfrom_tl } }
+        \tl_if_empty:NF \l__sf_mto_tl
+          { node [ sf/mlabel , pos = 0.9 , auto ] { \exp_not:V \l__sf_mto_tl } }
+        \tl_if_blank:nF {#3}
+          { node [ sf/elabel , pos = \l__sf_lpos_tl ] { \exp_not:n {#3} } }
+        ( \l__sf_to_tl ) ;
+      }
+  }
+\cs_generate_variant:Nn \str_case:nnF { V }
+
+\tl_new:N \l__sf_fit_tl
+\int_new:N \g__sf_group_int
+\cs_new_protected:Npn \__sf_draw_group:nnn #1#2#3   % kind label IDs
+  {
+    \tl_clear:N \l__sf_fit_tl
+    \clist_map_inline:nn {#3}
+      {
+        \bool_set_true:N \l__sf_ok_bool
+        \__sf_lookup:nn {##1} { group~#2 }
+        \bool_if:NT \l__sf_ok_bool { \tl_put_right:Nx \l__sf_fit_tl { ( \l__sf_tmp_tl ) } }
+      }
+    \tl_if_empty:NF \l__sf_fit_tl
+      {
+        \int_gincr:N \g__sf_group_int
+        \begin{pgfonlayer}{background}
+          \use:x
+            {
+              \exp_not:N \node [ sf/#1 , fit = \l__sf_fit_tl ]
+                ( sfg \int_use:N \g__sf_group_int ) { } ;
+            }
+        \end{pgfonlayer}
+        \tl_if_blank:nF {#2}
+          { \node [ sf/glabel ] at ( sfg \int_use:N \g__sf_group_int .north~west ) {#2} ; }
+      }
+  }
+
+% ---- element drawers ---------------------------------------------------------
+% #1 node name, #2 x, #3 y, #4 label, #5 index
+\cs_new_protected:Npn \__sf_draw_actor:nnnnn #1#2#3#4#5
+  {
+    \node [ sf/actor ] (#1) at (#2,#3) { } ;
+    \node [ sf/actorlabel ] at (#1.south) {#4} ;
+  }
+\cs_new_protected:Npn \__sf_draw_iface:nnnnn #1#2#3#4#5
+  {
+    \node [ sf/iface ] (#1) at (#2,#3) { } ;
+    \node [ sf/ifacelabel ] at (#1.south) {#4} ;
+  }
+\cs_new_protected:Npn \__sf_draw_statex:nnnnn #1#2#3#4#5
+  {
+    \prop_if_in:NnTF \g__sf_extra_prop {#5}
+      { \node [ sf/statex ] (#1) at (#2,#3) { #4 \nodepart{two} \__sf_extra_a:n {#5} } ; }
+      { \node [ sf/state ] (#1) at (#2,#3) {#4} ; }
+  }
+\cs_new_protected:Npn \__sf_draw_class:nnnnn #1#2#3#4#5
+  {
+    \node [ sf/class ] (#1) at (#2,#3)
+      { #4 \nodepart{two} \__sf_extra_a:n {#5} \nodepart{three} \__sf_extra_b:n {#5} } ;
+  }
+\cs_new_protected:Npn \__sf_draw_component:nnnnn #1#2#3#4#5
+  {
+    \node [ sf/component ] (#1) at (#2,#3) {#4} ;
+    % component icon in the upper right corner
+    \draw [ sfaccent , fill = white ]
+      ( $ (#1.north~east) + (-0.42cm,-0.12cm) $ ) rectangle ++ ( 0.3cm , -0.36cm ) ;
+    \draw [ sfaccent , fill = white ]
+      ( $ (#1.north~east) + (-0.48cm,-0.19cm) $ ) rectangle ++ ( 0.12cm , -0.07cm ) ;
+    \draw [ sfaccent , fill = white ]
+      ( $ (#1.north~east) + (-0.48cm,-0.34cm) $ ) rectangle ++ ( 0.12cm , -0.07cm ) ;
+  }
+\cs_new_protected:Npn \__sf_draw_device:nnnnn #1#2#3#4#5
+  {
+    \node [ sf/device ] (#1) at (#2,#3) { #4 \nodepart{two} \__sf_extra_a:n {#5} } ;
+    \draw [ sfaccent , fill = sffill!60!white ]
+      (#1.north~west) -- ++ ( 0.2cm , 0.2cm ) -- ( $ (#1.north~east) + (0.2cm,0.2cm) $ )
+      -- ( #1.north~east ) -- cycle ;
+    \draw [ sfaccent , fill = sffill!40!sfmuted!30 ]
+      (#1.north~east) -- ++ ( 0.2cm , 0.2cm ) -- ( $ (#1.south~east) + (0.2cm,0.2cm) $ )
+      -- ( #1.south~east ) -- cycle ;
+  }
+\cs_new_protected:Npn \__sf_draw_subprocess:nnnnn #1#2#3#4#5
+  {
+    \node [ sf/subprocess ] (#1) at (#2,#3) {#4} ;
+    \draw [ sfaccent ] ( $ (#1.north~west) + (0.12cm,0) $ ) -- ( $ (#1.south~west) + (0.12cm,0) $ )
+      ( $ (#1.north~east) + (-0.12cm,0) $ ) -- ( $ (#1.south~east) + (-0.12cm,0) $ ) ;
+  }
+\cs_new_protected:Npn \__sf_draw_package:nnnnn #1#2#3#4#5
+  {
+    \node [ sf/package ] (#1) at (#2,#3) { #4 \nodepart{two} \__sf_extra_a:n {#5} } ;
+    \draw [ sfaccent , fill = sffill ]
+      (#1.north~west) rectangle ++ ( 0.9cm , 0.22cm ) ;
+  }
+
+% ---- helper to declare the data commands of a figure ------------------------
+% \sf_def_node:Nnn \Cmd {kind}{lane}: \Cmd[c,r]{ID}{label}
+\cs_new_protected:Npn \sf_def_node:Nnn #1#2#3
+  { \DeclareDocumentCommand #1 { O{} m m } { \sf_node:nnnnn {#2} {#3} {##1} {##2} {##3} } }
+% \sf_def_point:Nnn \Cmd {kind}{lane}: \Cmd[c,r]{ID} (no label)
+\cs_new_protected:Npn \sf_def_point:Nnn #1#2#3
+  { \DeclareDocumentCommand #1 { O{} m } { \sf_node:nnnnn {#2} {#3} {##1} {##2} { } } }
+% \sf_def_edge:Nn \Cmd {kind}: \Cmd[options]{from}{to}{label}
+\cs_new_protected:Npn \sf_def_edge:Nn #1#2
+  { \DeclareDocumentCommand #1 { O{} m m m } { \sf_edge:nnnnn {#2} {##1} {##2} {##3} {##4} } }
+% \sf_def_edge_nolabel:Nnn \Cmd {kind}{fixed label}: \Cmd[options]{from}{to}
+\cs_new_protected:Npn \sf_def_edge_fixed:Nnn #1#2#3
+  { \DeclareDocumentCommand #1 { O{} m m } { \sf_edge:nnnnn {#2} {##1} {##2} {##3} {#3} } }
+
+% the picture around a graph figure
+\cs_new_protected:Npn \sf_graph_picture:
+  {
+    \begin{tikzpicture}
+      \sf_graph_draw:
+      \sf_problems_draw:
+    \end{tikzpicture}
+  }
+
+% =============================================================================
+%  State machine
+% =============================================================================
+\NewDocumentEnvironment { sfStateMachine } { O{} }
+  {
+    \sf_begin:nnn { sfStateMachine } { xstep = 3.4cm , ystep = 2cm } {#1}
+    \sf_def_point:Nnn \Initial { initial } { main }
+    \sf_def_point:Nnn \Final { final } { main }
+    \sf_def_point:Nnn \Choice { choice } { main }
+    \DeclareDocumentCommand \State { O{} m m }
+      { \sf_node:nnnnn { statex } { main } {##1} {##2} {##3} }
+    \DeclareDocumentCommand \Activity { m } { \sf_extra:nn { a } {##1} }
+    \sf_def_edge:Nn \Transition { transition }
+    \ignorespaces
+  }
+  { \sf_graph_picture: }
+
+% =============================================================================
+%  Activity diagram
+% =============================================================================
+\NewDocumentEnvironment { sfActivity } { O{} }
+  {
+    \sf_begin:nnn { sfActivity } { xstep = 3.6cm , ystep = 1.4cm } {#1}
+    \sf_lane:nnnnn { main } { 0 } { 0 } { down } { 1 }
+    \sf_def_point:Nnn \Start { initial } { main }
+    \sf_def_point:Nnn \End { final } { main }
+    \sf_def_node:Nnn \Action { action } { main }
+    \sf_def_node:Nnn \Object { object } { main }
+    \sf_def_node:Nnn \Decision { decision } { main }
+    \sf_def_point:Nnn \Merge { merge } { main }
+    \sf_def_point:Nnn \Fork { bar } { main }
+    \sf_def_point:Nnn \Join { bar } { main }
+    \sf_def_edge:Nn \Flow { flow }
+    \DeclareDocumentCommand \Partition { m m } { \sf_group:nnn { group } {##1} {##2} }
+    \ignorespaces
+  }
+  { \sf_graph_picture: }
+
+% =============================================================================
+%  Flowchart
+% =============================================================================
+\NewDocumentEnvironment { sfFlowchart } { O{} }
+  {
+    \sf_begin:nnn { sfFlowchart } { xstep = 4.2cm , ystep = 1.6cm } {#1}
+    \sf_lane:nnnnn { main } { 0 } { 0 } { down } { 1 }
+    \sf_def_node:Nnn \Terminal { terminal } { main }
+    \sf_def_node:Nnn \Process { process } { main }
+    \sf_def_node:Nnn \Subprocess { subprocess } { main }
+    \sf_def_node:Nnn \Decision { decision } { main }
+    \sf_def_node:Nnn \InOut { io } { main }
+    \sf_def_node:Nnn \Store { store } { main }
+    \sf_def_edge:Nn \Flow { flow }
+    \ignorespaces
+  }
+  { \sf_graph_picture: }
+
+% =============================================================================
+%  Use case diagram: actors in column 0, use cases from column 1.6, boundary
+% =============================================================================
+\tl_new:N \g__sf_system_tl
+\clist_new:N \g__sf_ucs_clist
+\NewDocumentEnvironment { sfUseCase } { O{} }
+  {
+    \sf_begin:nnn { sfUseCase } { xstep = 3.2cm , ystep = 1.3cm } {#1}
+    \tl_gclear:N \g__sf_system_tl
+    \clist_gclear:N \g__sf_ucs_clist
+    \sf_lane:nnnnn { actor } { 0 } { 0.3 } { down } { 1.8 }
+    \sf_lane:nnnnn { uc } { 1.6 } { 0 } { down } { 1 }
+    \DeclareDocumentCommand \Actor { O{} m m }
+      { \sf_node:nnnnn { actor } { actor } {##1} {##2} {##3} }
+    \DeclareDocumentCommand \UseCase { O{} m m }
+      {
+        \sf_node:nnnnn { usecase } { uc } {##1} {##2} {##3}
+        \clist_gput_right:Nn \g__sf_ucs_clist {##2}
+      }
+    \DeclareDocumentCommand \System { m } { \tl_gset:Nn \g__sf_system_tl {##1} }
+    \sf_def_edge_fixed:Nnn \Association { assoc } { }
+    \sf_def_edge_fixed:Nnn \Include { include } { \guillemotleft include\guillemotright }
+    \sf_def_edge_fixed:Nnn \Extend { include } { \guillemotleft extend\guillemotright }
+    \sf_def_edge_fixed:Nnn \Generalization { generalization } { }
+    \ignorespaces
+  }
+  {
+    \tl_if_empty:NF \g__sf_system_tl
+      { \exp_args:NnVV \sf_group:nnn { system } \g__sf_system_tl \g__sf_ucs_clist }
+    \sf_graph_picture:
+  }
+\cs_generate_variant:Nn \sf_group:nnn { nVV }
+
+% =============================================================================
+%  Class diagram
+% =============================================================================
+\NewDocumentEnvironment { sfClassDiagram } { O{} }
+  {
+    \sf_begin:nnn { sfClassDiagram } { xstep = 4.6cm , ystep = 3cm } {#1}
+    \DeclareDocumentCommand \Class { O{} m m }
+      { \sf_node:nnnnn { class } { main } {##1} {##2} { \textbf{##3} } }
+    \DeclareDocumentCommand \AbstractClass { O{} m m }
+      { \sf_node:nnnnn { class } { main } {##1} {##2} { \textbf{\textit{##3}} } }
+    \DeclareDocumentCommand \Interface { O{} m m }
+      {
+        \sf_node:nnnnn { class } { main } {##1} {##2}
+          { {\scriptsize\guillemotleft interface\guillemotright} \\ \textbf{##3} }
+      }
+    \DeclareDocumentCommand \Enumeration { O{} m m }
+      {
+        \sf_node:nnnnn { class } { main } {##1} {##2}
+          { {\scriptsize\guillemotleft enumeration\guillemotright} \\ \textbf{##3} }
+      }
+    \DeclareDocumentCommand \Attribute { m } { \sf_extra:nn { a } {##1} }
+    \DeclareDocumentCommand \Literal { m } { \sf_extra:nn { a } {##1} }
+    \DeclareDocumentCommand \Operation { m } { \sf_extra:nn { b } {##1} }
+    \sf_def_edge_fixed:Nnn \Inherits { inherit } { }
+    \sf_def_edge_fixed:Nnn \Implements { implement } { }
+    \sf_def_edge:Nn \Association { association }
+    \sf_def_edge:Nn \DirectedAssociation { directed }
+    \sf_def_edge:Nn \Composition { composition }
+    \sf_def_edge:Nn \Aggregation { aggregation }
+    \sf_def_edge:Nn \Dependency { dependency }
+    \ignorespaces
+  }
+  { \sf_graph_picture: }
+
+% =============================================================================
+%  Component diagram
+% =============================================================================
+\NewDocumentEnvironment { sfComponent } { O{} }
+  {
+    \sf_begin:nnn { sfComponent } { xstep = 3.6cm , ystep = 2cm } {#1}
+    \sf_def_node:Nnn \Component { component } { main }
+    \sf_def_node:Nnn \External { external } { main }
+    \sf_def_node:Nnn \Interface { iface } { main }
+    \sf_def_edge_fixed:Nnn \Provides { provide } { }
+    \sf_def_edge_fixed:Nnn \Requires { require } { \guillemotleft use\guillemotright }
+    \sf_def_edge:Nn \Connect { connect }
+    \DeclareDocumentCommand \Boundary { m m } { \sf_group:nnn { system } {##1} {##2} }
+    \ignorespaces
+  }
+  { \sf_graph_picture: }
+
+% =============================================================================
+%  Deployment diagram
+% =============================================================================
+\NewDocumentEnvironment { sfDeployment } { O{} }
+  {
+    \sf_begin:nnn { sfDeployment } { xstep = 5.4cm , ystep = 2.6cm } {#1}
+    \DeclareDocumentCommand \Node { O{} m m O{device} }
+      {
+        \sf_node:nnnnn { device } { main } {##1} {##2}
+          { {\scriptsize\guillemotleft ##4\guillemotright} \\ \textbf{##3} }
+      }
+    \DeclareDocumentCommand \Artifact { m } { \sf_extra:nn { a } { \textsf{##1} } }
+    \sf_def_edge:Nn \Link { link }
+    \sf_def_edge:Nn \Dependency { dependency }
+    \ignorespaces
+  }
+  { \sf_graph_picture: }
+
+% =============================================================================
+%  Package diagram
+% =============================================================================
+\NewDocumentEnvironment { sfPackage } { O{} }
+  {
+    \sf_begin:nnn { sfPackage } { xstep = 4.6cm , ystep = 2.4cm } {#1}
+    \DeclareDocumentCommand \Package { O{} m m }
+      { \sf_node:nnnnn { package } { main } {##1} {##2} { \textbf{##3} } }
+    \DeclareDocumentCommand \Element { m } { \sf_extra:nn { a } {##1} }
+    \sf_def_edge_fixed:Nnn \Import { import } { \guillemotleft import\guillemotright }
+    \sf_def_edge:Nn \Dependency { dependency }
+    \ignorespaces
+  }
+  { \sf_graph_picture: }
+
+% =============================================================================
+%  Block / context diagram
+% =============================================================================
+\NewDocumentEnvironment { sfBlock } { O{} }
+  {
+    \sf_begin:nnn { sfBlock } { xstep = 4.6cm , ystep = 1.8cm } {#1}
+    \sf_def_node:Nnn \Block { block } { main }
+    \sf_def_node:Nnn \External { external } { main }
+    \sf_def_node:Nnn \Store { store } { main }
+    \sf_def_edge:Nn \Signal { signal }
+    \sf_def_edge:Nn \Exchange { exchange }
+    \DeclareDocumentCommand \Group { m m } { \sf_group:nnn { group } {##1} {##2} }
+    \ignorespaces
+  }
+  { \sf_graph_picture: }
+
+% =============================================================================
+%  Sequence diagram: participants left to right, events top to bottom
+% =============================================================================
+\seq_new:N \g__sf_seq_parts_seq          % {ID}{label}{kind}
+\seq_new:N \g__sf_seq_events_seq         % {type}{a}{b}{label}
+\NewDocumentEnvironment { sfSequence } { O{} }
+  {
+    \sf_begin:nnn { sfSequence } { xstep = 3.2cm } {#1}
+    \seq_gclear:N \g__sf_seq_parts_seq
+    \seq_gclear:N \g__sf_seq_events_seq
+    \DeclareDocumentCommand \Participant { m m }
+      { \seq_gput_right:Nn \g__sf_seq_parts_seq { {##1} {##2} { participant } } }
+    \DeclareDocumentCommand \Actor { m m }
+      { \seq_gput_right:Nn \g__sf_seq_parts_seq { {##1} {##2} { actor } } }
+    \DeclareDocumentCommand \Message { m m m }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { msg } {##1} {##2} {##3} } }
+    \DeclareDocumentCommand \Async { m m m }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { async } {##1} {##2} {##3} } }
+    \DeclareDocumentCommand \Reply { m m m }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { reply } {##1} {##2} {##3} } }
+    \DeclareDocumentCommand \Self { m m }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { self } {##1} {##1} {##2} } }
+    \DeclareDocumentCommand \Note { m m }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { note } {##1} {##1} {##2} } }
+    \DeclareDocumentCommand \Fragment { m m }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { frag } {##1} { } {##2} } }
+    \DeclareDocumentCommand \Else { m }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { else } { } { } {##1} } }
+    \DeclareDocumentCommand \EndFragment { }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { endfrag } { } { } { } } }
+    \DeclareDocumentCommand \Gap { }
+      { \seq_gput_right:Nn \g__sf_seq_events_seq { { gap } { } { } { } } }
+    \ignorespaces
+  }
+  { \__sf_seq_draw: }
+
+\prop_new:N \l__sf_seq_x_prop            % ID -> x
+\fp_new:N \l__sf_seq_y_fp                % current y (cm, negative downwards)
+\seq_new:N \l__sf_frag_seq               % stack of open fragments {y}{kind}{guard}
+\fp_new:N \l__sf_seq_xmax_fp
+\dim_new:N \l__sf_note_dim
+\tl_new:N \l__sf_xa_tl
+\tl_new:N \l__sf_xb_tl
+\cs_new_protected:Npn \__sf_seq_draw:
+  {
+    \prop_clear:N \l__sf_seq_x_prop
+    \seq_clear:N \l__sf_frag_seq
+    \begin{tikzpicture}
+      % participants
+      \seq_map_indexed_inline:Nn \g__sf_seq_parts_seq
+        { \__sf_seq_part:nnnn {##1} ##2 }
+      \fp_set:Nn \l__sf_seq_xmax_fp
+        { ( \seq_count:N \g__sf_seq_parts_seq - 1 ) * \dim_to_fp:n { \l_sf_xstep_dim } }
+      \fp_set:Nn \l__sf_seq_y_fp { -1.1 }
+      \seq_map_inline:Nn \g__sf_seq_events_seq { \__sf_seq_event:nnnn ##1 }
+      \seq_if_empty:NF \l__sf_frag_seq
+        {
+          \sf_problem:n { Fragment~without~EndFragment }
+          \bool_do_until:nn { \seq_if_empty_p:N \l__sf_frag_seq } { \__sf_seq_event:nnnn { endfrag } { } { } { } }
+        }
+      % lifelines down to the last event
+      \fp_sub:Nn \l__sf_seq_y_fp { 0.3 }
+      \prop_map_inline:Nn \l__sf_seq_x_prop
+        {
+          \draw [ sf/lifeline ] ( ##2 pt , -0.45cm )
+            -- ( ##2 pt , \fp_to_decimal:N \l__sf_seq_y_fp cm ) ;
+        }
+      \sf_problems_draw:
+    \end{tikzpicture}
+  }
+\cs_new_protected:Npn \__sf_seq_part:nnnn #1#2#3#4   % n ID label kind
+  {
+    \tl_set:Nx \l__sf_x_tl { \fp_eval:n { (#1 - 1) * \dim_to_fp:n { \l_sf_xstep_dim } } }
+    \prop_if_in:NnTF \l__sf_seq_x_prop {#2}
+      { \sf_problem:n { duplicate~participant~#2 } }
+      { \prop_put:NnV \l__sf_seq_x_prop {#2} \l__sf_x_tl }
+    \str_if_eq:nnTF {#4} { actor }
+      {
+        \node [ sf/actor , anchor = south ] ( sfp#1 ) at ( \l__sf_x_tl pt , -0.05cm ) { } ;
+        \node [ sf/actorlabel , anchor = south ] at ( \l__sf_x_tl pt , 1.15cm ) {#3} ;
+      }
+      { \node [ sf/participant , anchor = north ] at ( \l__sf_x_tl pt , 0.4cm ) {#3} ; }
+  }
+\cs_generate_variant:Nn \prop_put:Nnn { NnV }
+% x of participant #1 into #2; unknown: problem, bool cleared
+\cs_new_protected:Npn \__sf_seq_x:nN #1#2
+  {
+    \prop_get:NnNF \l__sf_seq_x_prop {#1} #2
+      { \bool_set_false:N \l__sf_ok_bool \sf_problem:n { unknown~participant~#1 } }
+  }
+\cs_new_protected:Npn \__sf_seq_step:n #1   % y -= #1 * step
+  { \fp_sub:Nn \l__sf_seq_y_fp { #1 * \dim_to_fp:n { \l_sf_step_dim } / 28.45274 } }
+\cs_new_protected:Npn \__sf_seq_event:nnnn #1#2#3#4   % type a b label
+  {
+    \tl_set:Nx \l__sf_y_tl { \fp_to_decimal:N \l__sf_seq_y_fp cm }
+    \bool_set_true:N \l__sf_ok_bool
+    \str_case:nn {#1}
+      {
+        { msg }     { \__sf_seq_arrow:nnnn { msg } {#2} {#3} {#4} }
+        { async }   { \__sf_seq_arrow:nnnn { async } {#2} {#3} {#4} }
+        { reply }   { \__sf_seq_arrow:nnnn { reply } {#2} {#3} {#4} }
+        { self }
+          {
+            \__sf_seq_x:nN {#2} \l__sf_xa_tl
+            \bool_if:NT \l__sf_ok_bool
+              {
+                \draw [ sf/msg ] ( \l__sf_xa_tl pt , \l__sf_y_tl ) -- ++ ( 0.6cm , 0 )
+                  -- ++ ( 0 , -0.35cm ) -- ++ ( -0.6cm , 0 ) ;
+                \node [ sf/msglabel , anchor = west ]
+                  at ( \l__sf_xa_tl pt + 0.65cm , \l__sf_y_tl - 0.17cm ) {#4} ;
+              }
+            \__sf_seq_step:n { 1.5 }
+          }
+        { note }
+          {
+            \__sf_seq_x:nN {#2} \l__sf_xa_tl
+            \bool_if:NT \l__sf_ok_bool
+              {
+                \node [ sf/note , anchor = north~west ] ( sfnote )
+                  at ( \l__sf_xa_tl pt + 0.15cm , \l__sf_y_tl + 0.2cm ) {#4} ;
+                \pgfextracty \l__sf_note_dim { \pgfpointanchor { sfnote } { south } }
+                \fp_set:Nn \l__sf_seq_y_fp { \dim_to_fp:n { \l__sf_note_dim } / 28.45274 - 0.45 }
+              }
+            \bool_if:NF \l__sf_ok_bool { \__sf_seq_step:n { 1 } }
+          }
+        { frag }
+          {
+            \seq_push:Nx \l__sf_frag_seq
+              { { \fp_to_decimal:N \l__sf_seq_y_fp } { \exp_not:n {#2} } { \exp_not:n {#4} } }
+            \__sf_seq_step:n { 1.1 }
+          }
+        { else }
+          {
+            \seq_if_empty:NTF \l__sf_frag_seq
+              { \sf_problem:n { Else~outside~a~fragment } }
+              {
+                \__sf_seq_frag_x:
+                \draw [ sf/fragment , dashed ] ( \l__sf_xa_tl , \l__sf_y_tl ) -- ( \l__sf_xb_tl , \l__sf_y_tl ) ;
+                \tl_if_blank:nF {#4}
+                  { \node [ sf/guard ] at ( \l__sf_xa_tl , \l__sf_y_tl ) { [#4] } ; }
+                \__sf_seq_step:n { 1.1 }
+              }
+          }
+        { endfrag }
+          {
+            \seq_pop:NNTF \l__sf_frag_seq \l__sf_tmp_tl
+              {
+                \__sf_seq_frag_x:
+                \fp_sub:Nn \l__sf_seq_y_fp { 0.15 }
+                \tl_set:Nx \l__sf_y_tl { \fp_to_decimal:N \l__sf_seq_y_fp cm }
+                \tl_set:Nx \l__sf_a_tl { \tl_item:Nn \l__sf_tmp_tl { 1 } cm }
+                \draw [ sf/fragment ] ( \l__sf_xa_tl , \l__sf_a_tl ) rectangle ( \l__sf_xb_tl , \l__sf_y_tl ) ;
+                \node [ sf/fraglabel ] ( sffl ) at ( \l__sf_xa_tl , \l__sf_a_tl )
+                  { \tl_item:Nn \l__sf_tmp_tl { 2 } } ;
+                \tl_set:Nx \l__sf_b_tl { \tl_item:Nn \l__sf_tmp_tl { 3 } }
+                \tl_if_blank:VF \l__sf_b_tl
+                  { \node [ sf/guard ] at ( sffl.north~east ) { [ \l__sf_b_tl ] } ; }
+                \__sf_seq_step:n { 0.6 }
+              }
+              { \sf_problem:n { EndFragment~without~Fragment } }
+          }
+        { gap } { \__sf_seq_step:n { 1 } }
+      }
+  }
+% x extent of the innermost open fragment (inset by its depth)
+\cs_new_protected:Npn \__sf_seq_frag_x:
+  {
+    \tl_set:Nx \l__sf_xa_tl
+      { \fp_eval:n { -1.4 + 0.15 * \seq_count:N \l__sf_frag_seq } cm }
+    \tl_set:Nx \l__sf_xb_tl
+      { \fp_eval:n { \l__sf_seq_xmax_fp / 28.45274 + 1.4 - 0.15 * \seq_count:N \l__sf_frag_seq } cm }
+  }
+\cs_new_protected:Npn \__sf_seq_arrow:nnnn #1#2#3#4
+  {
+    \__sf_seq_x:nN {#2} \l__sf_xa_tl
+    \__sf_seq_x:nN {#3} \l__sf_xb_tl
+    \bool_if:NT \l__sf_ok_bool
+      {
+        \draw [ sf/#1 ] ( \l__sf_xa_tl pt , \l__sf_y_tl ) -- ( \l__sf_xb_tl pt , \l__sf_y_tl )
+          node [ sf/msglabel , midway ] {#4} ;
+      }
+    \__sf_seq_step:n { 1 }
+  }
+\ExplSyntaxOff
+
+% planning figures (Gantt, timeline, organisation chart, RACI) and charts
+% (risk matrix, timing diagram, bar and line charts)
+\RequirePackage{specfig-plan}
+\RequirePackage{specfig-chart}
+\endinput

@@ -1,0 +1,16 @@
+%% Gantt chart: plan of the heater_ctrl project, grouped by phase
+gantt
+    title heater_ctrl project plan
+    dateFormat YYYY-MM-DD
+    axisFormat %b %Y
+    section Specification
+    Software requirements            :done, req, 2026-12-01, 2026-12-23
+    Component specification          :active, arch, after req, 2027-02-06
+    M2 Architecture released         :milestone, m2, 2027-02-12, 0d
+    section Implementation
+    Units and unit tests             :impl, 2027-02-08, 2027-04-17
+    Integration on target            :integ, after impl, 2027-05-15
+    section Verification
+    Component test                   :comp, 2027-05-03, 2027-06-12
+    Qualification test (customer)    :qual, after comp, 2027-07-10
+    M4 Release for SOP               :milestone, sop, 2027-07-16, 0d

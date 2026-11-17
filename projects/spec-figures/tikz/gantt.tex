@@ -1,0 +1,19 @@
+% Gantt chart: plan of the heater_ctrl project, grouped by phase
+\begin{sfGantt}[today=2027-02-15]
+  \Group{Specification}
+  \Task[100]{req}{Software requirements}{2026-12-01}{2026-12-22}
+  \Task[80]{arch}{Component specification}{2027-01-04}{2027-02-05}
+  \Milestone{m2}{M2 Architecture released}{2027-02-12}
+  \Group{Implementation}
+  \Task[40]{impl}{Units and unit tests}{2027-02-08}{2027-04-16}
+  \Task{integ}{Integration on target}{2027-04-12}{2027-05-14}
+  \Group{Verification}
+  \Task{comp}{Component test}{2027-05-03}{2027-06-11}
+  \Task{qual}{Qualification test (customer)}{2027-06-14}{2027-07-09}
+  \Milestone{sop}{M4 Release for SOP}{2027-07-16}
+  \Depends{req}{arch}
+  \Depends{arch}{m2}
+  \Depends{impl}{integ}
+  \Depends{comp}{qual}
+  \Depends{qual}{sop}
+\end{sfGantt}

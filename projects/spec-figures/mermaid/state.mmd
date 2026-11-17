@@ -1,0 +1,14 @@
+%% State machine: operating modes of heater_ctrl
+stateDiagram-v2
+    state "Off" as off
+    state "Heating" as heat
+    state "Fault" as fault
+    heat : entry / enable PWM
+    heat : do / PI control
+    fault : entry / duty = 0
+    [*] --> off
+    off --> heat : on [temp < target]
+    heat --> off : off
+    heat --> fault : sensor fault
+    heat --> heat : tick / update duty
+    fault --> [*] : power off

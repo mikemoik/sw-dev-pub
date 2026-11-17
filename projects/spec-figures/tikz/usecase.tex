@@ -1,0 +1,15 @@
+% Use case diagram: heater_ctrl and its users
+\begin{sfUseCase}
+  \System{heater_ctrl}
+  \Actor{drv}{Driver}
+  \Actor{diag}{Diagnostic\\tester}
+  \UseCase{set}{Set target\\temperature}
+  \UseCase{heat}{Heat cabin}
+  \UseCase{fault}{Report fault}
+  \UseCase[3,1]{log}{Store DTC}
+  \Association{drv}{set}
+  \Association{drv}{heat}
+  \Association{diag}{fault}
+  \Include{fault}{log}
+  \Extend{heat}{fault}
+\end{sfUseCase}

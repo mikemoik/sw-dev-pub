@@ -1,0 +1,16 @@
+# spec_figures.pdf IS tracked (preview of all figures, see README)
+
+# scripts/check.py output
+build/
+
+# LaTeX intermediates
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# Python bytecode (scripts/ import each other)
+__pycache__/

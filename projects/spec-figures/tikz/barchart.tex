@@ -1,0 +1,7 @@
+% Bar chart: unit test results per unit of heater_ctrl (grouped: passed / failed / blocked)
+\begin{sfBarChart}[ylabel=Test cases, height=5cm]
+  \Categories{heater_ctrl_main, pi_controller, temp_sensor, pwm_port}
+  \Series{passed}{42, 35, 28, 12}
+  \Series{failed}{2, 0, 3, 1}
+  \Series{blocked}{1, 0, 0, 4}
+\end{sfBarChart}

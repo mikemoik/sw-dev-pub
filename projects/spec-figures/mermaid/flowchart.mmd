@@ -1,0 +1,10 @@
+%% Flowchart: release decision
+flowchart TD
+    start([Merge request]) --> ci[Run CI pipeline]
+    ci --> green{All stages green?}
+    green -- yes --> review[[Code review]]
+    green -- no --> fix[Fix findings]
+    fix --> ci
+    review --> tag[/Create tag vX.Y.Z/]
+    tag --> done([Released])
+    tag -- upload --> repo[(Artifact store)]

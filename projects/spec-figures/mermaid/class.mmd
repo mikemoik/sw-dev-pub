@@ -1,0 +1,30 @@
+%% Class diagram: heater_ctrl software structure
+classDiagram
+    class ITempSensor {
+        <<interface>>
+        +read_temp() int16
+    }
+    class HeaterCtrl {
+        -int16 target_dC
+        -Mode state
+        +step() Status
+        +set_target(int16 t)
+    }
+    class PiController {
+        -q15 kp
+        -q15 ki
+        +update(int16 err) q15
+    }
+    class NtcSensor {
+        +read_temp() int16
+    }
+    class Mode {
+        <<enumeration>>
+        OFF
+        HEATING
+        FAULT
+    }
+    ITempSensor <|.. NtcSensor
+    HeaterCtrl "1" --> "1" ITempSensor : reads
+    HeaterCtrl *-- "1" PiController
+    HeaterCtrl ..> Mode

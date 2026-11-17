@@ -1,0 +1,19 @@
+% Activity diagram: one control step
+\begin{sfActivity}
+  \Start{s}
+  \Action{read}{Read temperature}
+  \Decision{valid}{valid?}
+  \Action{pi}{Compute duty (PI)}
+  \Merge{m}
+  \Action{out}{Write PWM duty}
+  \End{e}
+  \Action[1,3]{safe}{Duty := 0, set fault}
+  \Flow{s}{read}{}
+  \Flow{read}{valid}{}
+  \Flow{valid}{pi}{yes}
+  \Flow[hv]{valid}{safe}{no}
+  \Flow{pi}{m}{}
+  \Flow[vh]{safe}{m}{}
+  \Flow{m}{out}{}
+  \Flow{out}{e}{}
+\end{sfActivity}

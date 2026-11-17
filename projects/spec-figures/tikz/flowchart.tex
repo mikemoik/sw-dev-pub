@@ -1,0 +1,19 @@
+% Flowchart: release decision
+\begin{sfFlowchart}
+  \Terminal{start}{Merge request}
+  \Process{ci}{Run CI pipeline}
+  \Decision{green}{All stages\\green?}
+  \Subprocess{review}{Code review}
+  \InOut{tag}{Create tag vX.Y.Z}
+  \Terminal{done}{Released}
+  \Process[1,2]{fix}{Fix findings}
+  \Store[1,4]{repo}{Artifact store}
+  \Flow{start}{ci}{}
+  \Flow{ci}{green}{}
+  \Flow{green}{review}{yes}
+  \Flow{green}{fix}{no}
+  \Flow[vh]{fix}{ci}{}
+  \Flow{review}{tag}{}
+  \Flow{tag}{done}{}
+  \Flow{tag}{repo}{upload}
+\end{sfFlowchart}

@@ -1,0 +1,23 @@
+% Class diagram: heater_ctrl software structure
+\begin{sfClassDiagram}
+  \Interface[0,0]{isens}{ITempSensor}
+    \Operation{+ read_temp(): int16}
+  \Class[1,0]{ctrl}{HeaterCtrl}
+    \Attribute{- target_dC: int16}
+    \Attribute{- state: Mode}
+    \Operation{+ step(): Status}
+    \Operation{+ set_target(t: int16)}
+  \Class[2,0]{pi}{PiController}
+    \Attribute{- kp, ki: q15}
+    \Operation{+ update(err: int16): q15}
+  \Class[0,1.2]{ntc}{NtcSensor}
+    \Operation{+ read_temp(): int16}
+  \Enumeration[1,1.2]{mode}{Mode}
+    \Literal{OFF}
+    \Literal{HEATING}
+    \Literal{FAULT}
+  \Implements{ntc}{isens}
+  \Association[m1=1, m2=1]{ctrl}{isens}{reads}
+  \Composition[m2=1]{ctrl}{pi}{}
+  \Dependency{ctrl}{mode}{}
+\end{sfClassDiagram}

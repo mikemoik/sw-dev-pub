@@ -1,0 +1,15 @@
+%% Component diagram: units of heater_ctrl and their interfaces (flowchart)
+flowchart LR
+    subgraph hc [heater_ctrl]
+        ctrl["«component» heater_ctrl_main"]
+        pi["«component» pi_controller"]
+        sens["«component» temp_sensor"]
+        ipi((IPi))
+        itemp((ITemp))
+    end
+    pwm["PWM driver (BSW)"]
+    pi --- ipi
+    ctrl -. "«use»" .-> ipi
+    sens --- itemp
+    ctrl -. "«use»" .-> itemp
+    ctrl -- set_duty --> pwm

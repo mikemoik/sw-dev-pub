@@ -1,0 +1,13 @@
+% Block / context diagram: heater_ctrl in its environment
+\begin{sfBlock}
+  \External[0,0]{hmi}{HMI}
+  \Block[1,0.5]{ctrl}{heater_ctrl}
+  \External[2,0]{pwm}{PWM driver}
+  \External[0,1]{ntc}{NTC sensor}
+  \External[2,1]{diag}{Diagnostics}
+  \Signal{hmi}{ctrl}{target temp}
+  \Signal{ntc}{ctrl}{temp raw}
+  \Signal{ctrl}{pwm}{duty}
+  \Exchange{ctrl}{diag}{DTC, status}
+  \Group{Body ECU}{ctrl, pwm, diag}
+\end{sfBlock}

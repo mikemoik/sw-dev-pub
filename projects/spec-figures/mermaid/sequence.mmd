@@ -1,0 +1,17 @@
+%% Sequence diagram: one control cycle of heater_ctrl
+sequenceDiagram
+    participant sched as Scheduler
+    participant ctrl as heater_ctrl
+    participant temp as TempSensor
+    participant pwm as PWM driver
+    sched->>ctrl: heater_ctrl_step()
+    ctrl->>temp: read_temp()
+    temp-->>ctrl: temp_dC
+    alt sensor valid
+        ctrl->>ctrl: PI controller
+        ctrl->>pwm: set_duty(duty)
+    else sensor fault
+        ctrl->>pwm: set_duty(0)
+        Note right of ctrl: Fault latched until the next power cycle.
+    end
+    ctrl-->>sched: status

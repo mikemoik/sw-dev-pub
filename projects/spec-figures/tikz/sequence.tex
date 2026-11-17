@@ -1,0 +1,18 @@
+% Sequence diagram: one control cycle of heater_ctrl
+\begin{sfSequence}
+  \Participant{sched}{Scheduler}
+  \Participant{ctrl}{heater_ctrl}
+  \Participant{temp}{TempSensor}
+  \Participant{pwm}{PWM driver}
+  \Message{sched}{ctrl}{heater_ctrl_step()}
+  \Message{ctrl}{temp}{read_temp()}
+  \Reply{temp}{ctrl}{temp_dC}
+  \Fragment{alt}{sensor valid}
+    \Self{ctrl}{PI controller}
+    \Message{ctrl}{pwm}{set_duty(duty)}
+  \Else{sensor fault}
+    \Message{ctrl}{pwm}{set_duty(0)}
+    \Note{ctrl}{Fault latched until the next power cycle.}
+  \EndFragment
+  \Reply{ctrl}{sched}{status}
+\end{sfSequence}

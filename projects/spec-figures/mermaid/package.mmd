@@ -1,0 +1,16 @@
+%% Package diagram: repository layout of heater_ctrl (flowchart)
+flowchart LR
+    subgraph app
+        e1[heater_ctrl_main]
+        e2[config]
+    end
+    subgraph control
+        e3[pi_controller]
+    end
+    subgraph hal
+        e4[temp_sensor]
+        e5[pwm_port]
+    end
+    app -. "«import»" .-> control
+    control -. "«import»" .-> hal
+    app -. uses .-> hal

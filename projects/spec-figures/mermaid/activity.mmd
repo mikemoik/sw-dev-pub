@@ -1,0 +1,10 @@
+%% Activity diagram: one control step (Mermaid has no activity diagram: flowchart)
+flowchart TD
+    s((start)) --> read(Read temperature)
+    read --> valid{valid?}
+    valid -- yes --> pi(Compute duty, PI)
+    valid -- no --> safe("Duty := 0, set fault")
+    pi --> m{merge}
+    safe --> m
+    m --> out(Write PWM duty)
+    out --> e(((end)))

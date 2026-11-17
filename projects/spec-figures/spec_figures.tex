@@ -1,0 +1,62 @@
+% spec-figures catalogue: every figure type with its TikZ source and Mermaid twin.
+% Build: latexmk -pdf spec_figures.tex  (latexmkrc puts sty/ on TEXINPUTS)
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2cm]{geometry}
+\usepackage{microtype}
+\usepackage{fancyvrb}
+\usepackage[export]{adjustbox}
+\usepackage{specfig}
+\usepackage[hidelinks]{hyperref}
+\usepackage[strings,nohyphen]{underscore} % last, as in the templates
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+% \Figure{type}{title}: the figure, its TikZ source and its Mermaid / Markdown twin
+\newcommand{\Figure}[2]{%
+  \clearpage
+  \section{#2}
+  \begin{center}
+    \begin{adjustbox}{max width=\linewidth}\input{tikz/#1}\end{adjustbox}
+  \end{center}
+  \subsection*{TikZ: \texttt{tikz/#1.tex}}
+  \VerbatimInput[fontsize=\footnotesize]{tikz/#1.tex}
+  \IfFileExists{mermaid/#1.mmd}{%
+    \subsection*{Mermaid twin: \texttt{mermaid/#1.mmd}}
+    \VerbatimInput[fontsize=\footnotesize]{mermaid/#1.mmd}}{}%
+  \IfFileExists{mermaid/#1.md}{%
+    \subsection*{Markdown twin: \texttt{mermaid/#1.md}}
+    \VerbatimInput[fontsize=\footnotesize]{mermaid/#1.md}}{}%
+}
+
+\begin{document}
+\begin{center}
+  {\LARGE\bfseries spec-figures\par}
+  \vspace{0.3em}
+  {\large Catalogue of figures for specifications and project manuals\par}
+\end{center}
+
+Every figure is an environment of the \texttt{specfig} package with plain data commands; the layout, the drawing and the consistency checks are generated. Each type also has an independent Mermaid template for Markdown pages. The command reference is in \texttt{README.md} and in the guides in \texttt{llm/}.
+
+\tableofcontents
+
+\Figure{sequence}{Sequence diagram}
+\Figure{state}{State machine}
+\Figure{activity}{Activity diagram}
+\Figure{usecase}{Use case diagram}
+\Figure{class}{Class diagram}
+\Figure{component}{Component diagram}
+\Figure{deployment}{Deployment diagram}
+\Figure{package}{Package diagram}
+\Figure{block}{Block / context diagram}
+\Figure{flowchart}{Flowchart}
+\Figure{gantt}{Gantt chart}
+\Figure{timeline}{Milestone timeline}
+\Figure{orgchart}{Organisation chart}
+\Figure{raci}{RACI matrix}
+\Figure{risk}{Risk matrix}
+\Figure{timing}{Timing diagram}
+\Figure{barchart}{Bar chart}
+\Figure{linechart}{Line chart}
+\end{document}

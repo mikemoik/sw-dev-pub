@@ -1,0 +1,12 @@
+% Deployment diagram: where heater_ctrl runs
+\begin{sfDeployment}
+  \Node[0,0]{ecu}{Body ECU}
+    \Artifact{heater_ctrl.a}
+    \Artifact{bsw.hex}
+  \Node[1,0]{gw}{Gateway}
+    \Artifact{routing.cfg}
+  \Node[2,0]{tester}{Workshop tester}[execution environment]
+    \Artifact{diag_tool}
+  \Link{ecu}{gw}{CAN 500 kbit/s}
+  \Link{gw}{tester}{DoIP}
+\end{sfDeployment}

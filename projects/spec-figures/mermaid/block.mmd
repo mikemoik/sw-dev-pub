@@ -1,0 +1,15 @@
+%% Block / context diagram: heater_ctrl in its environment
+flowchart LR
+    hmi[HMI]
+    ntc[NTC sensor]
+    subgraph body [Body ECU]
+        ctrl[heater_ctrl]
+        pwm[PWM driver]
+        diag[Diagnostics]
+    end
+    hmi -- target temp --> ctrl
+    ntc -- temp raw --> ctrl
+    ctrl -- duty --> pwm
+    ctrl <-->|DTC, status| diag
+    classDef ext fill:#EDEDED,stroke:#8A8A8A
+    class hmi,ntc,pwm,diag ext

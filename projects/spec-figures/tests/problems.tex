@@ -1,0 +1,63 @@
+% Deliberate mistakes: every figure must list them in red and warn.
+% Run by scripts/check.py, which compares the warnings with tests/problems.expected.
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{specfig}
+\usepackage[strings,nohyphen]{underscore}
+\begin{document}
+\begin{sfSequence}
+  \Participant{a}{A}
+  \Participant{a}{A again}
+  \Message{a}{b}{to nowhere}
+  \Else{no fragment}
+  \Fragment{loop}{forever}
+\end{sfSequence}
+
+\begin{sfStateMachine}[colour=red]
+  \State[1;0]{s1}{S1}{}
+  \State{s1}{S1 again}{}
+  \Transition[sideways]{s1}{s2}{go}
+\end{sfStateMachine}
+
+\begin{sfClassDiagram}
+  \Attribute{- orphan: int}
+  \Class{c}{C}
+  \Inherits{c}{base}
+\end{sfClassDiagram}
+
+\begin{sfBlock}
+  \Block{a}{A}
+  \Group{G}{a, ghost}
+\end{sfBlock}
+\begin{sfGantt}
+  \Task{t1}{Task}{2027-02-30x}{2027-03-01}
+  \Task{t2}{Task 2}{2027-03-10}{2027-03-01}
+  \Depends{t1}{t9}
+\end{sfGantt}
+
+\begin{sfOrgChart}
+  \Unit{a}{A}{}
+  \Unit[zz]{b}{B}{}
+\end{sfOrgChart}
+
+\begin{sfRaci}
+  \Roles{PL, DEV}
+  \Activity{Plan}{PL=A, DEV=A}
+  \Activity{Code}{DEV=X, QA=R}
+\end{sfRaci}
+
+\begin{sfRiskMatrix}[levels=3]
+  \Risk{R1}{4}{1}{too likely}
+  \Target{R9}{1}{1}
+\end{sfRiskMatrix}
+
+\begin{sfTiming}
+  \Signal{S}{H2 Q1}
+\end{sfTiming}
+
+\begin{sfLineChart}
+  \Categories{a, b}
+  \Series{s}{1, x, 3}
+\end{sfLineChart}
+\end{document}

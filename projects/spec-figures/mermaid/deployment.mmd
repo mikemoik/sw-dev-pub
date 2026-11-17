@@ -1,0 +1,14 @@
+%% Deployment diagram: where heater_ctrl runs (flowchart)
+flowchart LR
+    subgraph ecu ["«device» Body ECU"]
+        a1[heater_ctrl.a]
+        a2[bsw.hex]
+    end
+    subgraph gw ["«device» Gateway"]
+        a3[routing.cfg]
+    end
+    subgraph tester ["«execution environment» Workshop tester"]
+        a4[diag_tool]
+    end
+    ecu ---|CAN 500 kbit/s| gw
+    gw ---|DoIP| tester

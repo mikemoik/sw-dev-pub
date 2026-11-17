@@ -1,0 +1,10 @@
+% RACI matrix: who is Responsible, Accountable, Consulted, Informed per activity
+\begin{sfRaci}
+  \Roles{PL, SWA, DEV, TST, QA}
+  \Activity{Software requirements}{PL=A, SWA=R, DEV=C, TST=C, QA=I}
+  \Activity{Component specification}{PL=A, SWA=R, DEV=C, TST=C}
+  \Activity{Unit implementation}{SWA=A, DEV=R, TST=I}
+  \Activity{Unit test specification}{SWA=A, DEV=R, TST=C}
+  \Activity{Component test}{PL=A, TST=R, SWA=C, QA=I}
+  \Activity{Release}{PL=A/R, QA=C, SWA=I, DEV=I, TST=I}
+\end{sfRaci}

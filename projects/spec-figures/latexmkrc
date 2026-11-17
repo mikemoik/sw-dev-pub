@@ -1,0 +1,2 @@
+# sty/: the specfig packages, found without install
+ensure_path('TEXINPUTS', './sty//');

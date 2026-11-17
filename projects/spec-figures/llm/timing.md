@@ -1,0 +1,24 @@
+# Figure: Timing diagram
+
+Digital signals over time: clocks, levels, bus values, with markers and measured spans. Typical in the design or interface chapter of a unit or component specification (sampling, PWM, SPI/ADC sequences, timeouts).
+
+## TikZ: `\begin{sfTiming}[options]` … `\end{sfTiming}`
+
+- **`\Clock{name}{periods}`:** a clock row; each period is one time unit (high half, low half). Periods: whole number.
+- **`\Signal{name}{waveform}`:** one signal row. The waveform is space-separated tokens, each a letter plus a duration in time units (default 1, decimals allowed):
+  - `H3` high, `L2` low, `Z1` high impedance (middle line), `X2` unknown/don't care (grey),
+  - `D4{value}` bus or data value (hexagon with the value inside; keep it short so it fits).
+  Example: `L1 H3 L6`, `X4 D6{0x3F}`, `Z5 D2{duty} Z3`.
+- **`\Marker{time}{label}`:** dashed vertical line across all signals at that time, label on top.
+- **`\Span{signal name}{from}{to}{label}`:** dimension arrow above that signal between two times, e.g. a pulse width or a deadline.
+- **Options:** `width` (whole figure, default 13cm), `step` (row distance, default 0.9cm; larger if spans and labels crowd).
+- **Layout:** signals top to bottom in the order written; time from 0 to the right, scaled so the longest signal fills the width; grid line every time unit (up to 60 units). Choose the time unit so that all durations are small numbers (e.g. 1 unit = 100 µs) and say it in the caption.
+- **Red marks:** bad waveform token, duration ≤ 0, clock periods not a whole number, duplicate signal name, `\Span` for an unknown signal, a time that is not a number, unknown option.
+
+## Mermaid
+
+- No Mermaid diagram for timing. On the Markdown side the usual tool is WaveDrom (JSON, `wave: "01..x=."`); in Mermaid, fall back to a `sequenceDiagram` with notes only if the order matters and not the timing.
+
+## From a table
+
+- Event list with columns *time*, *signal*, *new value* → per signal, sort by time and turn the gaps into durations: value 0/1 → `L`/`H`, a number or name → `D<n>{value}`, unknown → `X`. Requirement rows such as "CS low for 200 µs" → `\Span`.
