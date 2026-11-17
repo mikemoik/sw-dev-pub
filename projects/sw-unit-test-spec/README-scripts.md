@@ -40,7 +40,7 @@ python3 scripts/clean.py sample       # one unit
 python3 scripts/clean.py -n           # only list what would be removed
 ```
 
-Removes the PDFs and LaTeX intermediates of `build.py` (`build/`) and of IDE or `latexmk` builds in the root folder (`<unit>.*`, `sw_unit_test_spec.*`). Without arguments this includes the committed preview `sw_unit_test_spec.pdf`: rebuild it or `git checkout` it.
+Removes the PDFs and LaTeX intermediates of `build.py` (`build/`) and of IDE or `latexmk` builds in the root folder (`<unit>.*`, `sw_unit_test_spec.*`). The committed preview `sw_unit_test_spec.pdf` is kept.
 
 ## Chat with an LLM
 
