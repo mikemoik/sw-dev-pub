@@ -20,7 +20,7 @@ Risks placed by probability and impact, with an optional arrow to the residual r
 
 ## Mermaid: `quadrantChart`
 
-- `x-axis Low impact --> High impact`, `y-axis Low probability --> High probability`; `quadrant-1` is top right, `quadrant-2` top left, `quadrant-3` bottom left, `quadrant-4` bottom right.
+- `x-axis Low impact --> High impact`, `y-axis Low probability --> High probability`. No `quadrant-1` … `quadrant-4` titles: they sit on the middle level and hide its points.
 - One point per risk: `R1 short title: [x, y]` with x = impact, y = probability in 0..1. Level k of n levels maps to (k − 0.5) / n, e.g. for 5 levels: 1 → 0.1, 2 → 0.3, 3 → 0.5, 4 → 0.7, 5 → 0.9.
 - No colon, brackets or quotes in point names. A quadrant chart has four zones only; there are no cell colours and no target arrows (show residual risk as a second point, e.g. `R1 residual: [0.7, 0.3]`).
 
@@ -54,10 +54,6 @@ quadrantChart
     title Risks of the heater_ctrl project
     x-axis Low impact --> High impact
     y-axis Low probability --> High probability
-    quadrant-1 Act now
-    quadrant-2 Reduce probability
-    quadrant-3 Accept and monitor
-    quadrant-4 Reduce impact
     R1 BSW late: [0.7, 0.7]
     R2 NTC tolerance: [0.9, 0.5]
     R3 Tool not qualified: [0.5, 0.3]
