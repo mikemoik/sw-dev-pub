@@ -13,7 +13,8 @@
    option of llm/_common.md.
 3. tests/problems.tex (deliberate mistakes) gives exactly the specfig warnings
    listed in tests/problems.expected.
-4. .continue/rules/ is up to date with llm/, figures/sample/ and mermaid/.
+4. .continue/rules/ is up to date with llm/, figures/sample/ and mermaid/, and
+   figures/sample/llm-context.md with the sample (scripts/llm_context.py).
 5. If mermaid-cli (mmdc) is on PATH: every mermaid/*.mmd renders; else skipped.
 
 Needs latexmk and pdflatex; Python 3.6+ standard library only. Exit 1 on failure.
@@ -30,6 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build import latexmk_cmd
 from continue_rules import RULES, sync
+from llm_context import main as llm_context
 from llm_prompt import LLM, ROOT, TIKZ, TYPES
 
 BUILD = ROOT / "build"
@@ -224,9 +226,11 @@ def main(argv=None) -> int:
         check_problems(),
         sync(RULES, check=True) == 0,
         check_mermaid(),
+        llm_context(["sample", "--check"]) == 0,
     ]
     if not results[4]:
         print("rules: FAILED (run python3 scripts/continue_rules.py)")
+    print(f"llm-context.md of sample: {'ok' if results[6] else 'FAILED'}")
     return 0 if all(results) else 1
 
 

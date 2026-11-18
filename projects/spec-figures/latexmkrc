@@ -1,2 +1,14 @@
 # sty/: the specfig packages, found without install
 ensure_path('TEXINPUTS', './sty//');
+
+# After every successful build (also each -pvc rebuild): rewrite
+# figures/<document>/llm-context.md, the one-file chat context (scripts/llm_context.py;
+# the document is read from the .fls, so -usepretex, \LoadFigures and IDE builds all
+# work; other builds such as tests/problems.tex are ignored). $success_cmd survives
+# -usepretex, which resets $pdflatex. A failing script only warns.
+{
+    my $null = $^O eq 'MSWin32' ? 'NUL' : '/dev/null';
+    my ($py) = grep { system("$_ -c \"\" >$null 2>&1") == 0 } ('python3', 'python');
+    $success_cmd = "$py scripts/llm_context.py --quiet --from-fls \"%Y%R.fls\""
+        . " || echo latexmkrc: scripts/llm_context.py failed" if defined $py;
+}

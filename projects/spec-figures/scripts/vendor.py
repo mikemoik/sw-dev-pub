@@ -45,7 +45,7 @@ def main(argv=None) -> int:
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(src.read_bytes())
             print(f"copied {src.name} -> {dst}")
-    rc |= sync(target / ".continue" / "rules", args.check)
+    rc |= sync(target / ".continue" / "rules", args.check, document=False)
     latexmkrc = target / "latexmkrc"
     if not (latexmkrc.is_file() and "./sty//" in latexmkrc.read_text(encoding="utf-8")):
         print(

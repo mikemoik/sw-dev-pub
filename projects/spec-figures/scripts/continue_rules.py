@@ -74,15 +74,33 @@ def type_rule(kind: str) -> str:
     return "\n".join(parts + examples(kind))
 
 
-def expected() -> dict:
+def document_rule() -> str:
+    body = (LLM / "_document.md").read_text(encoding="utf-8").rstrip()
+    return (
+        frontmatter(
+            "Figures: figure document",
+            "document.tex of a spec-figures figure document: commands and rules",
+            ["**/figures/*/document.tex"],
+        )
+        + HEADER
+        + "\n"
+        + body
+        + "\n"
+    )
+
+
+def expected(document: bool = True) -> dict:
+    """The rules; document=False leaves out the figure-document rule (templates)."""
     rules = {"sf-00-common.md": common_rule()}
+    if document:
+        rules["sf-00-document.md"] = document_rule()
     for kind in TYPES:
         rules[f"sf-{kind}.md"] = type_rule(kind)
     return rules
 
 
-def sync(rules_dir: Path, check: bool) -> int:
-    rules = expected()
+def sync(rules_dir: Path, check: bool, document: bool = True) -> int:
+    rules = expected(document)
     present = (
         {p.name for p in rules_dir.glob("sf-*.md")} if rules_dir.is_dir() else set()
     )

@@ -68,7 +68,8 @@ def main(argv=None) -> int:
         print(f"error: {target.relative_to(ROOT)} already exists", file=sys.stderr)
         return 1
 
-    shutil.copytree(source, target)
+    # llm-context.md is the source document's chat context; the first build writes the new one
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns("llm-context.md"))
     set_title(target / "document.tex", args.name)
 
     print(f"created {target.relative_to(ROOT)}/ (copy of {source.relative_to(ROOT)}/)")
