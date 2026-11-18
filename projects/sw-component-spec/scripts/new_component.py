@@ -67,7 +67,8 @@ def main(argv=None) -> int:
         print(f"error: {target.relative_to(ROOT)} already exists", file=sys.stderr)
         return 1
 
-    shutil.copytree(source, target)
+    # llm-context.md is the source component's chat context; the first build writes the new one
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns("llm-context.md"))
     for sub in ("figures", "data", "code"):  # also when --from lacks one
         folder = target / sub
         folder.mkdir(exist_ok=True)

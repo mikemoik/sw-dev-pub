@@ -22,13 +22,14 @@ Spin-off of [`sw-unit-test-spec`](../sw-unit-test-spec/) one level up. It uses t
 ```
 sw_component_spec.tex     main file: chapter order, default component
 swcs.cls                  the template: all formatting and input commands
-latexmkrc                 latexmk settings: sty/ on TeX's search path, -c also removes the free-text helper files
+latexmkrc                 latexmk settings: sty/ on TeX's search path, -c also removes the free-text helper files, llm-context.md after each build
 sty/                      packages TeX Live does not have, found without install: tikz-uml.sty, specfig*.sty
 sw_component_spec.pdf     the sample component, built: a preview of what the template produces
 scripts/new_component.py  creates components/<component>/ from components/empty/
 scripts/build.py          builds components into build/<component>.pdf
 scripts/clean.py          removes build output (build/ and root LaTeX files) for a clean build
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a component's file
+scripts/llm_context.py    writes components/<component>/llm-context.md: whole component + guides as one chat context (run after every build)
 llm/                      the guides it uses: general rules + one per content file
 scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)
 .continue/rules/          generated: the guides as Continue rules, one per content file
@@ -188,4 +189,4 @@ In `sw_component_spec.tex` you can reorder or drop the chapter commands (`\SpecT
 
 ## Test
 
-"Test" = it builds without errors or warnings: `latexmk -pdf sw_component_spec.tex` (the sample, also the committed preview) and `python3 scripts/build.py --strict --force sample empty`. A component created by `scripts/new_component.py` builds the same way. After changing `llm/`, `components/empty/` or `components/sample/`: `python3 scripts/continue_rules.py` (`--check` in CI).
+"Test" = it builds without errors or warnings: `latexmk -pdf sw_component_spec.tex` (the sample, also the committed preview) and `python3 scripts/build.py --strict --force sample empty`. A component created by `scripts/new_component.py` builds the same way. After changing `llm/`, `components/empty/` or `components/sample/`: `python3 scripts/continue_rules.py` (`--check` in CI). `components/sample/llm-context.md` is committed like the preview PDF: `python3 scripts/llm_context.py sample --check` must pass.

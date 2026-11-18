@@ -4,3 +4,15 @@ $clean_ext .= ' free-*.tex ltc';
 # sty/: packages shipped with the template that TeX Live does not have
 # (tikz-uml). TeX searches it before the TeX trees: no install needed.
 ensure_path('TEXINPUTS', './sty//');
+
+# After every successful build (also each -pvc rebuild): rewrite
+# components/<component>/llm-context.md, the one-file chat context (scripts/llm_context.py;
+# the component is read from the .fls, so -usepretex, \LoadComponent and IDE builds all
+# work). $success_cmd survives -usepretex, which resets $pdflatex. A failing script
+# only warns.
+{
+    my $null = $^O eq 'MSWin32' ? 'NUL' : '/dev/null';
+    my ($py) = grep { system("$_ -c \"\" >$null 2>&1") == 0 } ('python3', 'python');
+    $success_cmd = "$py scripts/llm_context.py --quiet --from-fls \"%Y%R.fls\""
+        . " || echo latexmkrc: scripts/llm_context.py failed" if defined $py;
+}

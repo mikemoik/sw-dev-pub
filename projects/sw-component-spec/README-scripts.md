@@ -57,6 +57,13 @@ python3 scripts/llm_prompt.py brake_mon component --add ../src/brake_mon.h -o bu
 
 The prompt is about 3K–7K tokens plus `--add` files. Above 32000 it warns (`--max-tokens`). `--no-example` leaves out the worked example from `components/sample/`.
 
+**Whole component in one file:** every build (`build.py`, `latexmk`, also each `-pvc` rebuild) rewrites `components/<component>/llm-context.md` through `latexmkrc`. It holds the rules, all guides and command references, the figure guides of the specfig types the component uses, an index of the declared IDs and all content and figure files of the component. In Continue, reference only that file (`@llm-context.md`) for requests that touch several files or a figure; the per-file rules stay for small edits. The file is the state of the last build: after applying an answer, save (so `-pvc` rebuilds) and start a new chat or reference the file again. About 17K tokens for the sample.
+
+```sh
+python3 scripts/llm_context.py brake_mon            # write it without building
+python3 scripts/llm_context.py brake_mon --check    # exit 1 if out of date
+```
+
 **Maintainers:** `llm/_common.md` (role, chat protocol, LaTeX rules, shared helpers) and `llm/<file>.md` (one guide per content file) are the source. `.continue/rules/` is generated from them plus `components/empty/` and `components/sample/`, and committed. After changing any of these:
 
 ```sh
