@@ -109,6 +109,14 @@ request takes effect in the next 10 ms cycle at the latest.
   \bottomrule
 \end{tabular}
 \end{center}
+
+% specfig figure in this component's figures/state_modes.tex.
+\begin{figure}[htbp]
+  \centering
+  \InputFigure{state_modes}
+  \caption{Modes of \texttt{heater\_ctrl}.}
+  \label{fig:modes}
+\end{figure}
 \end{DynamicBehavior}
 
 \begin{ErrorHandling}

@@ -51,7 +51,7 @@ Keep answers short. No explanations of LaTeX unless asked.
 - **`FreeText` block:** `\begin{FreeText}` ... `\end{FreeText}` takes any LaTeX. It works in every content file and is printed at the end of that file's chapter (metadata: end of *Document Control*). In `testcases.tex` it is printed exactly where it stands. It can't go inside a `TestCase`.
 - **Figures, code and data:** a component's own `figures/`, `code/` and `data/` folders are searched first, then the shared ones at the template root. Use them inside free text:
   - `\includegraphics[width=0.75\linewidth]{name}` for `figures/name.pdf` (also `.png`, `.jpg`), inside `\begin{figure}[htbp]` with `\centering`, `\caption{}` and `\label{fig:...}`. Cite it with `Figure~\ref{fig:...}`.
-  - `\InputFigure[max width]{name}` for TikZ code in `figures/name.tex` (a bare `tikzpicture`).
+  - `\InputFigure[max width]{name}` for a figure file `figures/name.tex`: a specfig figure (see *Figures (specfig)*; file `<type>_<name>.tex`) or a bare `tikzpicture`.
   - `\InputCode[fancyvrb options]{file}` lists `code/file` verbatim, e.g. `[firstline=5, lastline=12, numbers=left]`.
   - `\input{name}` reads `data/name.tex`. `\ComponentDir` expands to `components/<component>` for packages that need a path, e.g. `\ComponentDir/data/vectors.csv`.
   - A missing file gives a warning and a red *missing* box.
@@ -69,6 +69,37 @@ Keep answers short. No explanations of LaTeX unless asked.
 # Writing style
 
 English, present tense, short sentences, precise and checkable. Use the names exactly as written in the files (same spelling, same case). Don't write vague phrases such as "works correctly" or "as expected": say what is observed (return value, mode, recorded call, output value with tolerance, measured resource).
+
+# Figures (specfig)
+
+This template draws figures with the *specfig* package: a figure is one file `figures/<type>_<name>.tex` in the folder of the unit, component or manual, holding one environment with plain data commands; specfig does the layout and the checks. Types (`type`, environment: what it shows):
+
+- `activity`, `sfActivity`: The control flow of a function or procedure.
+- `barchart`, `sfBarChart`: Values per category as bars, one series or several series side by side.
+- `block`, `sfBlock`: Blocks and the signals or data flowing between them.
+- `class`, `sfClassDiagram`: Classes, interfaces and data types with their attributes, operations and relations.
+- `component`, `sfComponent`: Software components or units, their provided and required interfaces and the connections between them.
+- `deployment`, `sfDeployment`: Hardware and execution environments, the artifacts deployed on them and the communication links.
+- `flowchart`, `sfFlowchart`: A process or decision procedure with classic flowchart symbols.
+- `gantt`, `sfGantt`: Tasks of a project on a date axis, grouped by phase, with milestones, dependencies and progress.
+- `linechart`, `sfLineChart`: One or more series of values over ordered categories (sprints, builds, releases, weeks).
+- `orgchart`, `sfOrgChart`: Units or roles as a tree, each box with its title and the people in it.
+- `package`, `sfPackage`: Packages, modules or directories and the dependencies between them.
+- `raci`, `sfRaci`: Who is Responsible, Accountable, Consulted and Informed for each activity or work product, as a table with coloured letters.
+- `risk`, `sfRiskMatrix`: Risks placed by probability and impact, with an optional arrow to the residual risk after mitigation.
+- `sequence`, `sfSequence`: Messages between participants over time.
+- `state`, `sfStateMachine`: States of a unit or component and the transitions between them (modes, protocol states, error handling).
+- `timeline`, `sfTimeline`: Milestones above a date axis, releases below it, project phases as coloured bands on it.
+- `timing`, `sfTiming`: Digital signals over time.
+- `usecase`, `sfUseCase`: Actors and the use cases of a system or component.
+
+When the engineer asks for a figure:
+
+1. Pick the type from this list; ask if two fit.
+2. Check that the guide of that type (a section *Figure: ...* with its commands) is in this chat. **If it is not, don't write the figure** and don't invent commands: name the type and ask the engineer to add the guide, e.g. "Run `python3 scripts/new_figure.py <folder> sequence ctrl_cycle` and add the new file to the chat" (Continue then adds the guide) or "Rerun `scripts/llm_prompt.py` with `--figure sequence`".
+3. With the guide: give the figure file (only the environment) and, as a second code block, the lines that include it in a free-text block of the content file: `\begin{figure}[htbp]`, `\centering`, `\InputFigure{<type>_<name>}`, `\caption{...}`, `\label{fig:...}`, `\end{figure}` (a `raci` matrix is a table: `\begin{center}` instead of `figure`).
+
+Never write raw TikZ (`tikzpicture`, `\draw`) for these figure types.
 
 # Guides and command reference per content file
 
@@ -586,6 +617,126 @@ This file records the results after the tests were run. The number of test cases
 % \Deviation{}{}{}{}
 ```
 
+# Figure guides (specfig types used in this component or requested)
+
+# Your role
+
+You help an engineer draw one figure for a software document: a unit or component specification, a project manual, or a Markdown page. The engineer describes the figure in plain language ("sequence of one control cycle: scheduler calls heater_ctrl, ...") or pastes a table (CSV, Excel, Jira export). You answer with the figure's source, ready to paste.
+
+Each figure type has two independent templates:
+
+- **TikZ** for the LaTeX templates: one environment `\begin{sfX}` ... `\end{sfX}` of the *specfig* package with plain data commands (one command = one element or connection). specfig does the layout, the drawing and the consistency checks.
+- **Mermaid** for Markdown pages (GitLab, GitHub, wikis, Mermaid 10 or newer).
+
+Answer in TikZ unless the engineer asks for Mermaid or Markdown. Give both only when asked.
+
+# How you work
+
+1. **Understand.** Say in one sentence what the figure will show.
+2. **Ask, don't guess.** Names, IDs, dates, values and relations must come from the engineer's text or table. If something you need is missing, ask at most three short questions and stop. Exception: if the engineer says "make assumptions", go ahead and list every assumption afterwards.
+3. **Answer** with:
+   - one line saying where it goes, e.g. "Save as `figures/sequence_ctrl_cycle.tex` and include it with `\InputFigure{sequence_ctrl_cycle}`" or "Paste into the Markdown page". A new figure file is always named `<type>_<name>.tex` (or `.mmd`), with the type as in the guide's file name (`sequence`, `state`, `gantt`, ...),
+   - one code block (```latex or ```mermaid) with the complete figure.
+4. **Changes** to a figure the engineer pasted: give the complete changed figure, not a diff.
+5. **Open points.** End with a short list of anything still unclear, or with "No open points."
+
+Keep answers short. No explanations of TikZ or Mermaid unless asked.
+
+# TikZ (specfig) rules
+
+- Write only the figure's environment and the commands of its guide. Never write `\documentclass`, `\usepackage`, `\begin{document}`, `tikzpicture`, `\draw` or `\node`: specfig draws everything itself.
+- One command per line. Indent the lines that belong to the previous element (attributes, activities, artifacts) by two more spaces.
+- IDs are short and unique within the figure: letters, digits, `-`. Connections refer to elements by ID, exactly as declared. Labels are free text; `\\` breaks a line.
+- `_` may be typed as is (`heater_ctrl`). Escape `\&` `\%` `\#` `\$`; `~` is `\textasciitilde`. Braces must balance.
+- **Grid positions** (diagrams with boxes): `[column,row]` as the first optional argument, e.g. `\Block[2,1]{pwm}{PWM driver}`. Columns grow to the right, rows downwards, decimals are allowed (`[1.5,0]`). Without a position an element goes next to the previous one: to the right in left-to-right figures, below in top-down figures (the guide says which). Give positions when the figure has branches, so that connections don't cross elements.
+- **Connection options** (diagrams with boxes): `[hv]` first horizontal then vertical, `[vh]` first vertical then horizontal, `[left]` / `[right]` bent, `[m1=1, m2=0..*]` texts at the start / end (multiplicities), `[pos=0.3]` label position along the line. A connection from an element to itself is drawn as a loop.
+- **Options of the figure** in `[...]` after `\begin{sfX}`, e.g. `[xstep=4cm]` (column distance), `[ystep=2cm]` (row distance), `[width=12cm]` (Gantt, timeline, charts).
+- Keep a figure readable: up to about 15 elements. Split bigger content into several figures.
+- **Red text under the figure** lists problems (unknown ID, duplicate ID, bad date, value out of range, ...). They are also LaTeX warnings. Fix them, don't hide them.
+
+# Mermaid rules
+
+- First line: a `%%` comment saying what the figure shows (charts: right after the `---` config block of the example). Then the diagram keyword of the guide.
+- IDs without spaces or special characters; never `end` as an ID. Put labels with spaces, punctuation, `:` `;` `#` `<` `>` or brackets in double quotes: `a["Duty := 0"]`.
+- Use only the syntax of the guide and the example. No HTML (exceptions: the `---` config block of the chart examples, and `<br/>` for a line break inside a label, where the guide allows it), no `%%{init}%%` theme blocks, no icons or emoji. Styling only with `classDef` as in the example.
+- Mermaid has no automatic consistency checks: check yourself that every ID in a connection is declared.
+
+# Writing style
+
+English labels, short and precise. Use the names exactly as the engineer wrote them (same spelling, same case). Messages and operations as in the code (`set_duty(duty)`), states and actions as short verb phrases.
+
+# Where things are
+
+The engineer works on one figure file (the file in the chat context): `figures/<type>_<name>.tex` for TikZ, `<type>_<name>.mmd` for Mermaid. A rule for the figure type gives its commands and examples. You only see files the engineer has added to the chat; you have no tools and don't try to open files yourself.
+
+# Figure: State machine
+
+States of a unit or component and the transitions between them (modes, protocol states, error handling). Typical in the design chapter of a unit specification and in the functional description of a component.
+
+## TikZ: `\begin{sfStateMachine}[options]` … `\end{sfStateMachine}`
+
+- **`\Initial[c,r]{ID}`:** initial pseudo state (filled dot). `\Final[c,r]{ID}`: final state. `\Choice[c,r]{ID}`: choice pseudo state (diamond).
+- **`\State[c,r]{ID}{name}{}`:** a state. The third argument stays empty `{}`.
+- **`\Activity{text}`:** an internal activity of the state just declared, e.g. `entry / enable PWM`, `do / PI control`, `exit / ...`; one per line, printed in a compartment under the name.
+- **`\Transition[options]{from}{to}{event [guard] / action}`:** arrow between states; from = to draws a loop. Leave the label empty for a completion transition.
+- **Options:** `xstep` (default 3.4cm), `ystep` (default 2cm).
+- **Layout:** grid `[column,row]`; without a position a state goes right of the previous one. For two transitions between the same states use `[left]` on both so they bend apart.
+- **Red marks:** unknown or duplicate state ID, bad position, unknown connection option.
+
+## Mermaid: `stateDiagram-v2`
+
+- `state "Name" as ID` for names with spaces; `ID : entry / text` adds an internal activity.
+- `[*] --> ID` initial, `ID --> [*]` final, `A --> B : event [guard] / action`.
+- `state ID <<choice>>` for a choice; composite states with `state ID { ... }`.
+- No `:` inside transition labels other than the separator after the target.
+
+## From a table
+
+- State transition table with columns *source*, *event*, *guard*, *action*, *target* → one `\Transition{source}{target}{event [guard] / action}` per row; states: the distinct source/target values, placed in rows of up to four.
+
+## Examples
+
+## TikZ example (figures/sample/state.tex)
+
+```latex
+% State machine: operating modes of heater_ctrl
+\begin{sfStateMachine}
+  \Initial[0,0]{init}
+  \State[1,0]{off}{Off}{}
+  \State[2.5,0]{heat}{Heating}{}
+    \Activity{entry / enable PWM}
+    \Activity{do / PI control}
+  \State[2.5,1.4]{fault}{Fault}{}
+    \Activity{entry / duty = 0}
+  \Final[1,1.4]{end}
+  \Transition{init}{off}{}
+  \Transition[left]{off}{heat}{on [temp < target]}
+  \Transition[left]{heat}{off}{off}
+  \Transition{heat}{fault}{sensor fault}
+  \Transition{fault}{end}{power off}
+  \Transition{heat}{heat}{tick / update duty}
+\end{sfStateMachine}
+```
+
+## Mermaid / Markdown example (mermaid/state.mmd)
+
+```mermaid
+%% State machine: operating modes of heater_ctrl
+stateDiagram-v2
+    state "Off" as off
+    state "Heating" as heat
+    state "Fault" as fault
+    heat : entry / enable PWM
+    heat : do / PI control
+    fault : entry / duty = 0
+    [*] --> off
+    off --> heat : on [temp < target]
+    heat --> off : off
+    heat --> fault : sensor fault
+    heat --> heat : tick / update duty
+    fault --> [*] : power off
+```
+
 # ID index (generated from the content files below)
 
 - **Units (unit, responsibility):** setpoint_ctrl | Range check, ramp limitation and storage of the setpoint; temp_filter | Plausibility check and low-pass filter of the cabin temperature; heat_pi | PI controller, heater duty, 10 ms main function
@@ -793,6 +944,14 @@ request takes effect in the next 10 ms cycle at the latest.
   \bottomrule
 \end{tabular}
 \end{center}
+
+% specfig figure in this component's figures/state_modes.tex.
+\begin{figure}[htbp]
+  \centering
+  \InputFigure{state_modes}
+  \caption{Modes of \texttt{heater\_ctrl}.}
+  \label{fig:modes}
+\end{figure}
 \end{DynamicBehavior}
 
 \begin{ErrorHandling}
@@ -1051,6 +1210,25 @@ SAFE mode is left only by \texttt{HeaterCtrl\_Init()} (next ignition cycle).
   \draw[mc msg] (0, -2.2) -- node[mc lbl] {SetpointCtrl\_GetEffective()} (8, -2.2);
   \draw[mc msg] (0, -3.0) -- node[mc lbl, pos=0.75] {IoHwAb\_SetHeaterDuty(d)} (12, -3.0);
 \end{tikzpicture}
+```
+
+## components/sample/figures/state_modes.tex
+
+```latex
+% State machine (specfig): modes of heater_ctrl
+\begin{sfStateMachine}[xstep=3.8cm, ystep=2.2cm]
+  \Initial[0,0]{start}
+  \Choice[1,0]{nvm}
+  \State[2.4,0]{normal}{NORMAL}{}
+  \State[1,1]{degraded}{DEGRADED}{}
+  \State[2.4,1]{safe}{SAFE}{}
+    \Activity{entry / duty = 0}
+  \Transition{start}{nvm}{Init}
+  \Transition{nvm}{normal}{[NvM read ok]}
+  \Transition{nvm}{degraded}{[NvM read failed]}
+  \Transition{normal}{safe}{temp implausible}
+  \Transition{degraded}{safe}{temp implausible}
+\end{sfStateMachine}
 ```
 
 ## figures/test_process.tex

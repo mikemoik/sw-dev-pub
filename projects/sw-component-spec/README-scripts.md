@@ -57,6 +57,16 @@ python3 scripts/llm_prompt.py brake_mon component --add ../src/brake_mon.h -o bu
 
 The prompt is about 3K–7K tokens plus `--add` files. Above 32000 it warns (`--max-tokens`). `--no-example` leaves out the worked example from `components/sample/`.
 
+**Figures:** the rules and prompts list the specfig figure types. Ask for a figure in the chat; if the type's guide is missing, the model says which one to add. With Continue, create the figure file and add it to the chat (Continue then adds the type's guide); without, add `--figure`:
+
+```sh
+python3 scripts/new_figure.py brake_mon sequence cycle                         # components/brake_mon/figures/sequence_cycle.tex
+python3 scripts/llm_prompt.py brake_mon design --figure sequence -o build/prompt.md
+python3 scripts/llm_context.py brake_mon --figure gantt                        # whole-component context + a type not used yet
+```
+
+`llm_context.py --figure` lasts until the next build; after that, a figure file of the type keeps its guide in.
+
 **Whole component in one file:** every build (`build.py`, `latexmk`, also each `-pvc` rebuild) rewrites `components/<component>/llm-context.md` through `latexmkrc`. It holds the rules, all guides and command references, the figure guides of the specfig types the component uses, an index of the declared IDs and all content and figure files of the component. In Continue, reference only that file (`@llm-context.md`) for requests that touch several files or a figure; the per-file rules stay for small edits. The file is the state of the last build: after applying an answer, save (so `-pvc` rebuilds) and start a new chat or reference the file again. About 17K tokens for the sample.
 
 ```sh

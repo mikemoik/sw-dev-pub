@@ -44,7 +44,7 @@ Keep answers short. No explanations of LaTeX unless asked.
 - **`FreeText` block:** `\begin{FreeText}` ... `\end{FreeText}` takes any LaTeX. It works in every content file and is printed at the end of that file's chapter (metadata: end of *Document Control*). In `testcases.tex` it is printed exactly where it stands. It can't go inside a `TestCase`.
 - **Figures, code and data:** a component's own `figures/`, `code/` and `data/` folders are searched first, then the shared ones at the template root. Use them inside free text:
   - `\includegraphics[width=0.75\linewidth]{name}` for `figures/name.pdf` (also `.png`, `.jpg`), inside `\begin{figure}[htbp]` with `\centering`, `\caption{}` and `\label{fig:...}`. Cite it with `Figure~\ref{fig:...}`.
-  - `\InputFigure[max width]{name}` for TikZ code in `figures/name.tex` (a bare `tikzpicture`).
+  - `\InputFigure[max width]{name}` for a figure file `figures/name.tex`: a specfig figure (see *Figures (specfig)*; file `<type>_<name>.tex`) or a bare `tikzpicture`.
   - `\InputCode[fancyvrb options]{file}` lists `code/file` verbatim, e.g. `[firstline=5, lastline=12, numbers=left]`.
   - `\input{name}` reads `data/name.tex`. `\ComponentDir` expands to `components/<component>` for packages that need a path, e.g. `\ComponentDir/data/vectors.csv`.
   - A missing file gives a warning and a red *missing* box.

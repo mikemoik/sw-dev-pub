@@ -1,0 +1,14 @@
+% State machine (specfig): modes of heater_ctrl
+\begin{sfStateMachine}[xstep=3.8cm, ystep=2.2cm]
+  \Initial[0,0]{start}
+  \Choice[1,0]{nvm}
+  \State[2.4,0]{normal}{NORMAL}{}
+  \State[1,1]{degraded}{DEGRADED}{}
+  \State[2.4,1]{safe}{SAFE}{}
+    \Activity{entry / duty = 0}
+  \Transition{start}{nvm}{Init}
+  \Transition{nvm}{normal}{[NvM read ok]}
+  \Transition{nvm}{degraded}{[NvM read failed]}
+  \Transition{normal}{safe}{temp implausible}
+  \Transition{degraded}{safe}{temp implausible}
+\end{sfStateMachine}

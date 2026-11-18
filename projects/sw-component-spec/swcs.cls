@@ -46,6 +46,7 @@
 \RequirePackage{fancyvrb}               % FreeText: body copied verbatim to a file
 \RequirePackage{graphicx}               % search paths: see \LoadContent
 \RequirePackage[hidelinks]{hyperref}
+\RequirePackage{specfig}                % figures from data commands (spec-figures; sty/specfig*.sty)
 % underscore LAST: its active _ breaks older packages loaded after it
 % (pgf < 3.1.11, older fancyvrb on TeX Live 2022)
 \RequirePackage[strings,nohyphen]{underscore} % plain _ in text: unit_name, Unit_Init()

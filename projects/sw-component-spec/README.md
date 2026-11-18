@@ -28,6 +28,8 @@ sw_component_spec.pdf     the sample component, built: a preview of what the tem
 scripts/new_component.py  creates components/<component>/ from components/empty/
 scripts/build.py          builds components into build/<component>.pdf
 scripts/clean.py          removes build output (build/ and root LaTeX files) for a clean build
+scripts/new_figure.py     creates a specfig figure file from the example of its type (from spec-figures)
+scripts/sf_figures.py     figure types and chat guides for the scripts (from spec-figures)
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a component's file
 scripts/llm_context.py    writes components/<component>/llm-context.md: whole component + guides as one chat context (run after every build)
 llm/                      the guides it uses: general rules + one per content file
@@ -120,7 +122,19 @@ Generated with TikZ from the data you already enter. Each diagram only appears w
 | **Internal structure**: units inside the component boundary; provided interfaces enter from the left, unit → unit uses on lanes, uses of other components fan out to their boxes on the right | 3.x *Static Architecture* | `\Unit`, `\ProvidedInterface[unit]`, `\Uses` |
 | **Test harness**: test driver → `«CUT»` (all units real) → test doubles of the required interfaces | top of 5 *Test Environment* | `\ProvidedInterface` + `\RequiredInterface` |
 
-Units appear in the order of their `\Unit` lines, and the boxes of other components in the order of the mean position of their users. Sequence diagrams and other figures go into a `FreeText` or design block (see `figures/main_cycle.tex` of the sample). `sty/tikz-uml.sty` is shipped as in `sw-unit-test-spec`. Likewise `sty/specfig*.sty` (spec-figures, optional): `\usepackage{specfig}` after `\documentclass{swcs}`, figures as `figures/<type>_<name>.tex` with `\InputFigure`, refreshed with spec-figures' `scripts/vendor.py`.
+Units appear in the order of their `\Unit` lines, and the boxes of other components in the order of the mean position of their users. Sequence diagrams and other figures go into a `FreeText` or design block (see `figures/main_cycle.tex` of the sample). `sty/tikz-uml.sty` is shipped as in `sw-unit-test-spec`. specfig figures: see below.
+
+
+### specfig figures
+
+[`spec-figures`](../spec-figures/) draws 18 figure types (UML, block and flow diagrams, Gantt chart, timeline, organisation chart, RACI, risk matrix, timing diagram, bar and line charts) from plain data commands, with problems in red. `swcs.cls` loads it. Its packages (`sty/specfig*.sty`), chat rules (`.continue/rules/sf-*.md`) and `scripts/new_figure.py` + `scripts/sf_figures.py` come from there: don't edit them here, refresh them with spec-figures' `scripts/vendor.py`. A figure is a file `figures/<type>_<name>.tex` in the component's folder, started from the type's worked example:
+
+```sh
+python3 scripts/new_figure.py --list                      # the types
+python3 scripts/new_figure.py brake_mon sequence cycle   # -> components/brake_mon/figures/sequence_cycle.tex
+```
+
+Include it in a free-text block with `\InputFigure{sequence_cycle}` in a `figure` environment; the sample does this in `design.tex` (`figures/state_modes.tex`). Command reference: the spec-figures guides and its sample document.
 
 ## Free text, figures, code and data
 
@@ -189,4 +203,4 @@ In `sw_component_spec.tex` you can reorder or drop the chapter commands (`\SpecT
 
 ## Test
 
-"Test" = it builds without errors or warnings: `latexmk -pdf sw_component_spec.tex` (the sample, also the committed preview) and `python3 scripts/build.py --strict --force sample empty`. A component created by `scripts/new_component.py` builds the same way. After changing `llm/`, `components/empty/` or `components/sample/`: `python3 scripts/continue_rules.py` (`--check` in CI). `components/sample/llm-context.md` is committed like the preview PDF: `python3 scripts/llm_context.py sample --check` must pass.
+"Test" = it builds without errors or warnings: `latexmk -pdf sw_component_spec.tex` (the sample, also the committed preview) and `python3 scripts/build.py --strict --force sample empty`. A component created by `scripts/new_component.py` builds the same way. After changing `llm/`, `components/empty/` or `components/sample/`: `python3 scripts/continue_rules.py` (`--check` in CI). `components/sample/llm-context.md` is committed like the preview PDF: `python3 scripts/llm_context.py sample --check` must pass. In the sw-dev-pub checkout, `python3 ../spec-figures/scripts/vendor.py . --check` must pass too (specfig copies up to date).
