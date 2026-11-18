@@ -1150,7 +1150,7 @@ From \texttt{.gitlab-ci.yml} of the repository, copied to the manual's \texttt{c
 \end{sfGantt}
 ```
 
-Other files available to `\InputFigure`, `\includegraphics` and `\InputCode` (content not shown): `manuals/sample/code/gitlab-ci.yml`
+Other files available to `\InputFigure`, `\includegraphics` and `\InputCode` (content not shown): `manuals/sample/data/planmock_milestones.csv`, `manuals/sample/data/riskmock_risks.json`, `manuals/sample/code/gitlab-ci.yml`
 
 # Start
 

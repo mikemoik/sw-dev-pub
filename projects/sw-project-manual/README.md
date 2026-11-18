@@ -30,6 +30,7 @@ figures/  data/  code/    shared by all manuals (a manual's own file of the same
 manuals/
   empty/                  skeleton for new manuals: commented command templates, no content
   sample/                 worked example (the project developing heater_ctrl)
+    data/                 sample exports of a mockup planning tool (milestones, CSV) and risk tool (JSON), not in template format
   <manual>/               one folder per project:
     metadata.tex …        content files (table below)
     figures/ data/ code/  the manual's own figures, data and source files

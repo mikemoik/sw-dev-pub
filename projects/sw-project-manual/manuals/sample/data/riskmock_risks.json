@@ -1,0 +1,107 @@
+{
+  "export": {
+    "tool": "RiskMock",
+    "version": "2.4.1",
+    "note": "Artificial mockup app: sample export for the sw-project-manual template",
+    "project": "HC",
+    "exported_at": "2026-11-16T08:30:00Z",
+    "scales": {
+      "likelihood": "1 rare, 2 unlikely, 3 possible, 4 likely, 5 almost certain",
+      "impact": "1 negligible, 2 minor, 3 moderate, 4 major, 5 severe"
+    }
+  },
+  "risks": [
+    {
+      "key": "HC-R-1",
+      "summary": "Basic software release of the platform team comes late",
+      "category": "Schedule",
+      "state": "Open",
+      "likelihood": 3,
+      "impact": 4,
+      "score": 12,
+      "owner": {"name": "Jane Doe", "email": "jane.doe@example.com"},
+      "actions": [
+        {"text": "Stubs of the BSW interfaces in the component test", "status": "In progress", "due": "2026-12-04"},
+        {"text": "Monthly alignment with the platform team", "status": "Recurring", "due": null}
+      ],
+      "created": "2026-11-02",
+      "updated": "2026-11-13"
+    },
+    {
+      "key": "HC-R-2",
+      "summary": "Requirements change after M1",
+      "category": "Scope",
+      "state": "Open",
+      "likelihood": 4,
+      "impact": 3,
+      "score": 12,
+      "owner": {"name": "Jane Doe", "email": "jane.doe@example.com"},
+      "actions": [
+        {"text": "Change board, impact analysis for every CR", "status": "Done", "due": "2026-11-09"},
+        {"text": "Buffer of one sprint before M3", "status": "Planned", "due": "2027-04-23"}
+      ],
+      "created": "2026-11-02",
+      "updated": "2026-11-09"
+    },
+    {
+      "key": "HC-R-3",
+      "summary": "Timing budget of 200 us not met on the target",
+      "category": "Technical",
+      "state": "Open",
+      "likelihood": 2,
+      "impact": 5,
+      "score": 10,
+      "owner": {"name": "John Roe", "email": "john.roe@example.com"},
+      "actions": [
+        {"text": "Early timing measurement with v0.9 on the target", "status": "Planned", "due": "2027-03-26"}
+      ],
+      "created": "2026-11-05",
+      "updated": "2026-11-05"
+    },
+    {
+      "key": "HC-R-4",
+      "summary": "Only one tester in the project",
+      "category": "Resources",
+      "state": "Open",
+      "likelihood": 3,
+      "impact": 3,
+      "score": 9,
+      "owner": {"name": "Jane Doe", "email": "jane.doe@example.com"},
+      "actions": [
+        {"text": "Developers write the component test cases, the tester reviews", "status": "In progress", "due": null}
+      ],
+      "created": "2026-11-02",
+      "updated": "2026-11-10"
+    },
+    {
+      "key": "HC-R-5",
+      "summary": "Static analysis tool licence expires during the project",
+      "category": "Tools",
+      "state": "Open",
+      "likelihood": 1,
+      "impact": 2,
+      "score": 2,
+      "owner": {"name": "Lee Noe", "email": "lee.noe@example.com"},
+      "actions": [
+        {"text": "Licence renewal ordered with the project budget", "status": "Done", "due": "2026-11-12"}
+      ],
+      "created": "2026-11-06",
+      "updated": "2026-11-12"
+    },
+    {
+      "key": "HC-R-6",
+      "summary": "Second heater variant needs its own calibration set",
+      "category": "Scope",
+      "state": "Closed",
+      "likelihood": 2,
+      "impact": 3,
+      "score": 6,
+      "owner": {"name": "John Roe", "email": "john.roe@example.com"},
+      "actions": [
+        {"text": "Customer confirmed one calibration set for both variants", "status": "Done", "due": "2026-11-11"}
+      ],
+      "created": "2026-11-03",
+      "updated": "2026-11-11"
+    }
+  ]
+}
