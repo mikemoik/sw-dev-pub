@@ -11,7 +11,7 @@ Sister of [`sw-unit-test-spec`](../sw-unit-test-spec/) and [`sw-component-spec`]
 ```
 sw_project_manual.tex     main file: chapter order, default manual
 swpm.cls                  the template: all formatting and input commands
-latexmkrc                 latexmk settings: -c also removes the free-text helper files, sty/ on TEXINPUTS
+latexmkrc                 latexmk settings: -c also removes the free-text helper files, sty/ on TEXINPUTS, llm-context.md after each build
 sty/                      packages found without install: specfig*.sty (optional, see Diagrams)
 sw_project_manual.pdf     the sample manual, built: a preview of what the template produces
 scripts/new_manual.py     creates manuals/<manual>/ from manuals/empty/
@@ -19,6 +19,7 @@ scripts/build.py          builds manuals into build/<manual>.pdf
 scripts/clean.py          removes build output (build/ and root LaTeX files)
 scripts/gitlab_opl.py     writes a manual's opl.tex from a GitLab issue CSV export
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a manual's file
+scripts/llm_context.py    writes manuals/<manual>/llm-context.md: whole manual + guides as one chat context (run after every build)
 llm/                      the guides it uses: general rules + one per content file
 scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)
 .continue/rules/          generated: the guides as Continue rules, one per content file
@@ -177,4 +178,4 @@ In `sw_project_manual.tex` you can reorder or drop the chapter commands (`\SpecT
 
 ## Test
 
-"Test" = it builds without errors or warnings: `latexmk -pdf sw_project_manual.tex` (the sample, also the committed preview) and `python3 scripts/build.py --strict --force sample empty`. A manual created by `scripts/new_manual.py` builds the same way. After changing `llm/`, `manuals/empty/` or `manuals/sample/`: `python3 scripts/continue_rules.py` (`--check` in CI).
+"Test" = it builds without errors or warnings: `latexmk -pdf sw_project_manual.tex` (the sample, also the committed preview) and `python3 scripts/build.py --strict --force sample empty`. A manual created by `scripts/new_manual.py` builds the same way. After changing `llm/`, `manuals/empty/` or `manuals/sample/`: `python3 scripts/continue_rules.py` (`--check` in CI). `manuals/sample/llm-context.md` is committed like the preview PDF: `python3 scripts/llm_context.py sample --check` must pass.

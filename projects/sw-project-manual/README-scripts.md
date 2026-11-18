@@ -69,6 +69,13 @@ python3 scripts/llm_prompt.py brake_mon opl --add opl_export.csv -o build/prompt
 
 The prompt is about 2.5K–4.5K tokens plus `--add` files. Above 32000 it warns (`--max-tokens`). `--no-example` leaves out the worked example from `manuals/sample/`.
 
+**Whole manual in one file:** every build (`build.py`, `latexmk`, also each `-pvc` rebuild) rewrites `manuals/<manual>/llm-context.md` through `latexmkrc`. It holds the rules, all guides and command references, the figure guides of the specfig types the manual uses, an index of the declared IDs and all content and figure files of the manual. In Continue, reference only that file (`@llm-context.md`) for requests that touch several chapters or a figure; the per-file rules stay for small edits. The file is the state of the last build: after applying an answer, save (so `-pvc` rebuilds) and start a new chat or reference the file again. About 15K tokens for the sample.
+
+```sh
+python3 scripts/llm_context.py brake_mon            # write it without building
+python3 scripts/llm_context.py brake_mon --check    # exit 1 if out of date
+```
+
 **Maintainers:** `llm/_common.md` (role, chat protocol, LaTeX rules, shared helpers) and `llm/<file>.md` (one guide per content file) are the source. `.continue/rules/` is generated from them plus `manuals/empty/` and `manuals/sample/`, and committed. After changing any of these:
 
 ```sh
