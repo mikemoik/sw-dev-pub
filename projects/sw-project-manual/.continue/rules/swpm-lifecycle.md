@@ -92,4 +92,18 @@ You also need `workproducts.tex` from the same manual folder as the `lifecycle.t
 \Release{v0.9}{2027-03-19}{Control path, no NvM}{}
 \Release{v1.0}{2027-05-07}{Feature complete}{M3}
 \Release{v2.0}{2027-09-24}{All CRs of the SOP scope, all tests passed}{M4}
+
+% Free text at the end of the chapter: the plan as a specfig Gantt chart
+% (figures/gantt_plan.tex, created with scripts/new_figure.py sample gantt plan).
+\begin{FreeText}
+\subsection{Project Plan}
+The work packages run between the milestones above (Figure~\ref{fig:plan}).
+
+\begin{figure}[htbp]
+  \centering
+  \InputFigure{gantt_plan}
+  \caption{Plan of the heater_ctrl project up to SOP.}
+  \label{fig:plan}
+\end{figure}
+\end{FreeText}
 ```

@@ -12,12 +12,14 @@ Sister of [`sw-unit-test-spec`](../sw-unit-test-spec/) and [`sw-component-spec`]
 sw_project_manual.tex     main file: chapter order, default manual
 swpm.cls                  the template: all formatting and input commands
 latexmkrc                 latexmk settings: -c also removes the free-text helper files, sty/ on TEXINPUTS, llm-context.md after each build
-sty/                      packages found without install: specfig*.sty (optional, see Diagrams)
+sty/                      packages found without install: specfig*.sty (see Diagrams)
 sw_project_manual.pdf     the sample manual, built: a preview of what the template produces
 scripts/new_manual.py     creates manuals/<manual>/ from manuals/empty/
 scripts/build.py          builds manuals into build/<manual>.pdf
 scripts/clean.py          removes build output (build/ and root LaTeX files)
 scripts/gitlab_opl.py     writes a manual's opl.tex from a GitLab issue CSV export
+scripts/new_figure.py     creates a specfig figure file from the example of its type (from spec-figures)
+scripts/sf_figures.py     figure types and chat guides for the scripts (from spec-figures)
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a manual's file
 scripts/llm_context.py    writes manuals/<manual>/llm-context.md: whole manual + guides as one chat context (run after every build)
 llm/                      the guides it uses: general rules + one per content file
@@ -106,9 +108,16 @@ Generated with TikZ from the data you already enter. Each diagram only appears w
 
 Tables generated beyond the plain lists: work products per process (3.2), the RACI matrix (4.3).
 
-### specfig (optional)
+### specfig figures
 
-[`spec-figures`](../spec-figures/) draws sequence, state, activity, class, component and block diagrams, Gantt charts, timelines, risk matrices, timing diagrams and charts from plain data commands, with problems in red. Its packages are shipped in `sty/specfig*.sty`, and its chat rules in `.continue/rules/sf-*.md`; refresh both from there with `scripts/vendor.py`. Add `\usepackage{specfig}` after `\documentclass{swpm}` in `sw_project_manual.tex`, then write a figure as `figures/<type>_<name>.tex` (e.g. `figures/sequence_cycle.tex`) and include it with `\InputFigure{sequence_cycle}`. Command reference: the spec-figures guides and catalogue.
+[`spec-figures`](../spec-figures/) draws 18 figure types (UML, block and flow diagrams, Gantt chart, timeline, organisation chart, RACI, risk matrix, timing diagram, bar and line charts) from plain data commands, with problems in red. `swpm.cls` loads it. Its packages (`sty/specfig*.sty`), chat rules (`.continue/rules/sf-*.md`) and `scripts/new_figure.py` + `scripts/sf_figures.py` come from there: don't edit them here, refresh them with spec-figures' `scripts/vendor.py`. A figure is a file `figures/<type>_<name>.tex` in the manual's folder, started from the type's worked example:
+
+```sh
+python3 scripts/new_figure.py --list                      # the types
+python3 scripts/new_figure.py brake_mon sequence cycle   # -> manuals/brake_mon/figures/sequence_cycle.tex
+```
+
+Include it in a free-text block with `\InputFigure{sequence_cycle}` in a `figure` environment; the sample does this in `lifecycle.tex` (`figures/gantt_plan.tex`). Command reference: the spec-figures guides and its sample document.
 
 ## Free text, figures, code and data
 
@@ -178,4 +187,4 @@ In `sw_project_manual.tex` you can reorder or drop the chapter commands (`\SpecT
 
 ## Test
 
-"Test" = it builds without errors or warnings: `latexmk -pdf sw_project_manual.tex` (the sample, also the committed preview) and `python3 scripts/build.py --strict --force sample empty`. A manual created by `scripts/new_manual.py` builds the same way. After changing `llm/`, `manuals/empty/` or `manuals/sample/`: `python3 scripts/continue_rules.py` (`--check` in CI). `manuals/sample/llm-context.md` is committed like the preview PDF: `python3 scripts/llm_context.py sample --check` must pass.
+"Test" = it builds without errors or warnings: `latexmk -pdf sw_project_manual.tex` (the sample, also the committed preview) and `python3 scripts/build.py --strict --force sample empty`. A manual created by `scripts/new_manual.py` builds the same way. After changing `llm/`, `manuals/empty/` or `manuals/sample/`: `python3 scripts/continue_rules.py` (`--check` in CI). `manuals/sample/llm-context.md` is committed like the preview PDF: `python3 scripts/llm_context.py sample --check` must pass. In the sw-dev-pub checkout, `python3 ../spec-figures/scripts/vendor.py . --check` must pass too (specfig copies up to date).

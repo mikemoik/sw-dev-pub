@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # ---- template-specific part (the rest is the same in all three templates) ----
+from sf_figures import menu, types
 from llm_prompt import CHARS_PER_TOKEN, LLM, MANUALS as DOCS, NAME_RE, RELATED, ROOT, fenced
 
 KIND = "manual"  # what one folder under DOCS is
@@ -184,7 +185,7 @@ def other_files(doc_dir: Path, shown: set) -> list:
     return names
 
 
-def build_context(name: str) -> str:
+def build_context(name: str, extra_types: tuple = ()) -> str:
     doc_dir = DOCS / name
     rel_dir = f"{DOCS.name}/{name}"
     content = {}
@@ -197,6 +198,7 @@ def build_context(name: str) -> str:
     sf_types = sorted(
         {SF_RULES[e] for t in list(content.values()) + list(figures.values())
          for e in SF_RE.findall(strip_comments(t)) if e in SF_RULES}
+        | set(extra_types)
     )
 
     parts = [
@@ -204,6 +206,7 @@ def build_context(name: str) -> str:
         "rewritten on every build, don't edit. -->\n",
         PREFACE.format(kind=KIND, name=name, example=CROSS_FILE_EXAMPLE),
         (LLM / "_common.md").read_text(encoding="utf-8").rstrip() + "\n",
+        menu(),
         "# Guides and command reference per content file\n",
     ]
     for file in CHAPTERS:
@@ -215,7 +218,7 @@ def build_context(name: str) -> str:
             )
         )
     if sf_types:
-        parts.append(f"# Figure guides (specfig types used in this {KIND})\n")
+        parts.append(f"# Figure guides (specfig types used in this {KIND} or requested)\n")
         for rule in ["00-common"] + sf_types:
             path = RULES / f"sf-{rule}.md"
             if path.is_file():
@@ -255,6 +258,11 @@ def main(argv=None) -> int:
     )
     parser.add_argument("-o", "--output", type=Path, help=f"default: {DOCS.name}/<{KIND}>/{OUT_NAME}")
     parser.add_argument("--check", action="store_true", help="exit 1 if the file is out of date")
+    parser.add_argument(
+        "--figure", action="append", default=[], choices=types(), metavar="TYPE",
+        help="also add the guide of this specfig figure type (repeatable); "
+        "the next build drops it again unless a figure of the type exists",
+    )
     parser.add_argument("-q", "--quiet", action="store_true", help="print only warnings")
     parser.add_argument(
         "--max-tokens", type=int, default=32000,
@@ -271,7 +279,7 @@ def main(argv=None) -> int:
         print(f"error: no {KIND} {name!r} under {DOCS}", file=sys.stderr)
         return 2
 
-    text = build_context(name)
+    text = build_context(name, tuple(args.figure))
     out = args.output or DOCS / name / OUT_NAME
     old = out.read_text(encoding="utf-8") if out.is_file() else None
     try:

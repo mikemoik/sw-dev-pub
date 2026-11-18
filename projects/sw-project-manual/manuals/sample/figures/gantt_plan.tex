@@ -1,0 +1,18 @@
+% Gantt chart (specfig): plan of the heater_ctrl project up to SOP
+\begin{sfGantt}
+  \Group{Specification}
+  \Task{req}{Software requirements}{2026-11-02}{2026-12-18}
+  \Milestone{m1}{M1 Requirements baseline}{2026-12-18}
+  \Task{arch}{Component specification}{2026-12-21}{2027-02-12}
+  \Milestone{m2}{M2 Architecture released}{2027-02-12}
+  \Group{Implementation}
+  \Task{impl}{Units and unit tests}{2027-02-15}{2027-05-07}
+  \Milestone{m3}{M3 C-sample software}{2027-05-07}
+  \Group{Verification}
+  \Task{comp}{Component and qualification test}{2027-05-10}{2027-09-17}
+  \Milestone{m4}{M4 SOP release}{2027-09-24}
+  \Depends{req}{arch}
+  \Depends{arch}{impl}
+  \Depends{impl}{comp}
+  \Depends{comp}{m4}
+\end{sfGantt}
