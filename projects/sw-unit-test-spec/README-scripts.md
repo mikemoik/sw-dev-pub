@@ -57,6 +57,13 @@ python3 scripts/llm_prompt.py nvm_mgr unit --add ../src/nvm_mgr.h -o build/promp
 
 The prompt is about 2K–5K tokens plus `--add` files. Above 32000 it warns (`--max-tokens`). `--no-example` leaves out the worked example from `units/sample/`.
 
+**Whole unit in one file:** every build (`build.py`, `latexmk`, also each `-pvc` rebuild) rewrites `units/<unit>/llm-context.md` through `latexmkrc`. It holds the rules, all guides and command references, the figure guides of the specfig types the unit uses, an index of the declared IDs and all content and figure files of the unit. In Continue, reference only that file (`@llm-context.md`) for requests that touch several files or a figure; the per-file rules stay for small edits. The file is the state of the last build: after applying an answer, save (so `-pvc` rebuilds) and start a new chat or reference the file again. About 15K tokens for the sample.
+
+```sh
+python3 scripts/llm_context.py nvm_mgr            # write it without building
+python3 scripts/llm_context.py nvm_mgr --check    # exit 1 if out of date
+```
+
 **Maintainers:** `llm/_common.md` (role, chat protocol, LaTeX rules, shared helpers) and `llm/<file>.md` (one guide per content file) are the source. `.continue/rules/` is generated from them plus `units/empty/` and `units/sample/`, and committed. After changing any of these:
 
 ```sh

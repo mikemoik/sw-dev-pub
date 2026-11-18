@@ -11,13 +11,14 @@ LaTeX template for a **Software Unit Test Specification**. Structure follows ISO
 ```
 sw_unit_test_spec.tex     main file: chapter order, default unit
 suts.cls                  the template: all formatting and input commands
-latexmkrc                 latexmk settings: sty/ on TeX's search path, -c also removes the free-text helper files
+latexmkrc                 latexmk settings: sty/ on TeX's search path, -c also removes the free-text helper files, llm-context.md after each build
 sty/                      packages TeX Live does not have, found without install: tikz-uml.sty, specfig*.sty
 sw_unit_test_spec.pdf     the sample unit, built: a preview of what the template produces
 scripts/new_unit.py       creates units/<unit>/ from units/empty/
 scripts/build.py          builds units into build/<unit>.pdf (build/ is gitignored)
 scripts/clean.py          removes build output (build/ and root LaTeX files) for a clean build
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a unit's file
+scripts/llm_context.py    writes units/<unit>/llm-context.md: whole unit + guides as one chat context (run after every build)
 llm/                      the guides it uses: general rules + one per content file
 scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)
 .continue/rules/          generated: the guides as Continue rules, one per content file
@@ -355,4 +356,4 @@ In `sw_unit_test_spec.tex` you can reorder or drop the chapter commands (`\SpecT
 
 ## Test
 
-"Test" = it builds without errors or warnings: `latexmk -pdf sw_unit_test_spec.tex` (the sample unit, also the committed preview) and `python3 scripts/build.py --strict --force sample empty` (`units/empty`: everything as placeholders); a unit created by `scripts/new_unit.py` builds the same way.
+"Test" = it builds without errors or warnings: `latexmk -pdf sw_unit_test_spec.tex` (the sample unit, also the committed preview) and `python3 scripts/build.py --strict --force sample empty` (`units/empty`: everything as placeholders); a unit created by `scripts/new_unit.py` builds the same way. `units/sample/llm-context.md` is committed like the preview PDF: `python3 scripts/llm_context.py sample --check` must pass.
