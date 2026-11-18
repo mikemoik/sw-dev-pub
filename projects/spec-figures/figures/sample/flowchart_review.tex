@@ -1,0 +1,15 @@
+% Flowchart: review loop with a side branch, own grid distances
+\begin{sfFlowchart}[xstep=4.6cm, ystep=1.9cm]
+  \Terminal{s}{Work product ready}
+  \Process{rev}{Review}
+  \Decision{ok}{Findings?}
+  \Store{arch}{Archive record}
+  \Terminal{e}{Released}
+  \Process[1,2]{fix}{Rework}
+  \Flow{s}{rev}{}
+  \Flow{rev}{ok}{}
+  \Flow{ok}{arch}{none}
+  \Flow{ok}{fix}{some}
+  \Flow[vh]{fix}{rev}{}
+  \Flow{arch}{e}{}
+\end{sfFlowchart}

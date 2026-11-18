@@ -1,5 +1,11 @@
-% spec-figures catalogue: every figure type with its TikZ source and Mermaid twin.
-% Build: latexmk -pdf spec_figures.tex  (latexmkrc puts sty/ on TEXINPUTS)
+% spec-figures: a figure document. One folder per document: figures/<name>/
+% (document.tex + its figure files). figures/sample/ = every figure type and
+% feature with documentation (built: spec_figures.pdf), figures/empty/ = skeleton.
+%
+% Build:  latexmk -pdf spec_figures.tex                 (the document in \LoadFigures)
+%         python3 scripts/build.py <name>              (-> build/<name>.pdf)
+%  or     latexmk -pdf -jobname=<name> -usepretex='\def\SpecFigures{<name>}' spec_figures.tex
+% latexmkrc puts sty/ (specfig) on TEXINPUTS.
 \documentclass[11pt,a4paper]{article}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
@@ -7,56 +13,77 @@
 \usepackage{microtype}
 \usepackage{fancyvrb}
 \usepackage[export]{adjustbox}
+\usepackage{booktabs}
+\usepackage{needspace}
 \usepackage{specfig}
 \usepackage[hidelinks]{hyperref}
 \usepackage[strings,nohyphen]{underscore} % last, as in the templates
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.5em}
-% \Figure{type}{title}: the figure, its TikZ source and its Mermaid / Markdown twin
-\newcommand{\Figure}[2]{%
-  \clearpage
-  \section{#2}
+\setlength{\emergencystretch}{3em}
+\fvset{fontsize=\footnotesize}
+
+% ------------------------------------------------------- document commands ---
+% \FigDir: folder of the document being built (figures/<name>/).
+% \InputFigure[max width]{name}: figure file \FigDir<name>.tex (an sf<Type>
+%   environment), shrunk to max width (default \linewidth), never enlarged;
+%   or an image <name>.pdf/.png/.jpg there. Same command as in the templates,
+%   so a figure file moves between them unchanged.
+% \ShowFigure[max width]{name}: the figure centred, then its source.
+% \ShowSource{file}: a file (path from the project root) as framed listing.
+% \ShowMermaid{name}: mermaid/<name>.mmd (or .md), if it exists.
+% \Title{title}{subtitle}: heading block of the document.
+% \cs{name}: a command name in typewriter (\name), for text about commands.
+\makeatletter
+\newcommand*{\cs}[1]{\texttt{\char`\\#1}}
+\newcommand*{\FigDir}{}
+\newcommand{\sf@missing}[1]{%
+  \PackageWarning{spec_figures}{missing figure file #1}%
+  {\color{sfwarn}\bfseries missing figure: \texttt{#1}}}
+\newcommand{\InputFigure}[2][\linewidth]{%
+  \edef\sf@name{\detokenize{#2}}%
+  \IfFileExists{\FigDir\sf@name.tex}%
+    {\begin{adjustbox}{max width=#1}\input{\FigDir\sf@name.tex}\end{adjustbox}}%
+    {\IfFileExists{\FigDir\sf@name.pdf}{\includegraphics[max width=#1]{\FigDir\sf@name.pdf}}%
+      {\IfFileExists{\FigDir\sf@name.png}{\includegraphics[max width=#1]{\FigDir\sf@name.png}}%
+        {\IfFileExists{\FigDir\sf@name.jpg}{\includegraphics[max width=#1]{\FigDir\sf@name.jpg}}%
+          {\sf@missing{\FigDir\sf@name.tex}}}}}}
+\newcommand{\ShowSource}[1]{%
+  \edef\sf@file{\detokenize{#1}}%
+  \IfFileExists{\sf@file}%
+    {\VerbatimInput[frame=single,label={\sf@file}]{\sf@file}}%
+    {\sf@missing{\sf@file}}}
+\newcommand{\ShowFigure}[2][\linewidth]{%
+  \par\needspace{6\baselineskip}%
+  \begin{center}\InputFigure[#1]{#2}\end{center}
+  \edef\sf@file{\FigDir\detokenize{#2}.tex}%
+  \expandafter\ShowSource\expandafter{\sf@file}}
+\newcommand{\ShowMermaid}[1]{%
+  \edef\sf@name{\detokenize{#1}}%
+  \IfFileExists{mermaid/\sf@name.mmd}{\edef\sf@file{mermaid/\sf@name.mmd}}%
+    {\IfFileExists{mermaid/\sf@name.md}{\edef\sf@file{mermaid/\sf@name.md}}{\let\sf@file\relax}}%
+  \ifx\sf@file\relax\else\expandafter\ShowSource\expandafter{\sf@file}\fi}
+\newcommand{\Title}[2]{%
   \begin{center}
-    \begin{adjustbox}{max width=\linewidth}\input{tikz/#1}\end{adjustbox}
-  \end{center}
-  \subsection*{TikZ: \texttt{tikz/#1.tex}}
-  \VerbatimInput[fontsize=\footnotesize]{tikz/#1.tex}
-  \IfFileExists{mermaid/#1.mmd}{%
-    \subsection*{Mermaid twin: \texttt{mermaid/#1.mmd}}
-    \VerbatimInput[fontsize=\footnotesize]{mermaid/#1.mmd}}{}%
-  \IfFileExists{mermaid/#1.md}{%
-    \subsection*{Markdown twin: \texttt{mermaid/#1.md}}
-    \VerbatimInput[fontsize=\footnotesize]{mermaid/#1.md}}{}%
-}
+    {\LARGE\bfseries #1\par}
+    \if\relax\detokenize{#2}\relax\else\vspace{0.3em}{\large #2\par}\fi
+  \end{center}}
+% \LoadFigures{name}: loads figures/<name>/document.tex. Build-time override:
+%   \SpecFigures defined before \documentclass (-usepretex, as build.py does).
+\newcommand{\LoadFigures}[1]{%
+  \ifdefined\SpecFigures
+    \edef\sf@doc{\expandafter\detokenize\expandafter{\SpecFigures}}%
+  \else
+    \edef\sf@doc{\detokenize{#1}}%
+  \fi
+  \edef\FigDir{figures/\sf@doc/}%
+  \typeout{spec_figures: document folder `\FigDir'}%
+  \IfFileExists{\FigDir document.tex}{\input{\FigDir document.tex}}%
+    {\PackageError{spec_figures}{no \FigDir document.tex}%
+      {Create it with: python3 scripts/new_figures.py \sf@doc}}}
+\makeatother
 
 \begin{document}
-\begin{center}
-  {\LARGE\bfseries spec-figures\par}
-  \vspace{0.3em}
-  {\large Catalogue of figures for specifications and project manuals\par}
-\end{center}
-
-Every figure is an environment of the \texttt{specfig} package with plain data commands; the layout, the drawing and the consistency checks are generated. Each type also has an independent Mermaid template for Markdown pages. The command reference is in \texttt{README.md} and in the guides in \texttt{llm/}.
-
-\tableofcontents
-
-\Figure{sequence}{Sequence diagram}
-\Figure{state}{State machine}
-\Figure{activity}{Activity diagram}
-\Figure{usecase}{Use case diagram}
-\Figure{class}{Class diagram}
-\Figure{component}{Component diagram}
-\Figure{deployment}{Deployment diagram}
-\Figure{package}{Package diagram}
-\Figure{block}{Block / context diagram}
-\Figure{flowchart}{Flowchart}
-\Figure{gantt}{Gantt chart}
-\Figure{timeline}{Milestone timeline}
-\Figure{orgchart}{Organisation chart}
-\Figure{raci}{RACI matrix}
-\Figure{risk}{Risk matrix}
-\Figure{timing}{Timing diagram}
-\Figure{barchart}{Bar chart}
-\Figure{linechart}{Line chart}
+\LoadFigures{sample}   % default: figures/sample/ (overridden by \SpecFigures)
 \end{document}

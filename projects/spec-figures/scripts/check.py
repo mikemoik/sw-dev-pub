@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Test spec-figures: build the catalogue, check the problem marks, the rules and Mermaid.
+"""Test spec-figures: build sample and empty, check features, problem marks, rules, Mermaid.
 
     python3 scripts/check.py            # all checks
     python3 scripts/check.py --no-pdf   # keep the committed spec_figures.pdf untouched
 
-1. spec_figures.tex (every example) builds with 0 warnings and 0 overfull boxes;
-   the PDF is the committed preview (built in build/, copied unless --no-pdf).
-2. tests/problems.tex (deliberate mistakes) gives exactly the specfig warnings
+1. The figure documents figures/sample/ (every type and feature) and
+   figures/empty/ (skeleton) build with 0 warnings and 0 overfull boxes, as
+   scripts/build.py builds them; sample's PDF is the committed preview
+   spec_figures.pdf (copied unless --no-pdf).
+2. The sample uses every command and option named in the TikZ part of the
+   guides llm/<type>.md (in figures/sample/<type>*.tex) and every connection
+   option of llm/_common.md.
+3. tests/problems.tex (deliberate mistakes) gives exactly the specfig warnings
    listed in tests/problems.expected.
-3. .continue/rules/ is up to date with llm/, tikz/ and mermaid/.
-4. If mermaid-cli (mmdc) is on PATH: every mermaid/*.mmd renders; else skipped.
+4. .continue/rules/ is up to date with llm/, figures/sample/ and mermaid/.
+5. If mermaid-cli (mmdc) is on PATH: every mermaid/*.mmd renders; else skipped.
 
 Needs latexmk and pdflatex; Python 3.6+ standard library only. Exit 1 on failure.
 """
@@ -23,8 +28,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build import latexmk_cmd
 from continue_rules import RULES, sync
-from llm_prompt import ROOT
+from llm_prompt import LLM, ROOT, TIKZ, TYPES
 
 BUILD = ROOT / "build"
 ENV = dict(os.environ, max_print_line="10000")  # one log line per message
@@ -70,16 +76,83 @@ def warnings(log: str) -> list:
     return out
 
 
-def check_catalogue(copy_pdf: bool) -> bool:
-    log = latexmk(ROOT / "spec_figures.tex", BUILD)
+def check_document(name: str, copy_pdf: bool) -> bool:
+    """Build figures/<name>/ as build.py does (forced); 0 warnings, 0 overfull boxes."""
+    subprocess.run(
+        latexmk_cmd(name, force=True),
+        check=False,
+        cwd=ROOT,
+        env=ENV,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    log_file = BUILD / ".aux" / name / f"{name}.log"
+    log = (
+        log_file.read_text(encoding="utf-8", errors="replace")
+        if log_file.is_file()
+        else ""
+    )
     found = warnings(log)
-    ok = bool(log) and not found and (BUILD / "spec_figures.pdf").is_file()
-    print(f"catalogue: {'ok' if ok else 'FAILED'} ({len(found)} warnings/errors)")
+    pdf = BUILD / f"{name}.pdf"
+    ok = bool(log) and not found and pdf.is_file()
+    print(f"document {name}: {'ok' if ok else 'FAILED'} ({len(found)} warnings/errors)")
     for w in found:
         print(f"  {w}")
     if ok and copy_pdf:
-        shutil.copyfile(BUILD / "spec_figures.pdf", ROOT / "spec_figures.pdf")
+        shutil.copyfile(pdf, ROOT / "spec_figures.pdf")
     return ok
+
+
+# backticked commands in the guides that are not figure commands
+IGNORED = {"begin", "end", "Cmd", "InputFigure"}
+
+
+def guide_features(text: str) -> tuple:
+    """Commands and options named in backticks in the TikZ part of a guide."""
+    tikz = text.split("## TikZ", 1)[-1].split("\n## ", 1)[0]
+    commands, options = set(), set()
+    for code in re.findall(r"`([^`]+)`", tikz):
+        commands.update(
+            c for c in re.findall(r"\\([A-Za-z]+)", code) if c not in IGNORED
+        )
+    for line in tikz.splitlines():
+        if line.startswith("- **Options:**"):
+            for code in re.findall(r"`([^`]+)`", line):
+                m = re.fullmatch(r"([a-z]+)(=.*)?", code)
+                if m:
+                    options.add(m.group(1))
+    return commands, options
+
+
+def check_features() -> bool:
+    """Every command and option of the guides appears in the sample's figures."""
+    missing = []
+    every = "".join(p.read_text(encoding="utf-8") for p in sorted(TIKZ.glob("*.tex")))
+    for kind in TYPES:
+        text = "".join(
+            p.read_text(encoding="utf-8")
+            for p in sorted(TIKZ.glob(f"{kind}*.tex"))
+            if p.stem == kind or p.stem.startswith(kind + "_")
+        )
+        if not text:
+            missing.append(f"{kind}: no figures/sample/{kind}.tex")
+            continue
+        commands, options = guide_features(
+            (LLM / f"{kind}.md").read_text(encoding="utf-8")
+        )
+        missing += [f"{kind}: \\{c}" for c in sorted(commands) if f"\\{c}" not in text]
+        missing += [
+            f"{kind}: option {o}" for o in sorted(options) if f"{o}=" not in text
+        ]
+    for opt in ("[hv]", "[vh]", "[left", "[right", "m1=", "m2=", "pos="):
+        if opt not in every:
+            missing.append(f"connection option {opt}")
+    print(
+        f"sample features: {'ok' if not missing else 'FAILED'} ({len(missing)} missing)"
+    )
+    for m in missing:
+        print(f"  missing in figures/sample/: {m}")
+    return not missing
 
 
 def check_problems() -> bool:
@@ -145,12 +218,14 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
     results = [
-        check_catalogue(not args.no_pdf),
+        check_document("sample", not args.no_pdf),
+        check_document("empty", False),
+        check_features(),
         check_problems(),
         sync(RULES, check=True) == 0,
         check_mermaid(),
     ]
-    if not results[2]:
+    if not results[4]:
         print("rules: FAILED (run python3 scripts/continue_rules.py)")
     return 0 if all(results) else 1
 

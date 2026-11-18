@@ -1,0 +1,11 @@
+% Gantt chart: a short span (week columns), own axis width and row height
+\begin{sfGantt}[width=12cm, step=0.6cm, today=2027-03-10]
+  \Group{Sprint 7}
+  \Task[100]{s1}{Refactor PI controller}{2027-03-01}{2027-03-05}
+  \Task[50]{s2}{Unit tests pi_controller}{2027-03-04}{2027-03-12}
+  \Task{s3}{Review}{2027-03-15}{2027-03-16}
+  \Milestone{done}{Sprint review}{2027-03-19}
+  \Depends{s1}{s2}
+  \Depends{s2}{s3}
+  \Depends{s3}{done}
+\end{sfGantt}

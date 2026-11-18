@@ -1,0 +1,14 @@
+% State machine: start-up with a choice pseudo state
+\begin{sfStateMachine}[xstep=3.2cm, ystep=1.8cm]
+  \Initial[0,0]{i}
+  \State[1,0]{check}{Check}{}
+    \Activity{do / self test}
+  \Choice[2,0]{c}
+  \State[3,0]{ready}{Ready}{}
+  \State[2,1]{fault}{Fault}{}
+  \Transition{i}{check}{}
+  \Transition{check}{c}{done}
+  \Transition{c}{ready}{[ok]}
+  \Transition{c}{fault}{[not ok]}
+  \Transition[right]{fault}{check}{retry}
+\end{sfStateMachine}

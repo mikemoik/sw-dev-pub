@@ -1,0 +1,9 @@
+% Timing diagram: high impedance, several markers, own width and row distance
+\begin{sfTiming}[width=12cm, step=1cm]
+  \Clock{SCK}{8}
+  \Signal{CS}{H1 L6 H1}
+  \Signal{MISO}{Z1 D3{0xA5} D3{0x3C} Z1}
+  \Marker{1}{start}
+  \Marker{7}{end}
+  \Span{CS}{1}{7}{6 us}
+\end{sfTiming}

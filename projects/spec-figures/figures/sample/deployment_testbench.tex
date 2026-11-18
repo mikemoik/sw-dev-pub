@@ -1,0 +1,12 @@
+% Deployment diagram: HIL test bench with stereotypes and a dependency
+\begin{sfDeployment}[xstep=5.6cm, ystep=2.4cm]
+  \Node[0,0]{pc}{Test PC}[server]
+    \Artifact{test_runner}
+  \Node[1,0]{hil}{HIL rig}[test bench]
+    \Artifact{plant_model}
+  \Node[1,1]{ecu}{Body ECU}
+    \Artifact{heater_ctrl.a}
+  \Link{pc}{hil}{Ethernet}
+  \Link{hil}{ecu}{CAN, I/O}
+  \Dependency[vh]{pc}{ecu}{flashes}
+\end{sfDeployment}

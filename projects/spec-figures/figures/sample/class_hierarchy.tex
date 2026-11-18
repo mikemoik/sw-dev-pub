@@ -1,0 +1,17 @@
+% Class diagram: abstract base class, inheritance, aggregation, directed association
+\begin{sfClassDiagram}[xstep=4.4cm, ystep=2.6cm]
+  \AbstractClass[1,0]{sensor}{Sensor}
+    \Attribute{\# id: uint8}
+    \Operation{+ read(): int16}
+  \Class[0,1]{ntc}{NtcSensor}
+    \Operation{+ read(): int16}
+  \Class[2,1]{ptc}{PtcSensor}
+    \Operation{+ read(): int16}
+  \Class[3,0]{bus}{SensorBus}
+    \Operation{+ scan()}
+  \Class[3,1]{log}{Logger}
+  \Inherits{ntc}{sensor}
+  \Inherits{ptc}{sensor}
+  \Aggregation[m1=1, m2=1..*]{bus}{sensor}{}
+  \DirectedAssociation[pos=0.4]{bus}{log}{reports to}
+\end{sfClassDiagram}

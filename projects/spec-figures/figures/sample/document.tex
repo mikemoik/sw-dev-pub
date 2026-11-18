@@ -1,0 +1,360 @@
+% figures/sample: every figure type and feature of specfig, with documentation.
+% It is also the test document: it must build with 0 warnings (scripts/check.py).
+% Figure files: <type>.tex = the worked example of the type (also used by the
+% LLM guides), <type>_<feature>.tex = further features. Command reference: llm/<type>.md.
+\raggedright % long command names in the lists
+\Title{spec-figures}{Figures for specifications and project manuals:\\catalogue, reference and how-to}
+
+\tableofcontents
+
+\section{About this document}
+
+\textbf{specfig} is a LaTeX package that draws the figures software specifications and project manuals need: UML diagrams, block and flow diagrams, plans, matrices and charts. Each figure is one environment holding plain data commands, one command per element or connection. The package computes the layout, draws a TikZ picture and checks the data: problems (an unknown ID, a bad date, a value out of range) are listed in red under the figure and given as LaTeX warnings. Every type also has an independent Mermaid template for Markdown pages; there is no conversion between the two.
+
+This document is the \texttt{sample} figure document of the project. It shows every figure type and every feature, each figure next to its source, and explains how to work with them. It is also the test document: if it builds without warnings, specfig works on that checkout and machine.
+
+\textbf{Figure documents} are folders \texttt{figures/<name>/}, one per document, built by the main file \texttt{spec_figures.tex}:
+
+\begin{itemize}
+  \item \texttt{figures/sample/}: this document.
+  \item \texttt{figures/empty/}: the skeleton for new documents (one heading, comments, no figures).
+  \item \texttt{figures/<name>/}: your own, e.g. to draft the figures of a specification before moving them into the template, or a figure collection of its own.
+\end{itemize}
+
+A folder holds \texttt{document.tex} (the text) and the figure files, one figure per file. \texttt{sty/} holds the package, \texttt{mermaid/} the Mermaid twins of the examples, \texttt{llm/} the command reference per type (also the guides for a chat LLM).
+
+\section{How-to}
+
+\subsection{Create, build and clean a figure document}
+
+Run from the project's root folder (Python 3.6 or newer, \texttt{latexmk}):
+
+\begin{Verbatim}[frame=single]
+python3 scripts/new_figures.py brake_mon             # copies figures/empty/ to figures/brake_mon/
+python3 scripts/new_figures.py brake_mon --from sample
+python3 scripts/build.py brake_mon                   # -> build/brake_mon.pdf
+python3 scripts/build.py --all                       # every document except figures/empty
+python3 scripts/build.py --strict --force sample empty   # the test: 0 warnings
+python3 scripts/clean.py                             # removes build/ and root LaTeX files
+python3 scripts/clean.py brake_mon -n                # lists what would go
+latexmk -pdf spec_figures.tex                        # the default document (\LoadFigures)
+\end{Verbatim}
+
+Names: letters, digits, \texttt{_}, \texttt{-}, \texttt{.}. \cs{SpecFigures} selects the document at build time, one job name per document, as \texttt{build.py} does; without it, \texttt{spec_figures.tex} builds the document named in \cs{LoadFigures}:
+
+\begin{Verbatim}[frame=single]
+latexmk -pdf -jobname=brake_mon -usepretex='\def\SpecFigures{brake_mon}' spec_figures.tex
+\end{Verbatim}
+ The committed \texttt{spec_figures.pdf} is this document; \texttt{scripts/check.py} rebuilds it.
+
+\subsection{Write a figure}
+
+\begin{enumerate}
+  \item Create the figure file in the document folder, named after its type: \texttt{figures/<name>/sequence_ctrl_cycle.tex}. The type prefix makes the chat rules apply (section \ref{sec:llm}).
+  \item Write the figure's environment with its data commands, as in the examples below. Nothing else: no \texttt{tikzpicture}, no \cs{draw}.
+  \item Include it in \texttt{document.tex}. \cs{InputFigure[max width]\{name\}} inserts the figure, shrunk to the width (default: the line width), never enlarged; it also takes an image \texttt{name.pdf}, \texttt{.png} or \texttt{.jpg}. \cs{ShowFigure\{name\}} adds the source under it, as in this document.
+  \item Build. Red text under the figure lists problems; fix them, don't hide them.
+\end{enumerate}
+
+A figure with a caption and a label:
+
+\begin{Verbatim}[frame=single]
+\begin{figure}[htbp]
+  \centering
+  \InputFigure{sequence_ctrl_cycle}
+  \caption{One control cycle of heater_ctrl}\label{fig:cycle}
+\end{figure}
+\end{Verbatim}
+
+The text of \texttt{document.tex} is ordinary LaTeX: sections, lists, tables. \cs{FigDir} expands to the folder of the document, \cs{Title\{title\}\{subtitle\}} prints the heading block, \cs{ShowSource\{file\}} lists any file, \cs{ShowMermaid\{type\}} the Mermaid twin of a type.
+
+\subsection{Use a figure in a template}
+
+The templates \texttt{sw-unit-test-spec}, \texttt{sw-component-spec} and \texttt{sw-project-manual} carry a copy of specfig in their \texttt{sty/}. To use it:
+
+\begin{enumerate}
+  \item Add \cs{usepackage\{specfig\}} after \cs{documentclass\{…\}} in the template's main file.
+  \item Copy the figure file into the unit's, component's or manual's \texttt{figures/} folder and include it with the same \cs{InputFigure\{name\}}.
+\end{enumerate}
+
+After a change to specfig, refresh the copies: \texttt{python3 scripts/vendor.py ../sw-project-manual} (and the other two; \texttt{--check} reports whether they are up to date). In another document: put \texttt{sty/} on TeX's search path (\texttt{latexmkrc}: \texttt{ensure_path('TEXINPUTS', './sty//');}), load \texttt{fontenc} with \texttt{T1} and specfig after the document class, before \texttt{underscore}. pdfLaTeX, TeX Live 2022 or newer.
+
+\subsection{Draw a figure with a chat LLM}\label{sec:llm}
+
+The guides in \texttt{llm/} tell a chat model how to write a figure from free text or a pasted table (CSV, Excel, Jira or GitLab export). The model asks for missing facts and answers with the complete figure. Chat only.
+
+\begin{itemize}
+  \item \textbf{VS Code with Continue:} with a figure file \texttt{<type>_<name>.tex} (or \texttt{.mmd}) in the chat, Continue adds the common rules and the guide and examples of that type.
+  \item \textbf{Any other chat:} build the first message with \texttt{scripts/llm_prompt.py}:
+\end{itemize}
+
+\begin{Verbatim}[frame=single]
+python3 scripts/llm_prompt.py sequence -o build/prompt.md
+python3 scripts/llm_prompt.py gantt --add plan.csv -o build/prompt.md
+python3 scripts/llm_prompt.py state --edit figures/brake_mon/state_modes.tex -o build/prompt.md
+python3 scripts/llm_prompt.py gantt --mermaid -o build/prompt.md
+\end{Verbatim}
+
+The worked example of a type in the prompt is \texttt{figures/sample/<type>.tex}. After changing it, \texttt{llm/} or \texttt{mermaid/}, run \texttt{python3 scripts/continue_rules.py} and \texttt{vendor.py} for each template.
+
+\subsection{Mermaid for Markdown pages}
+
+Every type except the timing diagram has a Mermaid twin in \texttt{mermaid/} (Mermaid 10 or newer; the RACI matrix is a Markdown table). The twins are shown under the examples below. Mermaid checks nothing: verify yourself that every connection names a declared ID.
+
+\subsection{Find problems}
+
+Each type checks its data; the red marks are listed in the guide \texttt{llm/<type>.md}. \texttt{tests/problems.tex} makes deliberate mistakes in every type and \texttt{tests/problems.expected} lists the warnings they must give; build it to see how problems look:
+
+\begin{Verbatim}[frame=single]
+latexmk -pdf -outdir=build tests/problems.tex
+python3 scripts/check.py      # sample + empty 0 warnings, problem marks, rules, Mermaid
+\end{Verbatim}
+
+\section{Common rules}
+
+\begin{itemize}
+  \item \textbf{One command per line}, one element or connection per command. Lines belonging to the element above (attributes, activities, artifacts) are indented two more spaces.
+  \item \textbf{IDs} are short and unique within the figure (letters, digits, \texttt{-}); connections refer to them exactly. \textbf{Labels} are free text, \texttt{\textbackslash\textbackslash} breaks a line. \texttt{_} is typed as is; escape \texttt{\textbackslash\&} \texttt{\textbackslash\%} \texttt{\textbackslash\#} \texttt{\textbackslash\$}.
+  \item The data commands exist only inside their environment, so they never clash with a document's own \cs{Milestone}, \cs{Risk} and so on.
+  \item \textbf{Grid positions} (diagrams with boxes): \texttt{[column,row]} as first optional argument, columns to the right, rows downwards, decimals allowed (\texttt{[1.5,0]}). Without a position an element goes next to the previous one (right, or below in top-down figures). Give positions when the figure branches.
+  \item \textbf{Figure options} in \texttt{[…]} after \cs{begin\{sfX\}}: \texttt{xstep}, \texttt{ystep} (grid distances), \texttt{step} (row height), \texttt{width}, \texttt{height}, … per type below. An unknown option is reported.
+  \item Up to about 15 elements per figure; split bigger content.
+\end{itemize}
+
+\subsection{Connection options}
+
+Diagrams with boxes take these options on their connections: \texttt{[hv]} first horizontal then vertical, \texttt{[vh]} first vertical then horizontal, \texttt{[left]} / \texttt{[right]} bent, \texttt{[m1=…, m2=…]} texts at the start and the end (multiplicities), \texttt{[pos=0.3]} position of the label along the line. A connection from an element to itself is a loop. Options combine with commas.
+
+\ShowFigure{block_routing}
+
+\section{Sequence diagram}
+
+Messages between participants over time: one scenario of a unit or component. Environment \texttt{sfSequence}, options \texttt{xstep} (participant distance, 3.2\,cm), \texttt{step} (row height, 0.75\,cm).
+
+\begin{itemize}
+  \item \cs{Participant\{ID\}\{label\}} box with lifeline, \cs{Actor\{ID\}\{label\}} stick figure; all first, left to right.
+  \item \cs{Message} synchronous call, \cs{Async} asynchronous message, \cs{Reply} return: \texttt{\{from\}\{to\}\{label\}}. \cs{Self\{ID\}\{label\}} call to itself.
+  \item \cs{Note\{ID\}\{text\}} note right of the lifeline. \cs{Gap} extra space.
+  \item \cs{Fragment\{kind\}\{guard\}} … \cs{EndFragment} with kind \texttt{alt}, \texttt{opt}, \texttt{loop}, \texttt{par}, \texttt{break}, \texttt{critical}; \cs{Else\{guard\}} divides it. Fragments nest.
+\end{itemize}
+
+\ShowFigure{sequence}
+\ShowMermaid{sequence}
+\ShowFigure{sequence_async}
+
+\section{State machine}
+
+States and transitions: modes, protocol states, error handling. Environment \texttt{sfStateMachine}, options \texttt{xstep} (3.4\,cm), \texttt{ystep} (2\,cm).
+
+\begin{itemize}
+  \item \cs{Initial[c,r]\{ID\}}, \cs{Final[c,r]\{ID\}}, \cs{Choice[c,r]\{ID\}} pseudo states.
+  \item \cs{State[c,r]\{ID\}\{name\}\{\}} a state (third argument empty); \cs{Activity\{entry / …\}} internal activities of the state above.
+  \item \cs{Transition[options]\{from\}\{to\}\{event [guard] / action\}}; from = to is a loop. Two transitions between the same states: \texttt{[left]} on both.
+\end{itemize}
+
+\ShowFigure{state}
+\ShowMermaid{state}
+\ShowFigure{state_choice}
+
+\section{Activity diagram}
+
+The control flow of a function or procedure. Environment \texttt{sfActivity}, top-down, options \texttt{xstep} (3.6\,cm), \texttt{ystep} (1.4\,cm).
+
+\begin{itemize}
+  \item \cs{Start}, \cs{End} initial and final node; \cs{Action\{ID\}\{text\}}, \cs{Object\{ID\}\{name\}} object or data node.
+  \item \cs{Decision\{ID\}\{question\}}, \cs{Merge\{ID\}}; \cs{Fork}, \cs{Join} for parallel paths.
+  \item \cs{Flow[options]\{from\}\{to\}\{guard\}}. \cs{Partition\{name\}\{IDs\}} frame around elements.
+\end{itemize}
+
+\ShowFigure{activity}
+\ShowMermaid{activity}
+\ShowFigure{activity_parallel}
+
+\section{Use case diagram}
+
+Actors and the use cases of a system. Environment \texttt{sfUseCase}, options \texttt{xstep} (3.2\,cm), \texttt{ystep} (1.3\,cm). Actors stack in column 0, use cases in column 1.6; secondary actors get a position on the right.
+
+\begin{itemize}
+  \item \cs{System\{name\}} boundary around all use cases; \cs{Actor[c,r]\{ID\}\{name\}}, \cs{UseCase[c,r]\{ID\}\{name\}}.
+  \item \cs{Association\{actor\}\{use case\}}, \cs{Include\{base\}\{included\}}, \cs{Extend\{extension\}\{base\}}, \cs{Generalization\{child\}\{parent\}}.
+\end{itemize}
+
+\ShowFigure{usecase}
+\ShowMermaid{usecase}
+\ShowFigure{usecase_generalization}
+
+\section{Class diagram}
+
+Classes, interfaces and data types with their relations. Environment \texttt{sfClassDiagram}, options \texttt{xstep} (4.6\,cm), \texttt{ystep} (3\,cm).
+
+\begin{itemize}
+  \item \cs{Class}, \cs{AbstractClass}, \cs{Interface}, \cs{Enumeration}: \texttt{[c,r]\{ID\}\{name\}}; then \cs{Attribute\{text\}}, \cs{Operation\{text\}}, \cs{Literal\{value\}}.
+  \item \cs{Association}, \cs{DirectedAssociation}, \cs{Composition\{whole\}\{part\}}, \cs{Aggregation\{whole\}\{part\}}, \cs{Dependency}: \texttt{[options]\{from\}\{to\}\{label\}}, multiplicities with \texttt{[m1=…, m2=…]}.
+  \item \cs{Inherits\{child\}\{parent\}}, \cs{Implements\{class\}\{interface\}}.
+\end{itemize}
+
+\ShowFigure{class}
+\ShowMermaid{class}
+\ShowFigure{class_hierarchy}
+
+\section{Component diagram}
+
+Components or units with provided and required interfaces. Environment \texttt{sfComponent}, options \texttt{xstep} (3.6\,cm), \texttt{ystep} (2\,cm).
+
+\begin{itemize}
+  \item \cs{Component[c,r]\{ID\}\{name\}}, \cs{External} outside the scope, \cs{Interface[c,r]\{ID\}\{name\}} lollipop.
+  \item \cs{Provides\{component\}\{interface\}}, \cs{Requires\{component\}\{interface\}}, \cs{Connect\{from\}\{to\}\{label\}}; \cs{Boundary\{name\}\{IDs\}}.
+\end{itemize}
+
+\ShowFigure{component}
+\ShowMermaid{component}
+\ShowFigure{component_layers}
+
+\section{Deployment diagram}
+
+Hardware and execution environments with their artifacts. Environment \texttt{sfDeployment}, options \texttt{xstep} (5.4\,cm), \texttt{ystep} (2.6\,cm).
+
+\begin{itemize}
+  \item \cs{Node[c,r]\{ID\}\{name\}[stereotype]} (default \texttt{device}); \cs{Artifact\{name\}} on the node above.
+  \item \cs{Link\{from\}\{to\}\{bus or protocol\}}, \cs{Dependency\{from\}\{to\}\{label\}}.
+\end{itemize}
+
+\ShowFigure{deployment}
+\ShowMermaid{deployment}
+\ShowFigure{deployment_testbench}
+
+\section{Package diagram}
+
+Packages or directories and their dependencies. Environment \texttt{sfPackage}, options \texttt{xstep} (4.6\,cm), \texttt{ystep} (2.4\,cm).
+
+\begin{itemize}
+  \item \cs{Package[c,r]\{ID\}\{name\}}; \cs{Element\{name\}} in the package above.
+  \item \cs{Import\{from\}\{to\}}, \cs{Dependency\{from\}\{to\}\{label\}}; \texttt{[left]} bends one around a package in between.
+\end{itemize}
+
+\ShowFigure{package}
+\ShowMermaid{package}
+\ShowFigure{package_layers}
+
+\section{Block / context diagram}
+
+Blocks and the signals between them: the context of a component or a signal flow. Environment \texttt{sfBlock}, options \texttt{xstep} (4.6\,cm), \texttt{ystep} (1.8\,cm). The store and the connection options are in the figure of section 3.1.
+
+\begin{itemize}
+  \item \cs{Block[c,r]\{ID\}\{name\}} in scope, \cs{External} outside (grey), \cs{Store} memory or database.
+  \item \cs{Signal\{from\}\{to\}\{label\}}, \cs{Exchange\{a\}\{b\}\{label\}} two-way; \cs{Group\{name\}\{IDs\}}.
+\end{itemize}
+
+\ShowFigure{block}
+\ShowMermaid{block}
+
+\section{Flowchart}
+
+A process or decision procedure. Environment \texttt{sfFlowchart}, top-down, options \texttt{xstep} (4.2\,cm), \texttt{ystep} (1.6\,cm).
+
+\begin{itemize}
+  \item \cs{Terminal}, \cs{Process}, \cs{Subprocess}, \cs{Decision}, \cs{InOut}, \cs{Store}: \texttt{[c,r]\{ID\}\{text\}}.
+  \item \cs{Flow[options]\{from\}\{to\}\{label\}}; loops back with \texttt{[vh]} or \texttt{[hv]}.
+\end{itemize}
+
+\ShowFigure{flowchart}
+\ShowMermaid{flowchart}
+\ShowFigure{flowchart_review}
+
+\section{Gantt chart}
+
+Tasks on a date axis, grouped by phase. Environment \texttt{sfGantt}, options \texttt{width} (axis, 11\,cm), \texttt{step} (row height, 0.55\,cm), \texttt{today=YYYY-MM-DD}. Spans over 10 weeks get month columns, shorter ones week columns.
+
+\begin{itemize}
+  \item \cs{Group\{name\}} starts a phase; \cs{Task[progress]\{ID\}\{name\}\{start\}\{end\}} (end day included), \cs{Milestone\{ID\}\{name\}\{date\}}.
+  \item \cs{Depends\{from\}\{to\}} finish-to-start arrow. Dates \texttt{YYYY-MM-DD}.
+\end{itemize}
+
+\ShowFigure{gantt}
+\ShowMermaid{gantt}
+\ShowFigure{gantt_sprint}
+
+\section{Milestone timeline}
+
+Milestones above a date axis, releases below, phases as bands. Environment \texttt{sfTimeline}, options \texttt{width} (13.5\,cm), \texttt{today=YYYY-MM-DD}. To scale; with an invalid date the events are spaced evenly.
+
+\begin{itemize}
+  \item \cs{Milestone\{ID\}\{date\}\{name\}}, \cs{Release\{version\}\{date\}}, \cs{Phase\{name\}\{start\}\{end\}}.
+\end{itemize}
+
+\ShowFigure{timeline}
+\ShowMermaid{timeline}
+\ShowFigure{timeline_short}
+
+\section{Organisation chart}
+
+Units or roles as a tree, laid out automatically. Environment \texttt{sfOrgChart}, options \texttt{xstep} (column width, 3.4\,cm), \texttt{ystep} (level distance, 2.1\,cm).
+
+\begin{itemize}
+  \item \cs{Unit[parent ID]\{ID\}\{title\}\{people\}}: people separated by \texttt{\textbackslash\textbackslash}; without a parent the unit is a root, several roots stand side by side.
+\end{itemize}
+
+\ShowFigure{orgchart}
+\ShowMermaid{orgchart}
+\ShowFigure{orgchart_roots}
+
+\section{RACI matrix}
+
+Responsible, Accountable, Consulted, Informed per activity: a table, not a picture (in a \texttt{table} or \texttt{center} environment). Environment \texttt{sfRaci}, no options.
+
+\begin{itemize}
+  \item \cs{Roles\{ID, …\}} the columns, first; \cs{Activity\{name\}\{ID=letter, …\}} one row, letters \texttt{R}, \texttt{A}, \texttt{C}, \texttt{I}, two as \texttt{A/R}. Exactly one \texttt{A} and at least one \texttt{R} per row.
+\end{itemize}
+
+\ShowFigure{raci}
+\ShowMermaid{raci}
+
+\section{Risk matrix}
+
+Risks by probability and impact, with residual risk. Environment \texttt{sfRiskMatrix}, options \texttt{levels} (3, 4 or 5; default 5), \texttt{xlabel}, \texttt{ylabel}.
+
+\begin{itemize}
+  \item \cs{Risk\{ID\}\{probability\}\{impact\}\{short title\}} whole numbers from 1; \cs{Target\{ID\}\{probability\}\{impact\}} residual risk.
+  \item \cs{Levels\{…\}}, \cs{ImpactLevels\{…\}} level names, lowest first.
+\end{itemize}
+
+\ShowFigure{risk}
+\ShowMermaid{risk}
+\ShowFigure{risk_levels}
+
+\section{Timing diagram}
+
+Digital signals over time. Environment \texttt{sfTiming}, options \texttt{width} (13\,cm), \texttt{step} (row distance, 0.9\,cm). No Mermaid twin.
+
+\begin{itemize}
+  \item \cs{Clock\{name\}\{periods\}}; \cs{Signal\{name\}\{waveform\}} with tokens \texttt{H3} high, \texttt{L2} low, \texttt{Z1} high impedance, \texttt{X2} unknown, \texttt{D4\{value\}} bus value (letter + duration in time units).
+  \item \cs{Marker\{time\}\{label\}}, \cs{Span\{signal\}\{from\}\{to\}\{label\}}.
+\end{itemize}
+
+\ShowFigure{timing}
+\ShowFigure{timing_bus}
+
+\section{Bar chart}
+
+Values per category, one series or several side by side. Environment \texttt{sfBarChart}, options \texttt{width} (12\,cm), \texttt{height} (5.5\,cm), \texttt{xlabel}, \texttt{ylabel}.
+
+\begin{itemize}
+  \item \cs{Bar\{category\}\{value\}} single series, or \cs{Categories\{a, b, …\}} + \cs{Series\{name\}\{v1, v2, …\}} grouped (at most 6 series).
+  \item \cs{Threshold\{value\}\{label\}} dashed red line.
+\end{itemize}
+
+\ShowFigure{barchart}
+\ShowMermaid{barchart}
+\ShowFigure{barchart_single}
+
+\section{Line chart}
+
+Series of values over ordered categories. Environment \texttt{sfLineChart}, same options as the bar chart.
+
+\begin{itemize}
+  \item \cs{Categories\{a, b, …\}}, \cs{Series\{name\}\{v1, v2, …\}} (at most 6), \cs{Threshold\{value\}\{label\}}.
+\end{itemize}
+
+\ShowFigure{linechart}
+\ShowMermaid{linechart}
+\ShowFigure{linechart_trend}

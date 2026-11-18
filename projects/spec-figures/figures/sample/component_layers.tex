@@ -1,0 +1,14 @@
+% Component diagram: layered top-down, own grid distances, routed connections
+\begin{sfComponent}[xstep=4cm, ystep=1.6cm]
+  \Component[0,0]{app}{heater_app}
+  \Interface[0,1]{ictl}{ICtrl}
+  \Component[0,2]{ctrl}{heater_ctrl}
+  \External[1.5,2]{nvm}{NvM (BSW)}
+  \External[0,3.2]{io}{IoHwAb (BSW)}
+  \Provides{ctrl}{ictl}
+  \Requires{app}{ictl}
+  \Connect{ctrl}{nvm}{store params}
+  \Connect{ctrl}{io}{set_duty}
+  \Connect[hv]{app}{nvm}{read DTCs}
+  \Boundary{application layer}{app, ictl, ctrl}
+\end{sfComponent}

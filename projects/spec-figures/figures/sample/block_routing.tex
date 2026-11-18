@@ -1,0 +1,16 @@
+% Block diagram: the connection options (routing, bends, end texts, label position, loop) and a store
+\begin{sfBlock}[xstep=3.6cm, ystep=1.6cm]
+  \Block[0,0]{a}{A}
+  \Block[2,0]{b}{B}
+  \Block[0,1.2]{c}{C}
+  \Block[3,1.2]{e}{E}
+  \Block[0.7,2.4]{d}{D}
+  \Store[2.3,2.4]{nvm}{NVM}
+  \Signal{a}{b}{straight}
+  \Signal[left]{b}{a}{left}
+  \Signal[right, pos=0.3]{b}{e}{right, pos=0.3}
+  \Signal[hv]{c}{d}{hv}
+  \Signal[vh]{e}{nvm}{vh}
+  \Signal[m1=1, m2=n]{d}{nvm}{m1, m2}
+  \Signal{a}{a}{loop}
+\end{sfBlock}

@@ -1,0 +1,12 @@
+% Package diagram: layers from top to bottom, own grid distances
+\begin{sfPackage}[xstep=4cm, ystep=3cm]
+  \Package[0,0]{app}{application}
+    \Element{heater_ctrl}
+  \Package[0,1]{svc}{services}
+    \Element{diag}
+    \Element{nvm_access}
+  \Package[0,2]{bsw}{bsw}
+    \Element{io}
+  \Import{app}{svc}
+  \Import{svc}{bsw}
+\end{sfPackage}

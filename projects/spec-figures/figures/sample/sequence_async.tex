@@ -1,0 +1,19 @@
+% Sequence diagram: diagnostic request with an actor, async messages, nested fragments
+\begin{sfSequence}[xstep=3.6cm, step=0.7cm]
+  \Actor{tester}{Tester}
+  \Participant{diag}{Diagnostics}
+  \Participant{ctrl}{heater_ctrl}
+  \Async{tester}{diag}{read DTCs}
+  \Fragment{loop}{for each DTC}
+    \Message{diag}{ctrl}{get_dtc(i)}
+    \Fragment{opt}{DTC active}
+      \Reply{ctrl}{diag}{dtc}
+    \EndFragment
+  \EndFragment
+  \Gap
+  \Fragment{par}{}
+    \Async{diag}{tester}{DTC list}
+  \Else{}
+    \Self{diag}{log request}
+  \EndFragment
+\end{sfSequence}

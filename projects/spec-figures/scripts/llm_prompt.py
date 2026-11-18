@@ -5,7 +5,7 @@
 
 <type> is a figure type (the guides in llm/, e.g. sequence, state, gantt, risk).
 The prompt is llm/_common.md + llm/<type>.md + the worked examples
-(tikz/<type>.tex and mermaid/<type>.mmd) + optionally a figure to change (--edit)
+(figures/sample/<type>.tex and mermaid/<type>.mmd) + optionally a figure to change (--edit)
 and input files such as a table export (--add). Paste it as the first message of
 a new chat; models without a system role (e.g. Gemma) work the same way.
 Standard library only.
@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LLM = ROOT / "llm"
-TIKZ = ROOT / "tikz"
+TIKZ = ROOT / "figures" / "sample"  # worked example per type: <type>.tex
 MERMAID = ROOT / "mermaid"
 TYPES = sorted(p.stem for p in LLM.glob("*.md") if not p.stem.startswith("_"))
 
@@ -35,7 +35,7 @@ def examples(kind: str) -> list:
     if tikz.is_file():
         parts.append(
             fenced(
-                f"TikZ example (tikz/{kind}.tex)",
+                f"TikZ example (figures/sample/{kind}.tex)",
                 tikz.read_text(encoding="utf-8"),
                 "latex",
             )

@@ -1,0 +1,8 @@
+% Risk matrix: 3 levels with own level names and axis titles
+\begin{sfRiskMatrix}[levels=3, xlabel=Severity, ylabel=Likelihood]
+  \Levels{rare, possible, likely}
+  \ImpactLevels{minor, major, critical}
+  \Risk{R1}{3}{2}{Late BSW delivery}
+  \Risk{R2}{1}{3}{Sensor out of spec}
+  \Target{R1}{2}{2}
+\end{sfRiskMatrix}

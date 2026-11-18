@@ -1,0 +1,8 @@
+% Bar chart: one series with a threshold and axis titles
+\begin{sfBarChart}[width=10cm, height=4.5cm, xlabel=Unit, ylabel=Findings]
+  \Bar{heater_ctrl_main}{7}
+  \Bar{pi_controller}{3}
+  \Bar{temp_sensor}{9}
+  \Bar{pwm_port}{2}
+  \Threshold{8}{limit}
+\end{sfBarChart}

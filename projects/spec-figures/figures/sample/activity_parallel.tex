@@ -1,0 +1,20 @@
+% Activity diagram: start-up self test with parallel paths, an object node and partitions
+\begin{sfActivity}[xstep=4cm, ystep=1.3cm]
+  \Start[0.5,0]{s}
+  \Fork[0.5,1]{f}
+  \Action[0,2]{ram}{Test RAM}
+  \Action[1,2]{adc}{Test ADC reference}
+  \Join[0.5,3]{j}
+  \Object[0.5,4]{res}{SelfTestResult}
+  \Action[0.5,5]{rep}{Report result}
+  \End[0.5,6]{e}
+  \Flow{s}{f}{}
+  \Flow[vh]{f}{ram}{}
+  \Flow[vh]{f}{adc}{}
+  \Flow[vh]{ram}{j}{}
+  \Flow[vh]{adc}{j}{}
+  \Flow{j}{res}{}
+  \Flow{res}{rep}{}
+  \Flow{rep}{e}{}
+  \Partition{heater_ctrl}{ram, adc}
+\end{sfActivity}

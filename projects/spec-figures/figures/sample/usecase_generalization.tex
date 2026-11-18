@@ -1,0 +1,15 @@
+% Use case diagram: generalisation between actors and between use cases, secondary actor
+\begin{sfUseCase}[xstep=3.4cm, ystep=1.2cm]
+  \System{Diagnostics}
+  \Actor{user}{Tester}
+  \Actor{dev}{Developer}
+  \UseCase{read}{Read DTCs}
+  \UseCase{readx}{Read extended data}
+  \UseCase{clear}{Clear DTCs}
+  \Actor[3.4,1]{ecu}{ECU}
+  \Generalization{dev}{user}
+  \Generalization{readx}{read}
+  \Association{user}{read}
+  \Association{dev}{clear}
+  \Association{ecu}{readx}
+\end{sfUseCase}

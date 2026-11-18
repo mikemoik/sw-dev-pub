@@ -32,7 +32,7 @@ Supporting project of [`sw-unit-test-spec`](../sw-unit-test-spec/), [`sw-compone
 | `barchart` | `sfBarChart` | `xychart-beta` |
 | `linechart` | `sfLineChart` | `xychart-beta` |
 
-**Command reference:** `llm/<type>.md` (one guide per type, also used by the LLM), with the worked examples `tikz/<type>.tex` and `mermaid/<type>.mmd`. `spec_figures.pdf` shows every figure next to its sources.
+**Command reference:** `llm/<type>.md` (one guide per type, also used by the LLM), with the worked examples `figures/sample/<type>.tex` and `mermaid/<type>.mmd`. `spec_figures.pdf` (the sample document) shows every figure and feature next to its sources, with a how-to.
 
 ## Files
 
@@ -40,16 +40,36 @@ Supporting project of [`sw-unit-test-spec`](../sw-unit-test-spec/), [`sw-compone
 sty/specfig.sty           core + UML and block diagrams (loads the two below)
 sty/specfig-plan.sty      Gantt, timeline, organisation chart, RACI
 sty/specfig-chart.sty     risk matrix, timing diagram, bar and line charts
-tikz/<type>.tex           worked TikZ example per type
+spec_figures.tex          main file: document commands, default document (\LoadFigures{sample})
+spec_figures.pdf          the sample document, built: committed preview
+figures/
+  sample/                 every type and feature + how-to; <type>.tex = worked example per type
+  empty/                  skeleton for new documents
+  <document>/             one folder per figure document: document.tex + one file per figure
 mermaid/<type>.mmd        Mermaid twin per type
 llm/                      LLM guides: _common.md + one per type
-spec_figures.tex / .pdf   catalogue: every figure with its sources (PDF committed as preview)
 tests/problems.*          deliberate mistakes and the warnings they must give
-scripts/check.py          test: catalogue 0 warnings, problem marks, rules up to date, Mermaid (if mmdc)
+scripts/new_figures.py    creates figures/<document>/ from figures/empty/
+scripts/build.py          builds documents into build/<document>.pdf
+scripts/clean.py          removes build output (build/ and root LaTeX files)
+scripts/check.py          test: sample + empty 0 warnings, sample covers every feature, problem marks, rules, Mermaid (if mmdc)
 scripts/llm_prompt.py     chat prompt for one figure type
-scripts/continue_rules.py generates .continue/rules/sf-*.md from llm/, tikz/, mermaid/
+scripts/continue_rules.py generates .continue/rules/sf-*.md from llm/, figures/sample/, mermaid/
 scripts/vendor.py         copies specfig and the rules into a template
 ```
+
+## Figure documents
+
+A figure document is a folder `figures/<document>/`: `document.tex` (ordinary LaTeX text) plus one file per figure, built by `spec_figures.tex`. Use one to draft the figures of a specification, or as a figure collection of its own. `figures/sample/` is the reference and the test: if it builds without warnings, specfig works on that checkout and machine.
+
+```sh
+python3 scripts/new_figures.py brake_mon                 # copies figures/empty/ (--from sample: the sample)
+python3 scripts/build.py brake_mon                       # -> build/brake_mon.pdf; --all, --strict, --force, -v
+python3 scripts/clean.py                                 # everything; or: clean.py brake_mon; -n lists only
+latexmk -pdf spec_figures.tex                            # the document in \LoadFigures -> spec_figures.pdf
+```
+
+In `document.tex`: `\InputFigure[max width]{name}` (figure file `name.tex`, or an image `name.pdf/.png/.jpg`, as in the templates), `\ShowFigure{name}` (figure + source), `\ShowSource{file}`, `\ShowMermaid{type}`, `\Title{title}{subtitle}`, `\FigDir`. `\SpecFigures` selects the document at build time (`-usepretex='\def\SpecFigures{brake_mon}'`, one job name per document, as `build.py` does).
 
 ## Use in a document
 
@@ -84,12 +104,14 @@ python3 scripts/llm_prompt.py gantt --mermaid --add plan.csv -o build/prompt.md
 python3 scripts/llm_prompt.py state --edit figures/state_modes.tex -o build/prompt.md
 ```
 
-A prompt is about 2K–3K tokens plus the `--add` files. After changing `llm/`, `tikz/` or `mermaid/`, run `python3 scripts/continue_rules.py` and `vendor.py` for each template.
+A prompt is about 2K–3K tokens plus the `--add` files. After changing `llm/`, `figures/sample/<type>.tex` or `mermaid/`, run `python3 scripts/continue_rules.py` and `vendor.py` for each template.
 
 ## Test
 
 ```sh
 python3 scripts/check.py           # rebuilds spec_figures.pdf; --no-pdf leaves it alone
 ```
+
+It builds `sample` and `empty` as `build.py --strict` does (also no overfull boxes), checks that the sample uses every command and option of the guides, the problem marks of `tests/problems.tex`, and that the rules are up to date. A new feature needs a figure in `figures/sample/` and a line in its guide.
 
 The Mermaid check runs only if `mmdc` (mermaid-cli) is on the PATH.

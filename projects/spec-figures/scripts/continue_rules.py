@@ -7,8 +7,9 @@
 
 Writes sf-00-common.md (applies to figure files: figures/*.tex, *.mmd) and one
 sf-<type>.md per figure type (applies to figures/<type>_*.tex and <type>_*.mmd,
-so name figure files after their type, e.g. figures/sequence_ctrl_cycle.tex):
-the guide plus the worked examples from tikz/ and mermaid/. Continue adds a
+so name figure files after their type, e.g. figures/sequence_ctrl_cycle.tex; in
+this project also figures/<document>/<type>[_*].tex):
+the guide plus the worked examples from figures/sample/ and mermaid/. Continue adds a
 rule to the chat when a file matching its globs is in the chat context. llm/
 is the source: edit the guides there and rerun this script. Standard library only.
 """
@@ -38,7 +39,7 @@ def common_rule() -> str:
         frontmatter(
             "Figures: common rules",
             "Role, chat protocol, TikZ (specfig) and Mermaid rules for figures",
-            ["**/figures/*.tex", "**/tikz/*.tex", "**/*.mmd"],
+            ["**/figures/*.tex", "**/figures/*/*.tex", "**/*.mmd"],
         )
         + HEADER
         + "\n"
@@ -55,7 +56,8 @@ def type_rule(kind: str) -> str:
     guide = (LLM / f"{kind}.md").read_text(encoding="utf-8").rstrip()
     globs = [
         f"**/figures/{kind}_*.tex",
-        f"**/tikz/{kind}.tex",
+        f"**/figures/*/{kind}_*.tex",
+        f"**/figures/*/{kind}.tex",
         f"**/{kind}_*.mmd",
         f"**/mermaid/{kind}.mmd",
     ]
