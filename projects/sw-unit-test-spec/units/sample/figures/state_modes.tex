@@ -1,0 +1,11 @@
+% State machine (specfig): operating states of setpoint_ctrl, set once in SetpointCtrl_Init()
+\begin{sfStateMachine}[xstep=3cm, ystep=2.2cm]
+  \Initial[0,0]{start}
+  \State[1,0]{init}{INIT}{}
+  \State[3,0]{idle}{IDLE}{}
+  \State[1,1]{deg}{DEGRADED}{}
+    \Activity{entry / report DEM\_E\_NVM\_READ}
+  \Transition{start}{init}{}
+  \Transition{init}{idle}{NvM read E\_OK}
+  \Transition{init}{deg}{NvM read E\_NOT\_OK}
+\end{sfStateMachine}

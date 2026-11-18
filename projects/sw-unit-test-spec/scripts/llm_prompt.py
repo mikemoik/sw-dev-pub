@@ -8,7 +8,8 @@ design, introduction, metadata, approach, environment, results). The prompt is
 llm/_common.md + llm/<file>.md + the command reference (units/empty/<file>.tex)
 + a worked example (units/sample/<file>.tex, left out with --no-example or when
 working on the sample) + the unit's file and the related files it needs + any
---add files (e.g. a header or an SRS excerpt). Paste it as the first message of a new chat; models
+--add files (e.g. a header or an SRS excerpt). With --figure TYPE, the chat guide of that
+specfig figure type is added (the figure menu is always in). Paste it as the first message of a new chat; models
 without a system role (e.g. Gemma) work the same way. Standard library only.
 """
 
@@ -16,6 +17,8 @@ import argparse
 import re
 import sys
 from pathlib import Path
+
+from sf_figures import guides, menu, types
 
 ROOT = Path(__file__).resolve().parent.parent
 UNITS = ROOT / "units"
@@ -42,10 +45,13 @@ def fenced(title: str, text: str, lang: str = "latex") -> str:
     return f"## {title}\n\n```{lang}\n{text.rstrip()}\n```\n"
 
 
-def build_prompt(unit: str, file: str, extra: list, example: bool = True) -> str:
+def build_prompt(
+    unit: str, file: str, extra: list, example: bool = True, figures: tuple = ()
+) -> str:
     unit_dir = UNITS / unit
     parts = [
         (LLM / "_common.md").read_text(encoding="utf-8").rstrip() + "\n",
+        menu(),
         (LLM / f"{file}.md").read_text(encoding="utf-8").rstrip() + "\n",
         "# Files\n",
         fenced(
@@ -77,6 +83,8 @@ def build_prompt(unit: str, file: str, extra: list, example: bool = True) -> str
                 lang,
             )
         )
+    if figures:
+        parts.append(guides(list(figures)))
     parts.append(
         f"# Start\n\nWe work on `units/{unit}/{file}.tex`. "
         'Reply only "Ready." and wait for my first request.\n'
@@ -108,6 +116,15 @@ def main(argv=None) -> int:
         help="warn above this estimated prompt size (default 32000)",
     )
     parser.add_argument(
+        "--figure",
+        action="append",
+        default=[],
+        choices=types(),
+        metavar="TYPE",
+        help="add the chat guide of a specfig figure type (repeatable; "
+        "scripts/new_figure.py --list shows the types)",
+    )
+    parser.add_argument(
         "--no-example",
         action="store_true",
         help="leave out the worked example from units/sample/",
@@ -125,7 +142,7 @@ def main(argv=None) -> int:
             print(f"error: --add file not found: {path}", file=sys.stderr)
             return 2
 
-    prompt = build_prompt(args.unit, args.file, args.add, not args.no_example)
+    prompt = build_prompt(args.unit, args.file, args.add, not args.no_example, tuple(args.figure))
     tokens = round(len(prompt) / CHARS_PER_TOKEN)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

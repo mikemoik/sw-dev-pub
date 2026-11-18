@@ -57,6 +57,16 @@ python3 scripts/llm_prompt.py nvm_mgr unit --add ../src/nvm_mgr.h -o build/promp
 
 The prompt is about 2K–5K tokens plus `--add` files. Above 32000 it warns (`--max-tokens`). `--no-example` leaves out the worked example from `units/sample/`.
 
+**Figures:** the rules and prompts list the specfig figure types. Ask for a figure in the chat; if the type's guide is missing, the model says which one to add. With Continue, create the figure file and add it to the chat (Continue then adds the type's guide); without, add `--figure`:
+
+```sh
+python3 scripts/new_figure.py nvm_mgr sequence cycle                         # units/nvm_mgr/figures/sequence_cycle.tex
+python3 scripts/llm_prompt.py nvm_mgr design --figure sequence -o build/prompt.md
+python3 scripts/llm_context.py nvm_mgr --figure gantt                        # whole-unit context + a type not used yet
+```
+
+`llm_context.py --figure` lasts until the next build; after that, a figure file of the type keeps its guide in.
+
 **Whole unit in one file:** every build (`build.py`, `latexmk`, also each `-pvc` rebuild) rewrites `units/<unit>/llm-context.md` through `latexmkrc`. It holds the rules, all guides and command references, the figure guides of the specfig types the unit uses, an index of the declared IDs and all content and figure files of the unit. In Continue, reference only that file (`@llm-context.md`) for requests that touch several files or a figure; the per-file rules stay for small edits. The file is the state of the last build: after applying an answer, save (so `-pvc` rebuilds) and start a new chat or reference the file again. About 15K tokens for the sample.
 
 ```sh

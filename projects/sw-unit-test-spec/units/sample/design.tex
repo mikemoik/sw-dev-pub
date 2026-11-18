@@ -9,21 +9,15 @@
 
 \begin{IntendedBehavior}
 The unit has two operating states. Transitions happen only in
-\texttt{SetpointCtrl\_Init()}; set requests never change the state.
+\texttt{SetpointCtrl\_Init()}; set requests never change the state (Figure~\ref{fig:states}).
 
-\begin{center}
-\begin{tikzpicture}[>=Stealth, node distance=1.2cm and 3.2cm,
-    st/.style={draw=accent, rounded corners, fill=accent!10, minimum width=2.6cm,
-               minimum height=0.9cm, font=\small\bfseries}]
-  \node[circle, fill=accent, inner sep=2.5pt] (start) {};
-  \node[st, right=1.6cm of start] (init) {INIT};
-  \node[st, above right=0.3cm and 3.2cm of init] (idle) {IDLE};
-  \node[st, below right=0.3cm and 3.2cm of init] (deg) {DEGRADED};
-  \draw[->] (start) -- (init);
-  \draw[->] (init) -- node[pos=0.4, above, sloped, font=\scriptsize] {NvM read E\_OK} (idle);
-  \draw[->] (init) -- node[pos=0.4, below, sloped, font=\scriptsize] {NvM read E\_NOT\_OK} (deg);
-\end{tikzpicture}
-\end{center}
+% specfig figure in this unit's figures/state_modes.tex (scripts/new_figure.py sample state modes).
+\begin{figure}[htbp]
+  \centering
+  \InputFigure{state_modes}
+  \caption{Operating states of \TheUnit.}
+  \label{fig:states}
+\end{figure}
 
 \begin{center}
 \begin{tabular}{lll}
