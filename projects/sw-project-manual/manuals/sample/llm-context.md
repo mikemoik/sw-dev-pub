@@ -4,9 +4,8 @@
 
 This file holds the **whole manual `sample`** as of its last build: the rules and
 guides of the template, then the manual's files, each under a heading with its path.
-A request may need changes in several files (e.g. a new work product in
-`workproducts.tex` and its milestone in `lifecycle.tex`) or in a figure: give one
-separately labelled code block per file, each with the line saying where it goes.
+A request may need changes in several files (e.g. a new work product in `workproducts.tex` and its milestone in `lifecycle.tex`) or in a figure: give
+one separately labelled code block per file, each with the line saying where it goes.
 Take IDs, names and dates from the *ID index* and the files below. If the engineer
 says a file changed since, ask them to paste it; the pasted version wins.
 
@@ -566,7 +565,7 @@ Export row (CSV): `OP-011;Timing budget per task not yet given by the system tea
 - **Tools (name, version):** GCC | 14.2; Target compiler | 12.3; CMake | 3.30; GoogleTest | 1.15; gcov/lcov | 2.1; cppcheck | 2.16; clang-format | 19; GitLab CI | 17
 - **Risks:** RSK-01 | Basic software release of the platform team comes late; RSK-02 | Requirements change after M1; RSK-03 | Timing budget of 200 us not met on the target; RSK-04 | Only one tester in the project; RSK-05 | Static analysis tool licence expires during the project
 - **References (key for \DocRef, document):** offer | Project offer and statement of work, SOW-PRJ-0815; srs | Software Requirements Specification, SRS-SPC-001; swcs | Software Component Specification heater_ctrl, SWCS-HC-001; safety | Safety Plan heater_ctrl, SP-HC-001; process | Company software process handbook, PH-SW-003; aspice | Automotive SPICE PAM; misra | MISRA C:2012 (with Amendments 1--4)
-- **Open points (ID, topic, status):** OP-007 | NvM block layout for the calibration data not agreed with the platform team | in progress; OP-011 | Timing budget per task on the target not yet given by the system team | open; OP-004 | Static analysis rule set: deviations for the generated RTE code | in progress; OP-012 | HIL slot for the qualification test not reserved | open; OP-009 | Interface to the diagnostic event manager: event IDs missing in the system requirements | in progress; OP-013 | Coding guideline for the MISRA C:2012 amendment 4 rules | open; OP-014 | Second tester for the component tests (RSK-04) | open; OP-015 | Template for the software unit test report | open; OP-001 | Repository and CI runner set up | closed; OP-002 | Project manual reviewed by QA | closed; OP-003 | Licence of the static analysis tool for the project | closed; OP-005 | Kick-off minutes sent to the customer | closed
+- **Open points (ID, topic, status):** OP-007 | NvM block layout for the calibration data not agreed with the platf... | in progress; OP-011 | Timing budget per task on the target not yet given by the system team | open; OP-004 | Static analysis rule set: deviations for the generated RTE code | in progress; OP-012 | HIL slot for the qualification test not reserved | open; OP-009 | Interface to the diagnostic event manager: event IDs missing in the... | in progress; OP-013 | Coding guideline for the MISRA C:2012 amendment 4 rules | open; OP-014 | Second tester for the component tests (RSK-04) | open; OP-015 | Template for the software unit test report | open; OP-001 | Repository and CI runner set up | closed; OP-002 | Project manual reviewed by QA | closed; OP-003 | Licence of the static analysis tool for the project | closed; OP-005 | Kick-off minutes sent to the customer | closed
 - **How-tos:** HT-SETUP | Set up the workspace; HT-CHANGE | Make a change; HT-RELEASE | Create a release
 
 # Files of manual sample
