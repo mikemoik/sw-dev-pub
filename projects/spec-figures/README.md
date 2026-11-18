@@ -56,7 +56,8 @@ scripts/check.py          test: sample + empty 0 warnings, sample covers every f
 scripts/llm_prompt.py     chat prompt for one figure type
 scripts/llm_context.py    writes figures/<document>/llm-context.md: whole document as one chat context (run after every build)
 scripts/continue_rules.py generates .continue/rules/sf-*.md from llm/, figures/sample/, mermaid/
-scripts/vendor.py         copies specfig and the rules into a template
+scripts/vendor.py         copies specfig, the rules and vendor/*.py into a template
+vendor/                   scripts for the templates: new_figure.py (figure file from a type's example), sf_figures.py (types, guides, menu)
 ```
 
 ## Figure documents
@@ -93,7 +94,7 @@ A figure is its environment, e.g. in `figures/sequence_ctrl_cycle.tex`, included
 
 The data commands exist only inside their environment, so they don't clash with a document's own `\Milestone`, `\Risk` and so on. Diagrams with boxes place elements on a grid `[column,row]`; without a position, an element goes next to the previous one.
 
-**In the templates:** `python3 scripts/vendor.py ../sw-project-manual` copies `sty/specfig*.sty` and the Continue rules there (`--check` reports whether they are up to date). Rerun it after every change here. The templates don't load specfig themselves: add `\usepackage{specfig}` after `\documentclass{…}` in the main file.
+**In the templates:** `python3 scripts/vendor.py ../sw-project-manual` copies `sty/specfig*.sty`, `vendor/*.py` (to `scripts/`) and the Continue rules there, including the figure menu `sf-00-menu.md` for content files (`--check` reports whether they are up to date). Rerun it after every change here, for all three templates. Their classes load specfig; their `llm_prompt.py` and `llm_context.py` include the menu and take `--figure <type>` for a type's guide.
 
 ## Chat with an LLM
 
@@ -114,7 +115,7 @@ python3 scripts/llm_context.py brake_mon            # write it without building
 python3 scripts/llm_context.py brake_mon --check    # exit 1 if out of date
 ```
 
-After changing `llm/`, `figures/sample/<type>.tex` or `mermaid/`, run `python3 scripts/continue_rules.py` and `vendor.py` for each template (the templates get every rule except the one for `document.tex`).
+After changing `llm/`, `figures/sample/<type>.tex` or `mermaid/`, run `python3 scripts/continue_rules.py` and `vendor.py` for each template (the templates get every rule except the one for `document.tex`, plus the figure menu).
 
 ## Test
 

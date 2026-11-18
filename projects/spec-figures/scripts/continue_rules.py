@@ -15,6 +15,7 @@ is the source: edit the guides there and rerun this script. Standard library onl
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -89,18 +90,88 @@ def document_rule() -> str:
     )
 
 
-def expected(document: bool = True) -> dict:
-    """The rules; document=False leaves out the figure-document rule (templates)."""
+# content files of the document templates (units/, components/, manuals/)
+MENU_GLOBS = ["**/units/*/*.tex", "**/components/*/*.tex", "**/manuals/*/*.tex"]
+
+
+def summary(kind: str) -> tuple:
+    """(environment, first sentence of the description) of a guide."""
+    text = (LLM / f"{kind}.md").read_text(encoding="utf-8")
+    env = re.search(r"\\begin\{(sf[A-Za-z]+)\}", text)
+    para = text.split("\n\n", 2)[1].strip()
+    first = re.split(r"(?<=[.:])\s", para, maxsplit=1)[0].rstrip(":.")
+    return (env.group(1) if env else "?"), first
+
+
+def menu_rule() -> str:
+    """For the templates' content files: the figure types and how to ask for one."""
+    lines = [
+        "# Figures (specfig)",
+        "",
+        (
+            "This template draws figures with the *specfig* package: a figure is one file "
+            "`figures/<type>_<name>.tex` in the folder of the unit, component or manual, "
+            "holding one environment with plain data commands; specfig does the layout and "
+            "the checks. Types (`type`, environment: what it shows):"
+        ),
+        "",
+    ]
+    for kind in TYPES:
+        env, first = summary(kind)
+        lines.append(f"- `{kind}`, `{env}`: {first}.")
+    lines += [
+        "",
+        "When the engineer asks for a figure:",
+        "",
+        "1. Pick the type from this list; ask if two fit.",
+        (
+            "2. Check that the guide of that type (a section *Figure: ...* with its commands) "
+            "is in this chat. **If it is not, don't write the figure** and don't invent "
+            "commands: name the type and ask the engineer to add the guide, e.g. "
+            '"Run `python3 scripts/new_figure.py <folder> sequence ctrl_cycle` and add the '
+            'new file to the chat" (Continue then adds the guide) or "Rerun '
+            '`scripts/llm_prompt.py` with `--figure sequence`".'
+        ),
+        (
+            "3. With the guide: give the figure file (only the environment) and, as a second "
+            "code block, the lines that include it in a free-text block of the content file: "
+            "`\\begin{figure}[htbp]`, `\\centering`, `\\InputFigure{<type>_<name>}`, "
+            "`\\caption{...}`, `\\label{fig:...}`, `\\end{figure}` (a `raci` matrix is a "
+            "table: `\\begin{center}` instead of `figure`)."
+        ),
+        "",
+        "Never write raw TikZ (`tikzpicture`, `\\draw`) for these figure types.",
+    ]
+    return (
+        frontmatter(
+            "Figures: menu",
+            "The specfig figure types and how to ask for one (content files)",
+            MENU_GLOBS,
+        )
+        + HEADER
+        + "\n"
+        + "\n".join(lines)
+        + "\n"
+    )
+
+
+def expected(document: bool = True, menu: bool = False) -> dict:
+    """The rules: document = the figure-document rule (this project), menu = the
+    figure menu for content files (the templates)."""
     rules = {"sf-00-common.md": common_rule()}
     if document:
         rules["sf-00-document.md"] = document_rule()
+    if menu:
+        rules["sf-00-menu.md"] = menu_rule()
     for kind in TYPES:
         rules[f"sf-{kind}.md"] = type_rule(kind)
     return rules
 
 
-def sync(rules_dir: Path, check: bool, document: bool = True) -> int:
-    rules = expected(document)
+def sync(
+    rules_dir: Path, check: bool, document: bool = True, menu: bool = False
+) -> int:
+    rules = expected(document, menu)
     present = (
         {p.name for p in rules_dir.glob("sf-*.md")} if rules_dir.is_dir() else set()
     )
