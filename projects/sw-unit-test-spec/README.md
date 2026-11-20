@@ -21,7 +21,7 @@ scripts/new_figure.py     creates a specfig figure file from the example of its 
 scripts/sf_figures.py     figure types and chat guides for the scripts (from spec-figures)
 scripts/llm_prompt.py     builds a chat prompt so an LLM can help edit a unit's file
 scripts/llm_context.py    writes units/<unit>/llm-context.md: whole unit + guides as one chat context (run after every build)
-llm/                      the guides it uses: general rules + one per content file
+llm/                      the guides it uses: general rules + one per content file + knowledge.md
 scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in VS Code)
 .continue/rules/          generated: the guides as Continue rules, one per content file
 README-scripts.md         short usage of the scripts, incl. LLM chat help
@@ -31,6 +31,7 @@ units/
   sample/                 worked example (unit setpoint_ctrl)
   <unit>/                 one folder per unit:
     metadata.tex …        content files (table below)
+    knowledge.md          facts collected from code, documents, requirement exports (LLM chat, README-scripts.md)
     figures/ data/ code/  the unit's own figures, data and source files
 ```
 
@@ -73,7 +74,7 @@ latexmk -pdf sw_unit_test_spec.tex           # the default unit (\LoadUnit{sampl
 - **One job name per unit** (`-jobname=<unit>`, as `build.py` does). latexmk does not count `-usepretex` code as input. Under a shared job name, a build of another unit finds the previous PDF up to date and does nothing (force it with `-g`).
 - A unit folder without `metadata.tex` gives the warning `Unit folder … has no metadata.tex` (typo guard). The log names the folder used: `suts: content folder …`.
 - Plain `pdflatex` without latexmk: `pdflatex -jobname=nvm_mgr '\def\SpecUnit{nvm_mgr}\input{sw_unit_test_spec}'` (three runs).
-- `new_unit.py <unit> --from <other>` copies another unit instead of the skeleton, e.g. for a similar unit. Unit names: letters, digits, `_`, `-`, `.`.
+- `new_unit.py <unit> --from <other>` copies another unit instead of the skeleton, e.g. for a similar unit (`knowledge.md` starts empty). Unit names: letters, digits, `_`, `-`, `.`.
 
 `sw_unit_test_spec.pdf` is committed as a preview of the sample unit; rebuild it whenever the template or the sample changes.
 

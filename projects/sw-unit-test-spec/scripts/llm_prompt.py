@@ -7,7 +7,8 @@
 design, introduction, metadata, approach, environment, results). The prompt is
 llm/_common.md + llm/<file>.md + the command reference (units/empty/<file>.tex)
 + a worked example (units/sample/<file>.tex, left out with --no-example or when
-working on the sample) + the unit's file and the related files it needs + any
+working on the sample) + the unit's file and the related files it needs + the
+unit's knowledge.md if it has one + any
 --add files (e.g. a header or an SRS excerpt). With --figure TYPE, the chat guide of that
 specfig figure type is added (the figure menu is always in). Paste it as the first message of a new chat; models
 without a system role (e.g. Gemma) work the same way. Standard library only.
@@ -74,6 +75,15 @@ def build_prompt(
             path.read_text(encoding="utf-8") if path.is_file() else "% (file missing)"
         )
         parts.append(fenced(f"units/{unit}/{name}.tex ({label})", text))
+    knowledge = unit_dir / "knowledge.md"
+    if knowledge.is_file():
+        parts.append(
+            fenced(
+                f"units/{unit}/knowledge.md (collected facts, for reference, don't edit)",
+                knowledge.read_text(encoding="utf-8"),
+                "markdown",
+            )
+        )
     for path in extra:
         lang = "latex" if path.suffix == ".tex" else ""
         parts.append(

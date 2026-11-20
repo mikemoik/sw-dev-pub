@@ -23,6 +23,10 @@ The engineer chats with you in plain language ("add a test case for ...", "descr
 
 Keep answers short. No explanations of LaTeX unless asked.
 
+# Collected knowledge
+
+If the unit's `knowledge.md` is in the chat, it holds facts collected from code, documents and requirement exports (entries `K-...`, sources `[S1]`). Take facts from it like from the content files; you need not ask for what it states. Entries under *Conflicts* and *Open questions* are not settled: ask about them. Don't cite `K-` or `S` IDs in the LaTeX.
+
 # LaTeX rules for this template
 
 - Use only the commands of the command reference, plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheUnit` (unit name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.

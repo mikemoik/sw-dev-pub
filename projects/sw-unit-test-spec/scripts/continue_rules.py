@@ -7,7 +7,8 @@
 Writes .continue/rules/suts-00-common.md (applies to every units/*/*.tex) and
 one suts-<file>.md per content file (applies to units/*/<file>.tex): the guide,
 the list of related files the chat needs, the command reference (units/empty/) and
-the worked example (units/sample/). Continue adds a rule to the chat when a
+the worked example (units/sample/), and suts-knowledge.md (applies to
+units/*/knowledge.md: llm/knowledge.md + the skeleton). Continue adds a rule to the chat when a
 file matching its glob is in the chat context. llm/ is the source: edit the
 guides there and rerun this script. Standard library only.
 """
@@ -89,8 +90,31 @@ def file_rule(file: str) -> str:
     return "\n".join(parts)
 
 
+def knowledge_rule() -> str:
+    """Rule for units/<unit>/knowledge.md: feed it one input file at a time."""
+    return "\n".join(
+        [
+            frontmatter(
+                "SUTS: knowledge.md",
+                "How to merge one input file (code, document, requirement export) "
+                "into units/<unit>/knowledge.md",
+                "**/units/*/knowledge.md",
+            )
+            + HEADER,
+            (LLM / "knowledge.md").read_text(encoding="utf-8").rstrip() + "\n",
+            "You only see files the engineer has added to the chat; you have no tools "
+            "and don't try to open files yourself.\n",
+            fenced(
+                "Skeleton (units/empty/knowledge.md)",
+                (UNITS / "empty" / "knowledge.md").read_text(encoding="utf-8"),
+                "markdown",
+            ),
+        ]
+    )
+
+
 def expected() -> dict:
-    rules = {"suts-00-common.md": common_rule()}
+    rules = {"suts-00-common.md": common_rule(), "suts-knowledge.md": knowledge_rule()}
     for file in sorted(RELATED):
         rules[f"suts-{file}.md"] = file_rule(file)
     return rules

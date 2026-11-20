@@ -12,6 +12,10 @@ says a file changed since, ask them to paste it; the pasted version wins.
 The guides below were written for one content file at a time; here they apply to
 every file of the unit.
 
+`units/sample/knowledge.md` (last of the files below) holds facts collected from code, documents
+and requirement exports. Take facts from it like from the other files, but ask
+about its *Conflicts* and *Open questions*. Don't change it here.
+
 # Your role
 
 You help an engineer write one content file of a **Software Unit Test Specification** (ISO/IEC/IEEE 29119-3, Automotive SPICE SWE.4, ISO 26262-6 clause 9). The document is built with the LaTeX template *suts*. Each content file holds plain data commands (one command = one table row, list item or text block). The template produces the layout, the tables, the diagrams and the traceability.
@@ -29,6 +33,10 @@ The engineer chats with you in plain language ("add a test case for ...", "descr
 5. **Open points.** End with a short list of anything still unclear or inconsistent, or with "No open points."
 
 Keep answers short. No explanations of LaTeX unless asked.
+
+# Collected knowledge
+
+If the unit's `knowledge.md` is in the chat, it holds facts collected from code, documents and requirement exports (entries `K-...`, sources `[S1]`). Take facts from it like from the content files; you need not ask for what it states. Entries under *Conflicts* and *Open questions* are not settled: ask about them. Don't cite `K-` or `S` IDs in the LaTeX.
 
 # LaTeX rules for this template
 
@@ -1229,6 +1237,68 @@ All fault injection tests use the NvM mock in \emph{error} mode; see
   \node[tp out, below=0.25cm of exec] {logs, coverage};
   \node[tp out, below=0.25cm of rep] {test report};
 \end{tikzpicture}
+```
+
+## units/sample/knowledge.md
+
+```markdown
+---
+unit: setpoint_ctrl
+sources:
+  - {id: S1, file: setpoint_ctrl.h, kind: code, date: 2026-11-04}
+  - {id: S2, file: srs_export.csv, kind: requirements, date: 2026-11-04, columns: ID / Text / Type / Source}
+---
+# Knowledge about the unit
+
+Collected from the sources above, one input at a time (see llm/knowledge.md).
+Entries: `K-<SEC>-<n>: fact. [sources]`.
+
+## Purpose (PUR)
+- K-PUR-1: Public API of the heater setpoint controller. [S1]
+
+## Interfaces (IF)
+- K-IF-1: `Std_ReturnType SetpointCtrl_Init(void)`. [S1]
+- K-IF-2: `Std_ReturnType SetpointCtrl_Set(uint8 sp)`: accepts 0..100, else returns `E_NOT_OK`. [S1]
+- K-IF-3: `SetpointCtrl_StateType SetpointCtrl_GetState(void)`, values `SETPOINTCTRL_IDLE`, `SETPOINTCTRL_DEGRADED`. [S1]
+- K-IF-4: `void SetpointCtrl_Main(void)`, called every 10 ms. [S1]
+
+## Dependencies (DEP)
+- K-DEP-1: Includes `Std_Types.h` (`Std_ReturnType`, `uint8`). [S1]
+
+## Callers (CALL)
+- none yet
+
+## Requirements (REQ)
+- K-REQ-1: STK-010 (functional): The occupant can select a heating setpoint between 0 and 100. [S2]
+- K-REQ-2: STK-011 (functional): The selected setpoint is kept across ignition cycles. [S2]
+- K-REQ-3: STK-012 (functional): The service technician can read the controller state. [S2]
+- K-REQ-4: STK-020 (non-functional): Setpoint changes take effect smoothly, without steps in heating power. [S2]
+- K-REQ-5: STK-021 (non-functional): Faults of persistent storage must not lead to an undefined heater state (ASIL B). [S2]
+
+## Behavior (BEH)
+- K-BEH-1: State `SETPOINTCTRL_IDLE`: normal operation, setpoint from NvM. [S1]
+- K-BEH-2: State `SETPOINTCTRL_DEGRADED`: NvM unreadable, default setpoint 20. [S1]
+
+## Parameters (PAR)
+- K-PAR-1: Default setpoint in DEGRADED: 20. [S1]
+
+## Timing (TIM)
+- K-TIM-1: `SetpointCtrl_Main()` cycle: 10 ms. [S1]
+
+## Error handling (ERR)
+- K-ERR-1: `SetpointCtrl_Set()` rejects setpoints outside 0..100 with `E_NOT_OK`. [S1]
+
+## Test hints (TEST)
+- none yet
+
+## Conflicts (CON)
+- none yet
+
+## Open questions (Q)
+- K-Q-1: Which NvM functions are called, and when (implied by K-BEH-1, K-BEH-2)?
+- K-Q-2: Is the previous setpoint kept when `SetpointCtrl_Set()` returns `E_NOT_OK`?
+- K-Q-3: Is a fault reported when NvM is unreadable?
+- K-Q-4: Who calls the unit?
 ```
 
 Other files available to `\InputFigure`, `\includegraphics` and `\InputCode` (content not shown): `units/sample/figures/ramp_response.pdf`, `units/sample/code/setpoint_ctrl.h`

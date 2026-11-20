@@ -74,7 +74,9 @@ python3 scripts/llm_context.py nvm_mgr            # write it without building
 python3 scripts/llm_context.py nvm_mgr --check    # exit 1 if out of date
 ```
 
-**Maintainers:** `llm/_common.md` (role, chat protocol, LaTeX rules, shared helpers) and `llm/<file>.md` (one guide per content file) are the source. `.continue/rules/` is generated from them plus `units/empty/` and `units/sample/`, and committed. After changing any of these:
+**Collect knowledge first:** `units/<unit>/knowledge.md` gathers facts about the unit from its sources, one file at a time: code (`.h`, `.c`, `.py`, ...), documents (`.md`, text from a PDF, images if the model takes them), requirement exports (`.csv`). Open the input file, add `@knowledge.md` to the chat and write "ingest" (optionally a hint, e.g. "only the NvM part"). The model answers with the whole updated file: replace `knowledge.md` with it and check `git diff`. Then the next input in a new chat. The prompts above and `llm-context.md` include `knowledge.md` (`llm-context.md` from the next build), so the spec chats take facts from it. Example: `units/sample/knowledge.md`.
+
+**Maintainers:** `llm/_common.md` (role, chat protocol, LaTeX rules, shared helpers) and `llm/<file>.md` (one guide per content file) are the source. `llm/knowledge.md` is the guide for `knowledge.md`. `.continue/rules/` is generated from them plus `units/empty/` and `units/sample/`, and committed. After changing any of these:
 
 ```sh
 python3 scripts/continue_rules.py           # regenerate .continue/rules/

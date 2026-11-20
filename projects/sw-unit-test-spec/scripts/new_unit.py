@@ -4,8 +4,9 @@
     python3 scripts/new_unit.py <name> [--from <unit>]
 
 Copies units/empty/ (or another unit with --from) to units/<name>/, including
-its figures/, data/ and code/ folders, and sets \\UnitName{<name>} in
-metadata.tex. The name is used as folder name and as build job name, so only
+its figures/, data/ and code/ folders, sets \\UnitName{<name>} in
+metadata.tex and `unit:` in knowledge.md. With --from, knowledge.md starts
+from the skeleton: the other unit's knowledge is not copied. The name is used as folder name and as build job name, so only
 letters, digits, '_', '-' and '.' are allowed. Standard library only.
 """
 
@@ -19,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 UNITS = ROOT / "units"
 NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 UNITNAME_RE = re.compile(r"^%?[ \t]*\\UnitName\{[^}\n]*\}.*$", re.MULTILINE)
+KNOWLEDGE_UNIT_RE = re.compile(r"^unit:.*$", re.MULTILINE)
 
 
 def set_unit_name(metadata: Path, name: str) -> None:
@@ -30,6 +32,15 @@ def set_unit_name(metadata: Path, name: str) -> None:
     else:
         text = text + ("" if text.endswith("\n") or not text else "\n") + line + "\n"
     metadata.write_text(text, encoding="utf-8")
+
+
+def reset_knowledge(target: Path, name: str) -> None:
+    """knowledge.md from the skeleton, with unit: <name> (no file if the skeleton has none)."""
+    skeleton = UNITS / "empty" / "knowledge.md"
+    if not skeleton.is_file():
+        return
+    text = KNOWLEDGE_UNIT_RE.sub(f"unit: {name}", skeleton.read_text(encoding="utf-8"), count=1)
+    (target / "knowledge.md").write_text(text, encoding="utf-8")
 
 
 def main(argv=None) -> int:
@@ -75,6 +86,7 @@ def main(argv=None) -> int:
         if not any(folder.iterdir()):  # git keeps no empty folders
             (folder / ".gitkeep").touch()
     set_unit_name(target / "metadata.tex", name)
+    reset_knowledge(target, name)
 
     print(f"created {target.relative_to(ROOT)}/ (copy of {source.relative_to(ROOT)}/)")
     print(
