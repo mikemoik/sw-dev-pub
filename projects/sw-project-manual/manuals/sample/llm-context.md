@@ -32,9 +32,13 @@ The engineer chats with you in plain language ("add a risk for a late supplier r
 
 Keep answers short. No explanations of LaTeX unless asked.
 
+# Macros
+
+The project's `macros.tex` (template root) and the manual's `manuals/<manual>/macros.tex` define extra macros; the manual's file may override the project's. If one of them is in the chat, use its macros where they fit. Don't define macros in content files: if a new one would help, propose it as a separate code block for `manuals/<manual>/macros.tex`.
+
 # LaTeX rules for this template
 
-- Use only the commands of the command reference, plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheProject`, `\TheComponent`. Inside free-text blocks (`FreeText`), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`) and `\subsection`/`\subsubsection` are fine too.
+- Use only the commands of the command reference, the macros of the macro files (see *Macros*), plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheProject`, `\TheComponent`. Inside free-text blocks (`FreeText`), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`) and `\subsection`/`\subsubsection` are fine too.
 - Never write `\documentclass`, `\usepackage`, `\begin{document}` or Markdown inside LaTeX.
 - `_` may be typed as is in text (`heater_ctrl`).
 - Escape these when you mean the character: `\&` `\%` `\#` `\$`; `~` is `\textasciitilde`. A bare `%` starts a comment.
@@ -729,6 +733,16 @@ gantt
 
 # Files of manual sample
 
+## manuals/sample/macros.tex (macros, use them)
+
+```latex
+% Macros of this manual only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Repo{git.example.com/heater/heater_ctrl}  % repository URL
+```
+
 ## manuals/sample/metadata.tex
 
 ```latex
@@ -1068,7 +1082,7 @@ The work packages run between the milestones above (Figure~\ref{fig:plan}).
 \begin{HowTo}{HT-SETUP}{Set up the workspace}
   \Goal{A fresh clone that builds and runs the tests on a Linux host.}
   \Tools{GCC, CMake, GoogleTest}
-  \Step{Clone the repository with its submodules.}{git clone --recurse-submodules git.example.com/heater/heater_ctrl}
+  \Step{Clone the repository with its submodules.}{git clone --recurse-submodules \Repo}
   \Step{Configure the host build.}{cmake --preset host}
   \Step{Build and run all tests; all must pass.}{cmake --build --preset host \&\& ctest --preset host}
 \end{HowTo}

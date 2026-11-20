@@ -8,7 +8,9 @@
 The file holds: the common rules, the guide and command reference
 (manuals/empty/) of every content file, the figure guides (.continue/rules/sf-*.md)
 of the specfig types the manual uses, an index of the declared IDs, and the
-manual's current content and figure files, each under its path. Reference it in a
+manual's current content and figure files, each under its path, its knowledge.md if it
+has one, and the macro files (macros.tex at the root and in the folder) if they
+define anything. Reference it in a
 chat (Continue: @llm-context.md) and ask for changes across files and figures.
 It is a snapshot: latexmkrc rewrites it after every build, so a new chat always
 gets the built state. manuals/empty/ is skipped by the hook. The file is written
@@ -48,6 +50,7 @@ CROSS_FILE_EXAMPLE = "a new work product in `workproducts.tex` and its milestone
 
 OUT_NAME = "llm-context.md"
 KNOWLEDGE_NAME = "knowledge.md"  # collected facts, shown if the folder has one
+MACROS_NAME = "macros.tex"  # macro files at the root and in the folder, shown if not empty
 SKELETON = "empty"
 RULES = ROOT / ".continue" / "rules"
 CHAPTERS = list(RELATED)  # content files in document order
@@ -233,6 +236,10 @@ def build_context(name: str, extra_types: tuple = ()) -> str:
                 parts.append(rule_body(path))
     parts.append(id_index(content))  # not figures: specfig reuses \Milestone, \Risk, ...
     parts.append(f"# Files of {KIND} {name}\n")
+    for path in (ROOT / MACROS_NAME, doc_dir / MACROS_NAME):
+        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        if strip_comments(text).strip():
+            parts.append(fenced(f"{path.relative_to(ROOT).as_posix()} (macros, use them)", text))
     for rel, text in {**content, **figures}.items():
         parts.append(fenced(rel, text))
     if knowledge.is_file():

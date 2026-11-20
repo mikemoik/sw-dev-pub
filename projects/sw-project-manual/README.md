@@ -27,11 +27,14 @@ scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in
 .continue/rules/          generated: the guides as Continue rules, one per content file
 README-scripts.md         short usage of the scripts, incl. LLM chat help
 figures/  data/  code/    shared by all manuals (a manual's own file of the same name wins)
+packages.tex              project packages (\usepackage), loaded by the class for every manual
+macros.tex                project macros for every manual (a manual's macros.tex may override them)
 manuals/
   empty/                  skeleton for new manuals: commented command templates, no content
   sample/                 worked example (the project developing heater_ctrl)
     data/                 sample exports of a mockup planning tool (milestones, CSV) and risk tool (JSON), not in template format
   <manual>/               one folder per project:
+    macros.tex            the manual's own macros, read before the content files
     metadata.tex …        content files (table below)
     figures/ data/ code/  the manual's own figures, data and source files
 ```
@@ -184,7 +187,17 @@ LaTeX warnings: duplicate IDs (roles, processes, milestones, work products, risk
 
 ## Customizing
 
-In `sw_project_manual.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecOrganization`, `\SpecLifecycle`, `\SpecWorkProducts`, `\SpecConfiguration`, `\SpecQuality`, `\SpecRisks`, `\SpecEnvironment`, `\SpecDevelopment`, `\SpecOpenPoints`), load your own packages and add own sections. Class options go to `article`.
+**Own packages and macros** go to optional files, all read in the preamble; a missing one is skipped:
+
+| File | Read | For |
+|---|---|---|
+| `packages.tex` (root) | by `swpm.cls`, before `underscore` | `\usepackage` for all manuals (TeX Live 2022; others into `sty/`) |
+| `macros.tex` (root) | first when the manual is loaded | macros, colours, TikZ styles for all manuals |
+| `manuals/<manual>/macros.tex` | next, before `metadata.tex` | the manual's macros; `\renewcommand` overrides a root one |
+
+`\newcommand` stops on a name the template already uses. Example: `manuals/sample/macros.tex` (`\Repo`, used in `development.tex`). Manuals made with an older template get the new skeleton files with `scripts/new_manual.py --add-missing --all` (existing files are not changed).
+
+In `sw_project_manual.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecOrganization`, `\SpecLifecycle`, `\SpecWorkProducts`, `\SpecConfiguration`, `\SpecQuality`, `\SpecRisks`, `\SpecEnvironment`, `\SpecDevelopment`, `\SpecOpenPoints`), and add own sections. Class options go to `article`.
 
 ## Test
 

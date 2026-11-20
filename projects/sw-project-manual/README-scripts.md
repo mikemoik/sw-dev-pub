@@ -12,6 +12,7 @@ Run from the template's root folder. Python 3.6+ (standard library only) and `la
 ```sh
 python3 scripts/new_manual.py brake_mon                 # copies manuals/empty/ to manuals/brake_mon/
 python3 scripts/new_manual.py brake_mon --from sample   # copies another manual instead
+python3 scripts/new_manual.py --add-missing --all       # existing manuals: add the skeleton files they lack
 ```
 
 Manual names: letters, digits, `_`, `-`, `.`. The script also sets `\ComponentName{brake_mon}` (one project develops one component; change it if the names differ). Then fill in the files in `manuals/brake_mon/`.

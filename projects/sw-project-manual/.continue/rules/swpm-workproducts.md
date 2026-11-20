@@ -76,3 +76,13 @@ You also need `organization.tex` and `lifecycle.tex` from the same manual folder
 \Informed{WP-REL}{SWA, DEV}
 \Informed{WP-QAR}{PL}
 ```
+
+## Macros of the worked example (manuals/sample/macros.tex)
+
+```latex
+% Macros of this manual only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Repo{git.example.com/heater/heater_ctrl}  % repository URL
+```

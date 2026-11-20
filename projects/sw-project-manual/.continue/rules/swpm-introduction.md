@@ -103,3 +103,13 @@ You also need `metadata.tex` and `lifecycle.tex` from the same manual folder as 
 \Term{SOP}{Start Of Production}
 \Term{RACI}{Responsible, Accountable (approves), Consulted, Informed}
 ```
+
+## Macros of the worked example (manuals/sample/macros.tex)
+
+```latex
+% Macros of this manual only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Repo{git.example.com/heater/heater_ctrl}  % repository URL
+```

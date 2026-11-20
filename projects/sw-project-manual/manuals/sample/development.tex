@@ -27,7 +27,7 @@
 \begin{HowTo}{HT-SETUP}{Set up the workspace}
   \Goal{A fresh clone that builds and runs the tests on a Linux host.}
   \Tools{GCC, CMake, GoogleTest}
-  \Step{Clone the repository with its submodules.}{git clone --recurse-submodules git.example.com/heater/heater_ctrl}
+  \Step{Clone the repository with its submodules.}{git clone --recurse-submodules \Repo}
   \Step{Configure the host build.}{cmake --preset host}
   \Step{Build and run all tests; all must pass.}{cmake --build --preset host \&\& ctest --preset host}
 \end{HowTo}

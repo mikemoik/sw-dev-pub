@@ -49,3 +49,13 @@ You also need `organization.tex` from the same manual folder as the `risks.tex` 
 \Risk{RSK-04}{Only one tester in the project}{medium}{medium}{Developers write the component test cases, the tester reviews}{PL}
 \Risk{RSK-05}{Static analysis tool licence expires during the project}{low}{low}{Licence renewal ordered with the project budget}{CM}
 ```
+
+## Macros of the worked example (manuals/sample/macros.tex)
+
+```latex
+% Macros of this manual only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Repo{git.example.com/heater/heater_ctrl}  % repository URL
+```

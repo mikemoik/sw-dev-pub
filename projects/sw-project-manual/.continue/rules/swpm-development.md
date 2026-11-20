@@ -94,7 +94,7 @@ You also need `environment.tex` and `configuration.tex` from the same manual fol
 \begin{HowTo}{HT-SETUP}{Set up the workspace}
   \Goal{A fresh clone that builds and runs the tests on a Linux host.}
   \Tools{GCC, CMake, GoogleTest}
-  \Step{Clone the repository with its submodules.}{git clone --recurse-submodules git.example.com/heater/heater_ctrl}
+  \Step{Clone the repository with its submodules.}{git clone --recurse-submodules \Repo}
   \Step{Configure the host build.}{cmake --preset host}
   \Step{Build and run all tests; all must pass.}{cmake --build --preset host \&\& ctest --preset host}
 \end{HowTo}
@@ -124,4 +124,14 @@ You also need `environment.tex` and `configuration.tex` from the same manual fol
 From \texttt{.gitlab-ci.yml} of the repository, copied to the manual's \texttt{code/} folder:
 \InputCode[lastline=12]{gitlab-ci.yml}
 \end{FreeText}
+```
+
+## Macros of the worked example (manuals/sample/macros.tex)
+
+```latex
+% Macros of this manual only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Repo{git.example.com/heater/heater_ctrl}  % repository URL
 ```

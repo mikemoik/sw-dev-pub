@@ -100,3 +100,13 @@ No other files are needed.
 \OpenPoint{OP-003}{Licence of the static analysis tool for the project}{closed}{Lee Noe}{2026-11-10}{Licence ordered with the project budget}
 \OpenPoint{OP-005}{Kick-off minutes sent to the customer}{closed}{Jane Doe}{2026-11-04}{}
 ```
+
+## Macros of the worked example (manuals/sample/macros.tex)
+
+```latex
+% Macros of this manual only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Repo{git.example.com/heater/heater_ctrl}  % repository URL
+```
