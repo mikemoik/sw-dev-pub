@@ -118,3 +118,13 @@ You also need `metadata.tex` and `component.tex` from the same component folder 
 \Term{WCET}{Worst-Case Execution Time}
 \Term{NvM, Dem, IoHwAb}{Non-volatile Memory manager, Diagnostic event manager, I/O Hardware Abstraction}
 ```
+
+## Macros of the worked example (components/sample/macros.tex)
+
+```latex
+% Macros of this component only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{HeaterCtrl_#1}                % \Api{Init} -> HeaterCtrl_Init
+```

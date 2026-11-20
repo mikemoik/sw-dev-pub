@@ -47,6 +47,9 @@
 \RequirePackage{graphicx}               % search paths: see \LoadContent
 \RequirePackage[hidelinks]{hyperref}
 \RequirePackage{specfig}                % figures from data commands (spec-figures; sty/specfig*.sty)
+% Project packages: packages.tex at the template root (optional, \usepackage only),
+% read here so they load before underscore. Macros go to macros.tex (see \LoadContent).
+\IfFileExists{./packages.tex}{\input{./packages.tex}}{}
 % underscore LAST: its active _ breaks older packages loaded after it
 % (pgf < 3.1.11, older fancyvrb on TeX Live 2022)
 \RequirePackage[strings,nohyphen]{underscore} % plain _ in text: unit_name, Unit_Init()
@@ -979,11 +982,21 @@
   }
 \cs_new_protected:Npn \__swcs_verbatim_input:nn #1#2
   { \VerbatimInput [ fontsize = \small , #1 ] {#2} }
+% Macro files: macros.tex at the template root (once), then dir/macros.tex,
+% both optional, read before the content files; the folder's may \renewcommand.
+\bool_new:N \g__swcs_root_macros_bool
 \NewDocumentCommand \LoadContent { m }
   {
     \tl_gset:Nx \g__swcs_dir_tl { \tl_to_str:n {#1} }
     \typeout { swcs:~content~folder~`\g__swcs_dir_tl' }
+    % root macros before the search paths: no data/ or code/ file of that name
+    \bool_if:NF \g__swcs_root_macros_bool
+      {
+        \file_if_exist_input:n { ./macros.tex }
+        \bool_gset_true:N \g__swcs_root_macros_bool
+      }
     \__swcs_set_paths:
+    \__swcs_input:n { macros }
     \clist_map_inline:nn
       { metadata, introduction, requirements, component, design, approach, environment, results }
       { \tl_gset:Nn \g__swcs_chapter_tl {##1} \__swcs_input:n {##1} }

@@ -18,9 +18,13 @@ The engineer chats with you in plain language ("add a test case for a sensor fau
 
 Keep answers short. No explanations of LaTeX unless asked.
 
+# Macros
+
+The project's `macros.tex` (template root) and the component's `components/<component>/macros.tex` define extra macros; the component's file may override the project's. If one of them is in the chat, use its macros where they fit. Don't define macros in content files: if a new one would help, propose it as a separate code block for `components/<component>/macros.tex`.
+
 # LaTeX rules for this template
 
-- Use only the commands of the command reference, plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheComponent` (component name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
+- Use only the commands of the command reference, the macros of the macro files (see *Macros*), plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheComponent` (component name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
 - Never write `\documentclass`, `\usepackage`, `\begin{document}` or Markdown inside LaTeX.
 - `_` may be typed as is in text (`HeaterCtrl_Init()`). In math, `_` is a subscript.
 - Escape these when you mean the character: `\&` `\%` `\#` `\$`. A bare `%` starts a comment.

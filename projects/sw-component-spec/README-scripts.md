@@ -12,6 +12,7 @@ Run from the template's root folder. Python 3.6+ (standard library only) and `la
 ```sh
 python3 scripts/new_component.py brake_mon                 # copies components/empty/ to components/brake_mon/
 python3 scripts/new_component.py brake_mon --from sample   # copies another component instead
+python3 scripts/new_component.py --add-missing --all       # existing components: add the skeleton files they lack
 ```
 
 Component names: letters, digits, `_`, `-`, `.`. Then fill in the files in `components/brake_mon/`.

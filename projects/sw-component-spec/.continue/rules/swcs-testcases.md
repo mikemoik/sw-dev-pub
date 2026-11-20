@@ -101,7 +101,7 @@ You also need `requirements.tex` and `component.tex` and `approach.tex` from the
   \Method{Requirements-based; interface test}
   \Priority{High}
   \Preconditions{setpoint_ctrl stub returns 22.0; IoHwAb fake plays a plant model starting at 15.0.}
-  \Step{Call HeaterCtrl_Init().}{No Dem event reported.}
+  \Step{Call \Api{Init}().}{No Dem event reported.}
   \Step{Call HeaterCtrl_MainFunction() 60000 times (10 min).}{IoHwAb_SetHeaterDuty() called once per call.}
   \Step{Evaluate the temperature of the last 60 s.}{Within 21.0 .. 23.0.}
   \Implementation{test/heater_ctrl_test.cpp: ControlPath.ReachesSetpoint}
@@ -161,4 +161,14 @@ You also need `requirements.tex` and `component.tex` and `approach.tex` from the
   \Step{Sum the .text and .rodata sections of src/heater_ctrl/.}{At most 6144 bytes.}
   \Implementation{ci/check_resources.py --component heater_ctrl}
 \end{TestCase}
+```
+
+## Macros of the worked example (components/sample/macros.tex)
+
+```latex
+% Macros of this component only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{HeaterCtrl_#1}                % \Api{Init} -> HeaterCtrl_Init
 ```

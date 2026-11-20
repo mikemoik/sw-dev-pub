@@ -13,7 +13,7 @@
   \Method{Requirements-based; interface test}
   \Priority{High}
   \Preconditions{setpoint_ctrl stub returns 22.0; IoHwAb fake plays a plant model starting at 15.0.}
-  \Step{Call HeaterCtrl_Init().}{No Dem event reported.}
+  \Step{Call \Api{Init}().}{No Dem event reported.}
   \Step{Call HeaterCtrl_MainFunction() 60000 times (10 min).}{IoHwAb_SetHeaterDuty() called once per call.}
   \Step{Evaluate the temperature of the last 60 s.}{Within 21.0 .. 23.0.}
   \Implementation{test/heater_ctrl_test.cpp: ControlPath.ReachesSetpoint}

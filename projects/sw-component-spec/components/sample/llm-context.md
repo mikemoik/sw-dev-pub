@@ -32,9 +32,13 @@ The engineer chats with you in plain language ("add a test case for a sensor fau
 
 Keep answers short. No explanations of LaTeX unless asked.
 
+# Macros
+
+The project's `macros.tex` (template root) and the component's `components/<component>/macros.tex` define extra macros; the component's file may override the project's. If one of them is in the chat, use its macros where they fit. Don't define macros in content files: if a new one would help, propose it as a separate code block for `components/<component>/macros.tex`.
+
 # LaTeX rules for this template
 
-- Use only the commands of the command reference, plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheComponent` (component name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
+- Use only the commands of the command reference, the macros of the macro files (see *Macros*), plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheComponent` (component name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
 - Never write `\documentclass`, `\usepackage`, `\begin{document}` or Markdown inside LaTeX.
 - `_` may be typed as is in text (`HeaterCtrl_Init()`). In math, `_` is a subscript.
 - Escape these when you mean the character: `\&` `\%` `\#` `\$`. A bare `%` starts a comment.
@@ -754,6 +758,16 @@ stateDiagram-v2
 
 # Files of component sample
 
+## components/sample/macros.tex (macros, use them)
+
+```latex
+% Macros of this component only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{HeaterCtrl_#1}                % \Api{Init} -> HeaterCtrl_Init
+```
+
 ## components/sample/metadata.tex
 
 ```latex
@@ -1110,7 +1124,7 @@ SAFE mode is left only by \texttt{HeaterCtrl\_Init()} (next ignition cycle).
   \Method{Requirements-based; interface test}
   \Priority{High}
   \Preconditions{setpoint_ctrl stub returns 22.0; IoHwAb fake plays a plant model starting at 15.0.}
-  \Step{Call HeaterCtrl_Init().}{No Dem event reported.}
+  \Step{Call \Api{Init}().}{No Dem event reported.}
   \Step{Call HeaterCtrl_MainFunction() 60000 times (10 min).}{IoHwAb_SetHeaterDuty() called once per call.}
   \Step{Evaluate the temperature of the last 60 s.}{Within 21.0 .. 23.0.}
   \Implementation{test/heater_ctrl_test.cpp: ControlPath.ReachesSetpoint}

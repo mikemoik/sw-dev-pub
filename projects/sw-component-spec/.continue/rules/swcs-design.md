@@ -133,3 +133,13 @@ request takes effect in the next 10 ms cycle at the latest.
 SAFE mode is left only by \texttt{HeaterCtrl\_Init()} (next ignition cycle).
 \end{ErrorHandling}
 ```
+
+## Macros of the worked example (components/sample/macros.tex)
+
+```latex
+% Macros of this component only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{HeaterCtrl_#1}                % \Api{Init} -> HeaterCtrl_Init
+```

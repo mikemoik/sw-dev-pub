@@ -37,10 +37,13 @@ scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in
 .continue/rules/          generated: the guides as Continue rules, one per content file
 README-scripts.md         short usage of the scripts, incl. LLM chat help
 figures/  data/  code/    shared by all components (a component's own file of the same name wins)
+packages.tex              project packages (\usepackage), loaded by the class for every component
+macros.tex                project macros for every component (a component's macros.tex may override them)
 components/
   empty/                  skeleton for new components: commented command templates, no content
   sample/                 worked example (component heater_ctrl with the units setpoint_ctrl, temp_filter, heat_pi)
   <component>/            one folder per component:
+    macros.tex            the component's own macros, read before the content files
     metadata.tex …        content files (table below)
     figures/ data/ code/  the component's own figures, data and source files
 ```
@@ -199,7 +202,17 @@ LaTeX warnings: duplicate test case, requirement, unit or step IDs; `\Uses` from
 
 ## Customizing
 
-In `sw_component_spec.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecRequirements`, `\SpecDescription`, `\SpecTestApproach`, `\SpecTestEnvironment`, `\SpecTestCases`, `\SpecTraceability`, `\SpecResults`), load your own packages and add own sections. For a pure architecture document, drop the test chapters. Class options go to `article`.
+**Own packages and macros** go to optional files, all read in the preamble; a missing one is skipped:
+
+| File | Read | For |
+|---|---|---|
+| `packages.tex` (root) | by `swcs.cls`, before `underscore` | `\usepackage` for all components (TeX Live 2022; others into `sty/`) |
+| `macros.tex` (root) | first when the component is loaded | macros, colours, TikZ styles for all components |
+| `components/<component>/macros.tex` | next, before `metadata.tex` | the component's macros; `\renewcommand` overrides a root one |
+
+`\newcommand` stops on a name the template already uses. Example: `components/sample/macros.tex` (`\Api{Init}`, used in TC-HC-001). Components made with an older template get the new skeleton files with `scripts/new_component.py --add-missing --all` (existing files are not changed).
+
+In `sw_component_spec.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecRequirements`, `\SpecDescription`, `\SpecTestApproach`, `\SpecTestEnvironment`, `\SpecTestCases`, `\SpecTraceability`, `\SpecResults`), and add own sections. For a pure architecture document, drop the test chapters. Class options go to `article`.
 
 ## Test
 

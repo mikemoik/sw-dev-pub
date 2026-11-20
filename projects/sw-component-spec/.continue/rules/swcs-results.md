@@ -73,3 +73,13 @@ You also need `approach.tex` and `testcases.tex` from the same component folder 
 % {ID}{test case}{description / justification}{status}
 \Deviation{DEV-01}{--}{Call of Dem_ReportError() for NvM write errors not executed; covered by unit test of setpoint_ctrl. Accepted by review.}{closed}
 ```
+
+## Macros of the worked example (components/sample/macros.tex)
+
+```latex
+% Macros of this component only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{HeaterCtrl_#1}                % \Api{Init} -> HeaterCtrl_Init
+```

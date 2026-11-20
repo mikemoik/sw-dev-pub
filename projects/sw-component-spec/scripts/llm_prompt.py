@@ -7,7 +7,8 @@
 design, introduction, metadata, approach, environment, results). The prompt is
 llm/_common.md + llm/<file>.md + the command reference (components/empty/<file>.tex)
 + a worked example (components/sample/<file>.tex, left out with --no-example or when
-working on the sample) + the component's file and the related files it needs + any
+working on the sample) + the component's file and the related files it needs + the
+macro files (macros.tex at the root and in the component) if they define anything + any
 --add files (e.g. a header or an SRS excerpt). With --figure TYPE, the chat guide of that
 specfig figure type is added (the figure menu is always in). Paste it as the first message of a new chat; models
 without a system role (e.g. Gemma) work the same way. Standard library only.
@@ -24,6 +25,26 @@ ROOT = Path(__file__).resolve().parent.parent
 COMPONENTS = ROOT / "components"
 LLM = ROOT / "llm"
 NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+
+MACROS = "macros.tex"  # optional macro files: template root, then the component's
+
+
+def macro_files(doc_dir: Path) -> list:
+    """The macro files (root, component) that exist and hold more than comments."""
+    return [
+        path for path in (ROOT / MACROS, doc_dir / MACROS)
+        if path.is_file()
+        and re.sub(r"(?<!\\)%.*", "", path.read_text(encoding="utf-8")).strip()
+    ]
+
+
+def sample_macros() -> str:
+    """The worked example's own macros (components/sample/macros.tex), '' if none."""
+    path = COMPONENTS / "sample" / MACROS
+    if path not in macro_files(path.parent):
+        return ""
+    return fenced("Macros of the worked example (components/sample/macros.tex)", path.read_text(encoding="utf-8"))
+
 
 # content file -> files of the same component the model also needs to see
 RELATED = {
@@ -67,6 +88,7 @@ def build_prompt(
                 sample.read_text(encoding="utf-8"),
             )
         )
+        parts.append(sample_macros())
     for name in [file] + RELATED[file]:
         path = comp_dir / f"{name}.tex"
         label = "the file to edit" if name == file else "for reference, don't edit"
@@ -74,6 +96,9 @@ def build_prompt(
             path.read_text(encoding="utf-8") if path.is_file() else "% (file missing)"
         )
         parts.append(fenced(f"components/{component}/{name}.tex ({label})", text))
+    for path in macro_files(comp_dir):
+        rel = path.relative_to(ROOT).as_posix()
+        parts.append(fenced(f"{rel} (macros, use them; don't edit)", path.read_text(encoding="utf-8")))
     for path in extra:
         lang = "latex" if path.suffix == ".tex" else ""
         parts.append(
@@ -89,7 +114,7 @@ def build_prompt(
         f"# Start\n\nWe work on `components/{component}/{file}.tex`. "
         'Reply only "Ready." and wait for my first request.\n'
     )
-    return "\n".join(parts)
+    return "\n".join(p for p in parts if p)
 
 
 def main(argv=None) -> int:

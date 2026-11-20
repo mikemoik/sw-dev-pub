@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from llm_prompt import LLM, RELATED, ROOT, COMPONENTS, fenced
+from llm_prompt import LLM, RELATED, ROOT, COMPONENTS, fenced, sample_macros
 
 RULES = ROOT / ".continue" / "rules"
 GLOB = "**/components/*/{}.tex"
@@ -47,7 +47,8 @@ def common_rule() -> str:
         "the chat context). The other content files of the same component are in the same "
         "folder. A file-specific rule names the files you also need. You only see "
         "files the engineer has added to the chat; you have no tools and don't try to "
-        "open files yourself.\n"
+        "open files yourself. The macro files (`macros.tex` at the root and in the "
+        "component folder) come only if the engineer adds them (e.g. `@macros.tex`).\n"
     )
 
 
@@ -86,7 +87,8 @@ def file_rule(file: str) -> str:
                 sample.read_text(encoding="utf-8"),
             )
         )
-    return "\n".join(parts)
+        parts.append(sample_macros())
+    return "\n".join(p for p in parts if p)
 
 
 def expected() -> dict:
