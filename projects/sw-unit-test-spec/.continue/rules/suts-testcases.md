@@ -131,8 +131,8 @@ it passes if
   \Preconditions{Unit initialised (TC-SPC-001).}
   \InputValue{sp}{100}{max (valid)}
   \InputValue{sp}{101}{max+1 (invalid)}
-  \Step{SetpointCtrl_Set(100)}{Returns E_OK; setpoint = 100.}
-  \Step{SetpointCtrl_Set(101)}{Returns E_NOT_OK; setpoint unchanged (100).}
+  \Step{\Api{Set}(\SpMax)}{Returns E_OK; setpoint = \SpMax.}
+  \Step{\Api{Set}(101)}{Returns E_NOT_OK; setpoint unchanged (\SpMax).}
   \Postconditions{Setpoint = 100.}
   \Implementation{test/setpoint_ctrl_test.cpp: RangeTest.UpperLimit}
 \end{TestCase}
@@ -157,4 +157,15 @@ All fault injection tests use the NvM mock in \emph{error} mode; see
   \Postconditions{Unit degraded, default setpoint 20.}
   \Implementation{test/setpoint_ctrl_test.cpp: NvmTest.ReadFailure}
 \end{TestCase}
+```
+
+## Macros of the worked example (units/sample/macros.tex)
+
+```latex
+% Macros of this unit only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{SetpointCtrl_#1}               % \Api{Set} -> SetpointCtrl_Set
+\newcommand\SpMax{100}                            % upper setpoint limit (SWR-0110)
 ```

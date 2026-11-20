@@ -26,10 +26,13 @@ scripts/continue_rules.py generates .continue/rules/ from llm/ (Continue chat in
 .continue/rules/          generated: the guides as Continue rules, one per content file
 README-scripts.md         short usage of the scripts, incl. LLM chat help
 figures/  data/  code/    shared by all units (a unit's own file of the same name wins)
+packages.tex              project packages (\usepackage), loaded by the class for every unit
+macros.tex                project macros for every unit (a unit's macros.tex may override them)
 units/
   empty/                  skeleton for new units: commented command templates, no content
   sample/                 worked example (unit setpoint_ctrl)
   <unit>/                 one folder per unit:
+    macros.tex            the unit's own macros, read before the content files
     metadata.tex …        content files (table below)
     knowledge.md          facts collected from code, documents, requirement exports (LLM chat, README-scripts.md)
     figures/ data/ code/  the unit's own figures, data and source files
@@ -47,7 +50,7 @@ units/
 | `testcases.tex` | the test cases |
 | `results.tex` | execution results, achieved coverage, deviations (optional) |
 
-You edit only `units/<unit>/` and the shared `figures/`, `data/`, `code/`. `suts.cls`, `latexmkrc` and `scripts/` are not edited in a project; `sw_unit_test_spec.tex` rarely (see *Customizing*).
+You edit only `units/<unit>/`, the shared `figures/`, `data/`, `code/` and the root `packages.tex`, `macros.tex`. `suts.cls`, `latexmkrc` and `scripts/` are not edited in a project; `sw_unit_test_spec.tex` rarely (see *Customizing*).
 
 ## Build
 
@@ -75,6 +78,7 @@ latexmk -pdf sw_unit_test_spec.tex           # the default unit (\LoadUnit{sampl
 - A unit folder without `metadata.tex` gives the warning `Unit folder … has no metadata.tex` (typo guard). The log names the folder used: `suts: content folder …`.
 - Plain `pdflatex` without latexmk: `pdflatex -jobname=nvm_mgr '\def\SpecUnit{nvm_mgr}\input{sw_unit_test_spec}'` (three runs).
 - `new_unit.py <unit> --from <other>` copies another unit instead of the skeleton, e.g. for a similar unit (`knowledge.md` starts empty). Unit names: letters, digits, `_`, `-`, `.`.
+- `new_unit.py --add-missing <unit> | --all` gives existing units the files of `units/empty/` they lack (e.g. `macros.tex` after a template update); existing files are not changed.
 
 `sw_unit_test_spec.pdf` is committed as a preview of the sample unit; rebuild it whenever the template or the sample changes.
 
@@ -146,16 +150,16 @@ Expect these conflicts, resolved the same way every time:
 | Conflict | Why | Resolve |
 |---|---|---|
 | `units/sample/*`, `figures/test_process.tex`, `sw_unit_test_spec.pdf` (modify/delete) | upstream changed its worked example; the project removed it | `git rm` them |
-| `units/empty/*.tex` | upstream changed the skeleton; the project filled in its defaults | keep ours and take over new commented commands by hand |
+| `units/empty/*.tex`, `packages.tex`, `macros.tex` | upstream changed the skeleton; the project filled in its defaults | keep ours and take over new commented commands by hand |
 | `sw_unit_test_spec.tex` (`\LoadUnit`) | only if upstream changed the same line | keep `\LoadUnit{empty}` |
 
 ```sh
 git rm -r -q --ignore-unmatch units/sample figures/test_process.tex sw_unit_test_spec.pdf
-git checkout --ours -- units/empty/ && git add units/empty/
+git checkout --ours -- units/empty/ && git add units/empty/   # same for packages.tex, macros.tex if in conflict
 git commit -m "Merge template update from upstream" && git push
 ```
 
-`suts.cls`, `latexmkrc`, `sty/`, `scripts/` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `units/empty/` (a new content file or command is shown there) and to `sw_unit_test_spec.tex`. Then rebuild every unit: `scripts/build.py --all --strict`.
+`suts.cls`, `latexmkrc`, `sty/`, `scripts/` and `.gitignore` merge cleanly, because they are not edited in the copy. Check the upstream changes to `units/empty/` (a new content file or command is shown there) and to `sw_unit_test_spec.tex`. A new file in `units/empty/` reaches the existing units with `scripts/new_unit.py --add-missing --all` (units without it still build). Then rebuild every unit: `scripts/build.py --all --strict`.
 
 ### 5. Baseline a unit's spec
 
@@ -232,7 +236,7 @@ Generated with TikZ from the data you already enter — nothing to draw. Each di
 
 ### tikz-uml (optional)
 
-[TikZ-UML](https://tikzuml.pages.math.cnrs.fr/) draws class, sequence, state, use case and component diagrams with little code. It is not on CTAN or in TeX Live, so the template ships it as `sty/tikz-uml.sty` (v1.1, unchanged, LaTeX Project Public License 1.3). `latexmkrc` puts `sty/` on TeX's search path (`TEXINPUTS`), so `scripts/build.py` and `latexmk` find it: nothing to install. For plain `pdflatex`, set `TEXINPUTS=./sty//:` yourself. Add `\usepackage{tikz-uml}` after `\documentclass{suts}` in `sw_unit_test_spec.tex` and use its commands in a `tikzpicture` inside a `FreeText` block or a `figures/<name>.tex`. The template itself does not use it.
+[TikZ-UML](https://tikzuml.pages.math.cnrs.fr/) draws class, sequence, state, use case and component diagrams with little code. It is not on CTAN or in TeX Live, so the template ships it as `sty/tikz-uml.sty` (v1.1, unchanged, LaTeX Project Public License 1.3). `latexmkrc` puts `sty/` on TeX's search path (`TEXINPUTS`), so `scripts/build.py` and `latexmk` find it: nothing to install. For plain `pdflatex`, set `TEXINPUTS=./sty//:` yourself. Add `\usepackage{tikz-uml}` to `packages.tex` and use its commands in a `tikzpicture` inside a `FreeText` block or a `figures/<name>.tex`. The template itself does not use it.
 
 On TeX Live 2022, write `\_` in class names (`\umlclass{Setpoint\_Ctrl}…`) and use no underscore in the names you refer to (`\umlobject[class=Setpoint_Ctrl]{spctrl}`, `alias=`, `name=`). In all other text a plain `_` works as usual.
 
@@ -362,7 +366,17 @@ Consistency checks, shown in red in the PDF: a requirement in `\Verifies` that i
 
 ## Customizing
 
-In `sw_unit_test_spec.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecRequirements`, `\SpecUnitUnderTest`, `\SpecTestApproach`, `\SpecTestEnvironment`, `\SpecTestCases`, `\SpecTraceability`, `\SpecResults`), load your own packages, and add own sections (`\section{…}` + `\input{\UnitDir/my_extra}`). One spec per unit: one folder per unit under `units/` (see *Using it for a project*). Class options go to `article` (`\documentclass[10pt]{suts}`).
+**Own packages and macros** go to optional files, all read in the preamble; a missing one is skipped:
+
+| File | Read | For |
+|---|---|---|
+| `packages.tex` (root) | by `suts.cls`, before `underscore` | `\usepackage` for all units (TeX Live 2022; others into `sty/`) |
+| `macros.tex` (root) | first in `\LoadUnit` | macros, colours, TikZ styles for all units |
+| `units/<unit>/macros.tex` | next, before `metadata.tex` | the unit's macros; `\renewcommand` overrides a root one |
+
+`\newcommand` stops on a name the template already uses. Example: `units/sample/macros.tex` (`\Api{Set}`, `\SpMax`, used in TC-SPC-002).
+
+In `sw_unit_test_spec.tex` you can reorder or drop the chapter commands (`\SpecTitlePage`, `\SpecDocumentControl`, `\SpecContents`, `\SpecIntroduction`, `\SpecRequirements`, `\SpecUnitUnderTest`, `\SpecTestApproach`, `\SpecTestEnvironment`, `\SpecTestCases`, `\SpecTraceability`, `\SpecResults`), and add own sections (`\section{…}` + `\input{\UnitDir/my_extra}`). One spec per unit: one folder per unit under `units/` (see *Using it for a project*). Class options go to `article` (`\documentclass[10pt]{suts}`).
 
 ## Test
 

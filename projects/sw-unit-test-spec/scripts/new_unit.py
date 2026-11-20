@@ -2,12 +2,17 @@
 """Create a new unit folder units/<name>/ from the skeleton units/empty/.
 
     python3 scripts/new_unit.py <name> [--from <unit>]
+    python3 scripts/new_unit.py --add-missing <unit> [<unit> ...] | --all
 
 Copies units/empty/ (or another unit with --from) to units/<name>/, including
 its figures/, data/ and code/ folders, sets \\UnitName{<name>} in
 metadata.tex and `unit:` in knowledge.md. With --from, knowledge.md starts
 from the skeleton: the other unit's knowledge is not copied. The name is used as folder name and as build job name, so only
-letters, digits, '_', '-' and '.' are allowed. Standard library only.
+letters, digits, '_', '-' and '.' are allowed.
+
+--add-missing updates existing units (e.g. made with an older template):
+it copies every file of units/empty/ that the unit does not have yet and never
+changes an existing file. Standard library only.
 """
 
 import argparse
@@ -43,11 +48,66 @@ def reset_knowledge(target: Path, name: str) -> None:
     (target / "knowledge.md").write_text(text, encoding="utf-8")
 
 
+def add_missing(target: Path) -> list:
+    """Copy the files of units/empty/ that target lacks; returns their paths."""
+    skeleton = UNITS / "empty"
+    added = []
+    for src in sorted(skeleton.rglob("*")):
+        rel = src.relative_to(skeleton)
+        dst = target / rel
+        if not src.is_file() or rel.name == "llm-context.md" or dst.exists():
+            continue
+        if rel.name == ".gitkeep" and dst.parent.is_dir() and any(dst.parent.iterdir()):
+            continue  # folder exists and is not empty
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if rel.as_posix() == "knowledge.md":
+            reset_knowledge(target, target.name)
+        else:
+            shutil.copy2(src, dst)
+        added.append(dst)
+    return added
+
+
+def main_add_missing(names, all_units) -> int:
+    if all_units:
+        names = sorted(
+            d.name for d in UNITS.iterdir()
+            if d.name != "empty" and (d / "metadata.tex").is_file()
+        )
+    if not names:
+        print("error: give unit names or --all", file=sys.stderr)
+        return 2
+    status = 0
+    for name in names:
+        target = UNITS / name
+        if not NAME_RE.fullmatch(name) or not (target / "metadata.tex").is_file():
+            print(f"error: units/{name} is not a unit folder (no metadata.tex)", file=sys.stderr)
+            status = 1
+            continue
+        if name == "empty":
+            print("error: units/empty is the skeleton itself", file=sys.stderr)
+            status = 1
+            continue
+        added = add_missing(target)
+        for path in added:
+            print(f"added {path.relative_to(ROOT).as_posix()}")
+        if not added:
+            print(f"units/{name}: nothing missing")
+    return status
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
-        description="Create units/<name>/ from units/empty/ (or another unit)."
+        description="Create units/<name>/ from units/empty/ (or another unit), "
+        "or add the skeleton files existing units lack."
     )
-    parser.add_argument("name", help="unit name, used as folder name under units/")
+    parser.add_argument("name", nargs="*", help="unit name, used as folder name under units/")
+    parser.add_argument(
+        "--add-missing",
+        action="store_true",
+        help="existing units: copy the files of units/empty/ they lack (none is changed)",
+    )
+    parser.add_argument("--all", action="store_true", help="with --add-missing: every unit")
     parser.add_argument(
         "--from",
         dest="source",
@@ -57,7 +117,13 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    name = args.name
+    if args.add_missing:
+        if args.source != "empty":
+            parser.error("--from does not apply to --add-missing")
+        return main_add_missing(args.name, args.all)
+    if args.all or len(args.name) != 1:
+        parser.error("give exactly one unit name (--all only with --add-missing)")
+    name = args.name[0]
     for value in (name, args.source):
         if not NAME_RE.fullmatch(value):
             print(

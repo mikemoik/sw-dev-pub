@@ -73,3 +73,14 @@ You also need `approach.tex` and `testcases.tex` from the same unit folder as th
 % {ID}{test case}{description / justification}{status}
 \Deviation{DEV-01}{TC-SPC-002}{Branch for sp > 255 unreachable (uint8); accepted by review.}{closed}
 ```
+
+## Macros of the worked example (units/sample/macros.tex)
+
+```latex
+% Macros of this unit only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{SetpointCtrl_#1}               % \Api{Set} -> SetpointCtrl_Set
+\newcommand\SpMax{100}                            % upper setpoint limit (SWR-0110)
+```

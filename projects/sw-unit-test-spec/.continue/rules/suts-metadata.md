@@ -88,3 +88,14 @@ No other files are needed.
 \Revision{0.1}{2026-10-20}{Jane Doe}{Initial draft}
 \Revision{0.2}{2026-11-04}{Jane Doe}{Fault injection test case added after review}
 ```
+
+## Macros of the worked example (units/sample/macros.tex)
+
+```latex
+% Macros of this unit only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{SetpointCtrl_#1}               % \Api{Set} -> SetpointCtrl_Set
+\newcommand\SpMax{100}                            % upper setpoint limit (SWR-0110)
+```

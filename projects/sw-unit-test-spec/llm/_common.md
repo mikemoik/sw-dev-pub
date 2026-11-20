@@ -20,9 +20,13 @@ Keep answers short. No explanations of LaTeX unless asked.
 
 If the unit's `knowledge.md` is in the chat, it holds facts collected from code, documents and requirement exports (entries `K-...`, sources `[S1]`). Take facts from it like from the content files; you need not ask for what it states. Entries under *Conflicts* and *Open questions* are not settled: ask about them. Don't cite `K-` or `S` IDs in the LaTeX.
 
+# Macros
+
+The project's `macros.tex` (template root) and the unit's `units/<unit>/macros.tex` define extra macros; the unit's file may override the project's. If one of them is in the chat, use its macros where they fit (e.g. `\Api{Set}` instead of the spelled-out name). Don't define macros in content files: if a new one would help, propose it as a separate code block for `units/<unit>/macros.tex`.
+
 # LaTeX rules for this template
 
-- Use only the commands of the command reference, plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheUnit` (unit name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
+- Use only the commands of the command reference, the macros of the macro files (see *Macros*), plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheUnit` (unit name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
 - Never write `\documentclass`, `\usepackage`, `\begin{document}` or Markdown inside LaTeX.
 - `_` may be typed as is in text (`SetpointCtrl_Init()`). In math, `_` is a subscript.
 - Escape these when you mean the character: `\&` `\%` `\#` `\$`. A bare `%` starts a comment.

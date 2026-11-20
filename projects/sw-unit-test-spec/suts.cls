@@ -43,6 +43,9 @@
 \RequirePackage{graphicx}               % search paths: see \LoadContent
 \RequirePackage[hidelinks]{hyperref}
 \RequirePackage{specfig}                % figures from data commands (spec-figures; sty/specfig*.sty)
+% Project packages: packages.tex at the template root (optional, \usepackage only),
+% read here so they load before underscore. Macros go to macros.tex (see \LoadContent).
+\IfFileExists{./packages.tex}{\input{./packages.tex}}{}
 % underscore LAST: its active _ breaks older packages loaded after it
 % (pgf < 3.1.11, older fancyvrb on TeX Live 2022)
 \RequirePackage[strings,nohyphen]{underscore} % plain _ in text: unit_name, Unit_Init()
@@ -657,7 +660,8 @@
 %   Build-time override: if \SpecUnit is defined before the class, e.g.
 %     latexmk -pdf -jobname=foo -usepretex='\def\SpecUnit{foo}' sw_unit_test_spec.tex
 %   it replaces name. A unit folder without metadata.tex gives a warning.
-% \LoadContent{dir}: reads dir/{metadata,introduction,requirements,unit,design,
+% \LoadContent{dir}: reads the macro files macros.tex (template root, once) and
+%   dir/macros.tex, then dir/{metadata,introduction,requirements,unit,design,
 %   approach,environment,results}.tex (missing files are skipped) and scans
 %   dir/testcases.tex. Use in the preamble.
 % Both set the search paths: unit first, then the shared folders at root level
@@ -723,11 +727,19 @@
   }
 \cs_new_protected:Npn \__suts_verbatim_input:nn #1#2
   { \VerbatimInput [ fontsize = \small , #1 ] {#2} }
+\bool_new:N \g__suts_root_macros_bool
 \NewDocumentCommand \LoadContent { m }
   {
     \tl_gset:Nx \g__suts_dir_tl { \tl_to_str:n {#1} }
     \typeout { suts:~content~folder~`\g__suts_dir_tl' }
+    % root macros before the search paths: no data/ or code/ file of that name
+    \bool_if:NF \g__suts_root_macros_bool
+      {
+        \file_if_exist_input:n { ./macros.tex }
+        \bool_gset_true:N \g__suts_root_macros_bool
+      }
     \__suts_set_paths:
+    \__suts_input:n { macros }
     \clist_map_inline:nn
       { metadata, introduction, requirements, unit, design, approach, environment, results }
       { \tl_gset:Nn \g__suts_chapter_tl {##1} \__suts_input:n {##1} }

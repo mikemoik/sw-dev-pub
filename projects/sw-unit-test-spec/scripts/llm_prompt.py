@@ -8,7 +8,8 @@ design, introduction, metadata, approach, environment, results). The prompt is
 llm/_common.md + llm/<file>.md + the command reference (units/empty/<file>.tex)
 + a worked example (units/sample/<file>.tex, left out with --no-example or when
 working on the sample) + the unit's file and the related files it needs + the
-unit's knowledge.md if it has one + any
+unit's knowledge.md if it has one + the macro files (macros.tex at the root and
+in the unit) if they define anything + any
 --add files (e.g. a header or an SRS excerpt). With --figure TYPE, the chat guide of that
 specfig figure type is added (the figure menu is always in). Paste it as the first message of a new chat; models
 without a system role (e.g. Gemma) work the same way. Standard library only.
@@ -25,6 +26,26 @@ ROOT = Path(__file__).resolve().parent.parent
 UNITS = ROOT / "units"
 LLM = ROOT / "llm"
 NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+
+MACROS = "macros.tex"  # optional macro files: template root, then the unit's
+
+
+def macro_files(unit_dir: Path) -> list:
+    """The macro files (root, unit) that exist and hold more than comments."""
+    return [
+        path for path in (ROOT / MACROS, unit_dir / MACROS)
+        if path.is_file()
+        and re.sub(r"(?<!\\)%.*", "", path.read_text(encoding="utf-8")).strip()
+    ]
+
+
+def sample_macros() -> str:
+    """The worked example's own macros (units/sample/macros.tex), '' if none."""
+    path = UNITS / "sample" / MACROS
+    if path not in macro_files(path.parent):
+        return ""
+    return fenced("Macros of the worked example (units/sample/macros.tex)", path.read_text(encoding="utf-8"))
+
 
 # content file -> files of the same unit the model also needs to see
 RELATED = {
@@ -68,6 +89,7 @@ def build_prompt(
                 sample.read_text(encoding="utf-8"),
             )
         )
+        parts.append(sample_macros())
     for name in [file] + RELATED[file]:
         path = unit_dir / f"{name}.tex"
         label = "the file to edit" if name == file else "for reference, don't edit"
@@ -75,6 +97,9 @@ def build_prompt(
             path.read_text(encoding="utf-8") if path.is_file() else "% (file missing)"
         )
         parts.append(fenced(f"units/{unit}/{name}.tex ({label})", text))
+    for path in macro_files(unit_dir):
+        rel = path.relative_to(ROOT).as_posix()
+        parts.append(fenced(f"{rel} (macros, use them; don't edit)", path.read_text(encoding="utf-8")))
     knowledge = unit_dir / "knowledge.md"
     if knowledge.is_file():
         parts.append(
@@ -99,7 +124,7 @@ def build_prompt(
         f"# Start\n\nWe work on `units/{unit}/{file}.tex`. "
         'Reply only "Ready." and wait for my first request.\n'
     )
-    return "\n".join(parts)
+    return "\n".join(p for p in parts if p)
 
 
 def main(argv=None) -> int:

@@ -41,8 +41,8 @@ it passes if
   \Preconditions{Unit initialised (TC-SPC-001).}
   \InputValue{sp}{100}{max (valid)}
   \InputValue{sp}{101}{max+1 (invalid)}
-  \Step{SetpointCtrl_Set(100)}{Returns E_OK; setpoint = 100.}
-  \Step{SetpointCtrl_Set(101)}{Returns E_NOT_OK; setpoint unchanged (100).}
+  \Step{\Api{Set}(\SpMax)}{Returns E_OK; setpoint = \SpMax.}
+  \Step{\Api{Set}(101)}{Returns E_NOT_OK; setpoint unchanged (\SpMax).}
   \Postconditions{Setpoint = 100.}
   \Implementation{test/setpoint_ctrl_test.cpp: RangeTest.UpperLimit}
 \end{TestCase}

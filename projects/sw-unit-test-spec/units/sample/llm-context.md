@@ -38,9 +38,13 @@ Keep answers short. No explanations of LaTeX unless asked.
 
 If the unit's `knowledge.md` is in the chat, it holds facts collected from code, documents and requirement exports (entries `K-...`, sources `[S1]`). Take facts from it like from the content files; you need not ask for what it states. Entries under *Conflicts* and *Open questions* are not settled: ask about them. Don't cite `K-` or `S` IDs in the LaTeX.
 
+# Macros
+
+The project's `macros.tex` (template root) and the unit's `units/<unit>/macros.tex` define extra macros; the unit's file may override the project's. If one of them is in the chat, use its macros where they fit (e.g. `\Api{Set}` instead of the spelled-out name). Don't define macros in content files: if a new one would help, propose it as a separate code block for `units/<unit>/macros.tex`.
+
 # LaTeX rules for this template
 
-- Use only the commands of the command reference, plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheUnit` (unit name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
+- Use only the commands of the command reference, the macros of the macro files (see *Macros*), plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheUnit` (unit name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
 - Never write `\documentclass`, `\usepackage`, `\begin{document}` or Markdown inside LaTeX.
 - `_` may be typed as is in text (`SetpointCtrl_Init()`). In math, `_` is a subscript.
 - Escape these when you mean the character: `\&` `\%` `\#` `\$`. A bare `%` starts a comment.
@@ -722,6 +726,17 @@ stateDiagram-v2
 
 # Files of unit sample
 
+## units/sample/macros.tex (macros, use them)
+
+```latex
+% Macros of this unit only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{SetpointCtrl_#1}               % \Api{Set} -> SetpointCtrl_Set
+\newcommand\SpMax{100}                            % upper setpoint limit (SWR-0110)
+```
+
 ## units/sample/metadata.tex
 
 ```latex
@@ -1117,8 +1132,8 @@ it passes if
   \Preconditions{Unit initialised (TC-SPC-001).}
   \InputValue{sp}{100}{max (valid)}
   \InputValue{sp}{101}{max+1 (invalid)}
-  \Step{SetpointCtrl_Set(100)}{Returns E_OK; setpoint = 100.}
-  \Step{SetpointCtrl_Set(101)}{Returns E_NOT_OK; setpoint unchanged (100).}
+  \Step{\Api{Set}(\SpMax)}{Returns E_OK; setpoint = \SpMax.}
+  \Step{\Api{Set}(101)}{Returns E_NOT_OK; setpoint unchanged (\SpMax).}
   \Postconditions{Setpoint = 100.}
   \Implementation{test/setpoint_ctrl_test.cpp: RangeTest.UpperLimit}
 \end{TestCase}

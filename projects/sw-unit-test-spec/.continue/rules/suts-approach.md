@@ -112,3 +112,14 @@ Statement coverage is measured as
 \]
 \end{FreeText}
 ```
+
+## Macros of the worked example (units/sample/macros.tex)
+
+```latex
+% Macros of this unit only. Read after the project's macros.tex (template root)
+% and before metadata.tex, so every content file can use them.
+% \newcommand for new names, \renewcommand to override a project macro.
+
+\newcommand\Api[1]{SetpointCtrl_#1}               % \Api{Set} -> SetpointCtrl_Set
+\newcommand\SpMax{100}                            % upper setpoint limit (SWR-0110)
+```

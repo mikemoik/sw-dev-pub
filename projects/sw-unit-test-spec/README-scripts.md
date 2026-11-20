@@ -12,6 +12,7 @@ Run from the template's root folder. Python 3.6+ (standard library only) and `la
 ```sh
 python3 scripts/new_unit.py nvm_mgr                 # copies units/empty/ to units/nvm_mgr/
 python3 scripts/new_unit.py nvm_mgr --from sample   # copies another unit instead
+python3 scripts/new_unit.py --add-missing --all     # existing units: add the skeleton files they lack
 ```
 
 Unit names: letters, digits, `_`, `-`, `.`. Then fill in the files in `units/nvm_mgr/`.

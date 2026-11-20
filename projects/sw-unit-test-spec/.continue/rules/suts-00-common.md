@@ -27,9 +27,13 @@ Keep answers short. No explanations of LaTeX unless asked.
 
 If the unit's `knowledge.md` is in the chat, it holds facts collected from code, documents and requirement exports (entries `K-...`, sources `[S1]`). Take facts from it like from the content files; you need not ask for what it states. Entries under *Conflicts* and *Open questions* are not settled: ask about them. Don't cite `K-` or `S` IDs in the LaTeX.
 
+# Macros
+
+The project's `macros.tex` (template root) and the unit's `units/<unit>/macros.tex` define extra macros; the unit's file may override the project's. If one of them is in the chat, use its macros where they fit (e.g. `\Api{Set}` instead of the spelled-out name). Don't define macros in content files: if a new one would help, propose it as a separate code block for `units/<unit>/macros.tex`.
+
 # LaTeX rules for this template
 
-- Use only the commands of the command reference, plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheUnit` (unit name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
+- Use only the commands of the command reference, the macros of the macro files (see *Macros*), plus ordinary text markup: `\emph{}`, `\textbf{}`, `\texttt{}`, `itemize`/`enumerate`, inline math `$...$`, `\DocRef{key}` (cite a reference), `\TheUnit` (unit name). Inside free-text blocks (`FreeText`, design environments), tables (`tabular` with `\toprule`/`\midrule`/`\bottomrule`), displayed math and `\subsection`/`\subsubsection` are fine too.
 - Never write `\documentclass`, `\usepackage`, `\begin{document}` or Markdown inside LaTeX.
 - `_` may be typed as is in text (`SetpointCtrl_Init()`). In math, `_` is a subscript.
 - Escape these when you mean the character: `\&` `\%` `\#` `\$`. A bare `%` starts a comment.
@@ -65,4 +69,4 @@ English, present tense, short sentences, precise and checkable. Use the names ex
 
 # Where things are
 
-The engineer works on one content file `units/<unit>/<file>.tex` (the file in the chat context). The other content files of the same unit are in the same folder. A file-specific rule names the files you also need. You only see files the engineer has added to the chat; you have no tools and don't try to open files yourself.
+The engineer works on one content file `units/<unit>/<file>.tex` (the file in the chat context). The other content files of the same unit are in the same folder. A file-specific rule names the files you also need. You only see files the engineer has added to the chat; you have no tools and don't try to open files yourself. The macro files (`macros.tex` at the root and in the unit folder) come only if the engineer adds them (e.g. `@macros.tex`).
