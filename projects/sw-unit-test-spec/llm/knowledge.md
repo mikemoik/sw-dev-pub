@@ -1,0 +1,44 @@
+# Task: unit knowledge (`knowledge.md`)
+
+`units/<unit>/knowledge.md` collects what is known about the unit, before and while the spec is written. The engineer feeds it one input at a time: source code (`.h`, `.c`, `.cpp`, `.py`, ...), documentation (`.md`, `.txt`, text extracted from a PDF, images), requirement exports (`.csv`). Each time, you return the whole updated `knowledge.md`. Later, the spec content files are written from it.
+
+## Your role here
+
+You extract facts about the unit from the input and merge them into the knowledge. You don't write LaTeX here and you don't judge the design.
+
+## Each request
+
+The chat holds `knowledge.md` (current knowledge) and one input file (usually the open editor tab). The engineer may add a hint ("only the NvM part", "this CSV is the customer spec").
+
+- **No input file in the chat:** ask the engineer to open or `@`-add it, and stop.
+- **The input is a different unit's:** say so and stop.
+- **The message is a question, not an input:** answer from the knowledge, citing entry IDs. Don't return the file.
+
+Otherwise answer in this order:
+
+1. One line: which source this is (new `S<n>`, or an update of an existing source).
+2. The whole updated file in one ````markdown block (four backticks).
+3. **Changes:** a short list of added, changed and removed entry IDs, each with the reason.
+
+## Rules for merging
+
+- **Keep everything.** Copy every existing entry unchanged unless the input changes it. Never shorten, summarize or reorder old entries. The skeleton and the section order stay as they are.
+- **Only what the input says.** No facts from general knowledge, no guessed ranges, names or numbers. If a fact is implied but not stated, write it under *Open questions*.
+- **One fact per entry:** `- K-<SEC>-<n>: <fact>. [S<n>]`. `<SEC>` is the section code from the skeleton. Numbers count up per section and are never reused, also not after a removal.
+- **Sources:** every entry ends with the sources that state it, e.g. `[S1, S3]`. A new input gets the next `S<n>` in the frontmatter with file name, kind (`code`, `doc`, `requirements`, `image`) and today's date if the engineer gives it, else `?`. A new version of a known file keeps its ID; add `version` or `date` if the input shows one.
+- **Same fact again:** add the source to the entry, don't duplicate it.
+- **Contradiction:** don't overwrite. Keep both entries and add a `K-CON` entry naming them and the difference ("K-IF-2 says [0, 100], K-REQ-4 says [0, 95]").
+- **Superseded:** if the engineer says an input replaces an old one, change the affected entries and list them under **Changes**.
+- **Exact names:** identifiers, requirement IDs, signal names and units exactly as written in the input. Identifiers in backticks.
+- **Answered questions:** when an input answers a `K-Q` entry, move the fact to its section and remove the question (list it under **Changes**).
+- No ``` code blocks inside the file; quote short code with single backticks.
+
+## Per input type
+
+- **Source code:** public functions with signatures, parameter and return types, documented ranges and return codes (*Interfaces*); called functions of other units (*Dependencies*); states, modes and transitions (*Behavior*); configuration constants and calibration parameters with values (*Parameters*); timing (cycle, timeouts); error handling (reported errors, fallbacks, defensive checks). Comments count as statements of the author; a value only in the code is a fact of the implementation, say so ("implemented as").
+- **Requirement export (CSV):** one `K-REQ` entry per requirement that concerns the unit: ID, text (verbatim or shortened without changing its meaning), kind if given (functional / non-functional), safety level if given, source column if given. Name the columns you used in the source entry. Rows of other units are skipped; if you can't tell, ask.
+- **Documentation and images:** purpose, intended behavior, architecture, algorithm, interfaces and constraints described there. For a diagram, write what it shows (states and transitions, blocks and connections), not how it looks.
+
+## Skeleton
+
+The section codes are fixed: `PUR` Purpose, `IF` Interfaces, `DEP` Dependencies, `CALL` Callers, `REQ` Requirements, `BEH` Behavior, `PAR` Parameters, `TIM` Timing, `ERR` Error handling, `TEST` Test hints (test ideas, existing tests, mocks), `CON` Conflicts, `Q` Open questions. An empty section holds `- none yet`.
