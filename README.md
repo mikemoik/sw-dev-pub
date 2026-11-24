@@ -25,6 +25,7 @@ sw-dev-pub/
 | Project | What | Owner | Status |
 |---|---|---|---|
 | [`cbor`](projects/cbor/) | CBOR codec twins: C++17 single header (CMake target `cbor::cbor`) + MATLAB/Octave, RFC 8746 typed arrays, cbor2 interop check | swdevos | stable, tested |
+| [`geotiff`](projects/geotiff/) | Dependency-free GeoTIFF block reader: C++17 single header (CMake target `geotiff::geotiff`), no exceptions; classic/BigTIFF, tiles/strips, GDAL sparse files, overviews, georeferencing; uncompressed only; checked block by block against GDAL | swdevos | new, tested |
 | [`matlab-json-config`](projects/matlab-json-config/) | Typed JSON config pattern for MATLAB (validated class properties from `jsondecode`) | swdevos | example, untested (MATLAB only) |
 | [`spec-figures`](projects/spec-figures/) | Figure templates for specs and manuals: LaTeX package `specfig` (UML, block, Gantt, timeline, org chart, RACI, risk matrix, timing, charts from plain data commands, red consistency checks) + independent Mermaid twins + LLM chat guides; vendored into the three document templates | swdevos | new, builds clean |
 | [`sw-component-spec`](projects/sw-component-spec/) | LaTeX SW Component Specification template: requirements, architecture and integration/component test of one component (ASPICE 4.0 SWE.2/SWE.5, ISO 26262-6 §7/§10); spin-off of `sw-unit-test-spec` | swdevos | new, builds clean |

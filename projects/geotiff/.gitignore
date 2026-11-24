@@ -1,0 +1,9 @@
+# build output (CMake presets build to build/<preset>/, incl. the generated oracle files)
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# written by the unit test
+geotiff_test_tmp.tif
