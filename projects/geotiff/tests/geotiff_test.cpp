@@ -1,4 +1,4 @@
-// geotiff_test.cpp — unit tests for geotiff.hpp. No GDAL, no Python: an in-test TIFF
+// geotiff_test.cpp — unit tests for the geotiff library. No GDAL, no Python: an in-test TIFF
 // writer builds the files in memory (1 / 3 bands x data type x BigTIFF x sparse), plus
 // georeferencing, nodata, the project constraints (little-endian, tiles only, one tile
 // size, 1 or 3 pixel-interleaved bands, Byte / UInt16 / Int16), unsupported subsets and
@@ -6,7 +6,7 @@
 //
 // Built twice: with the default tile size (256), and with GEOTIFF_TILE_SIZE=16, where the
 // files are small enough to mutate every byte (testCorrupt).
-#include "geotiff/geotiff.hpp"
+#include "geotiff/geotiff.h"
 
 #include <algorithm>
 #include <cmath>

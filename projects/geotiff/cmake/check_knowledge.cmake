@@ -1,10 +1,13 @@
-# Fails if llm/knowledge.md disagrees with the header:
-#   cmake -DHEADER=<geotiff.hpp> -DTEST=<geotiff_test.cpp> -DKNOWLEDGE=<knowledge.md> -P check_knowledge.cmake
-#  - every tag constant of the header (kName = number) is a row of the tag table, with the same number
+# Fails if llm/knowledge.md disagrees with the code (header + source file, called "header" below):
+#   cmake -DHEADER=<geotiff.h> -DSOURCE=<geotiff.cpp> -DTEST=<geotiff_test.cpp> -DKNOWLEDGE=<knowledge.md>
+#         -P check_knowledge.cmake
+#  - every tag constant of the code (kName = number) is a row of the tag table, with the same number
 #  - every row of the tag table is a constant of the header
 #  - every `name()` the file mentions is a function of the header or of the unit test
 #  - the default tile size is the header's
 file(READ "${HEADER}" header)
+file(READ "${SOURCE}" source)
+string(APPEND header "\n${source}")
 file(READ "${TEST}" test)
 file(READ "${KNOWLEDGE}" knowledge)
 set(errors "")
@@ -55,4 +58,4 @@ endif()
 if(errors)
     message(FATAL_ERROR "${KNOWLEDGE} disagrees with the code:\n${errors}")
 endif()
-message(STATUS "knowledge.md agrees with the header: ${constantCount} tags, ${mentionCount} functions")
+message(STATUS "knowledge.md agrees with the code: ${constantCount} tags, ${mentionCount} functions")

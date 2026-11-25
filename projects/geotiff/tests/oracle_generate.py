@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the GDAL oracle for geotiff.hpp.
+"""Generate the GDAL oracle for the geotiff library.
 
     python3 oracle_generate.py OUTDIR
 
@@ -15,7 +15,7 @@ reader must ignore), and next to each <name>.tif
 
 plus index.txt (one name per line), reject.txt (compressed files: "<name> <codec>") and
 outside.txt (valid files outside the subset: "<name> <word of the message>").
-oracle_check (C++) reads all of it back through geotiff.hpp. Needs python-gdal only.
+oracle_check (C++) reads all of it back through the library. Needs python-gdal only.
 """
 import array
 import itertools

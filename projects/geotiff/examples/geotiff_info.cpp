@@ -1,7 +1,7 @@
-// geotiff_info — print what geotiff.hpp sees in a GeoTIFF and read every block once.
+// geotiff_info — print what the geotiff library sees in a GeoTIFF and read every block once.
 //
 //     geotiff_info FILE.tif
-#include "geotiff/geotiff.hpp"
+#include "geotiff/geotiff.h"
 
 #include <cstdio>
 #include <vector>

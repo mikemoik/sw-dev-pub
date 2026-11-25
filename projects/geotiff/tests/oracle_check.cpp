@@ -1,4 +1,4 @@
-// oracle_check.cpp — compare geotiff.hpp with GDAL, file by file.
+// oracle_check.cpp — compare the geotiff library with GDAL, file by file.
 //
 //     oracle_check DIR
 //
@@ -10,7 +10,7 @@
 // with the codec named; files in outside.txt lie outside the project constraints (strips,
 // other tile sizes, band counts, band-interleaved, big-endian, other data types) and must
 // be refused with the reason named.
-#include "geotiff/geotiff.hpp"
+#include "geotiff/geotiff.h"
 
 #include <cmath>
 #include <cstdint>

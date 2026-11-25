@@ -1,12 +1,13 @@
 # geotiff — knowledge for maintaining the reader offline
 
-Background on TIFF, GeoTIFF and GDAL that `include/geotiff/geotiff.hpp` relies on but
-does not explain. Written for a maintainer (human or local LLM) without internet access:
-give it this file together with the header. It holds only what this reader needs.
+Background on TIFF, GeoTIFF and GDAL that the code relies on but does not explain. The
+code is two files: `include/geotiff/geotiff.h` (the API: types and the `Reader` class) and
+`src/geotiff.cpp` (all of the implementation). Written for a maintainer (human or local LLM) without internet access:
+give it this file together with both code files. It holds only what this reader needs.
 
 Rules for this file:
 
-- A number here must equal the number in the header. `ctest` checks the tag table and
+- A number here must equal the number in the code. `ctest` checks the tag table and
   every function named here with `()` behind it (`geotiff.knowledge`,
   `cmake/check_knowledge.cmake`).
 - "Observed" means: seen with GDAL 3.13.3 / libtiff 4.7.2 on the development host, and
@@ -40,7 +41,7 @@ Target platform: 64-bit little-endian Linux (x86-64, AArch64).
   `_fseeki64` branches for that.
 - File and host have the same byte order (C8), so the reader copies bytes: tile data is
   the samples, DOUBLE and SHORT tag arrays are read with one `entryBytes()` call. There is
-  no byte swapping anywhere. The header stops the build (`#error`) on a big-endian host.
+  no byte swapping anywhere. `geotiff.cpp` stops the build (`#error`) on a big-endian host.
 
 Consequences to keep in mind when changing code:
 
@@ -58,8 +59,15 @@ Consequences to keep in mind when changing code:
 - A block of one band is always `kTileSamples` = `kTileSize`² samples.
   `ImageInfo::blockBytes` = `kTileSamples` × sample size; a caller may use a fixed buffer.
 - `GEOTIFF_TILE_SIZE` exists so the unit tests can run with 16×16 tiles (small files,
-  every byte mutated). The product is built with 256. It must be the same in every
-  translation unit; allowed range 1..4096.
+  every byte mutated). The product is built with 256; allowed range 1..4096.
+- The library is compiled, so the tile size must be the same in the library and in the
+  code that uses it. CMake guarantees that: the cache variable `GEOTIFF_TILE_SIZE` becomes
+  a PUBLIC compile definition of the target `geotiff::geotiff`. Never define the macro in
+  a single source file. The tests build a second library, `geotiff_small_tiles`, for 16.
+- What goes where: a new public function is declared in `geotiff.h` and defined in
+  `geotiff.cpp`. A helper that needs no `Reader` state is a free function in the unnamed
+  namespace at the top of `geotiff.cpp` and does not appear in the header. A helper that
+  needs state is a private member: declaration in the class, definition in `geotiff.cpp`.
 - Strips, band-interleaved files and free tile sizes were supported up to release
   `geotiff-v0.1.0` (incl. libtiff strip chopping and GDAL split mode). That code was
   removed on purpose; the tag is the place to look if it is ever needed again.
@@ -107,7 +115,7 @@ Image file directory (IFD), one per image — `loadIfd()` reads the entries of t
 
 ## 3. Tags the reader uses
 
-The names are the constants in the header. Default = value if the tag is absent.
+The names are the constants in `geotiff.cpp`. Default = value if the tag is absent.
 
 | Constant | Tag | Meaning | Default |
 |---|---|---|---|
@@ -277,7 +285,7 @@ Keys the reader uses:
 
 | Change | Place |
 |---|---|
-| Another tile size | build with `-DGEOTIFF_TILE_SIZE=n`; nothing else |
+| Another tile size | configure with `cmake -DGEOTIFF_TILE_SIZE=n`; nothing else |
 | Accept another band count | `if` in `parseImage()`; the scratch buffer size and the copy loop in `readBlock()` assume 3 |
 | Accept another sample type | `DataType`, `dataTypeSize()`, `dataTypeName()`, the type mapping in `parseImage()`, `fillNoData()`; add matrix and oracle files |
 | Add a codec | decode in `readTile()`, admit the code in `parseImage()`, add oracle files |
@@ -299,8 +307,8 @@ cmake --preset asan-clang && cmake --build --preset asan-clang && ctest --preset
 |---|---|
 | `geotiff.unit` | `tests/geotiff_test.cpp` with 256×256 tiles: `testMatrix()` (bands × type × BigTIFF × sparse), `testLayouts()`, `testConstraints()` (section 1, further images ignored), `testGeo()`, `testNoData()`, `testUnsupported()`, `testApi()`, `testCorrupt()` |
 | `geotiff.unit_small_tiles` | the same source with `GEOTIFF_TILE_SIZE=16`, plus every truncation and byte mutation in `testCorrupt()` |
-| `geotiff.no_exceptions` | no exception / RTTI keyword in the header |
-| `geotiff.knowledge` | this file agrees with the header |
+| `geotiff.no_exceptions` | no exception / RTTI keyword in the two code files |
+| `geotiff.knowledge` | this file agrees with the code |
 | `geotiff.oracle_*` | only with the Python GDAL bindings: GDAL writes files, the reader must return the same blocks (CRC-32) and metadata; compressed files and files outside section 1 must be refused |
 
 The unit tests need no GDAL: `build()` in the test writes TIFF files in memory from an
