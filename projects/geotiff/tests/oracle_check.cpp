@@ -2,14 +2,17 @@
 //
 //     oracle_check DIR
 //
-// DIR is written by oracle_generate.py: for every name in index.txt the block dump of
-// GDAL's ReadBlock (<name>.blocks) must equal Reader::readBlock byte for byte, absent
-// blocks must be reported as sparse, and size / type / block size / nodata / geotransform
-// / EPSG must equal what gdalinfo reported (<name>.txt). Files in reject.txt are
-// compressed and must be refused at open with the codec named.
+// DIR is written by oracle_generate.py: for every name in index.txt the CRC-32 of every
+// block as GDAL's ReadBlock gives it (<name>.blocks) must equal the CRC-32 of what
+// Reader::readBlock gives, absent blocks must be reported as sparse, and size / type /
+// block size / nodata / geotransform / EPSG must equal what gdalinfo reported
+// (<name>.txt). Files in reject.txt are compressed and must be refused at open with the
+// codec named; files in outside.txt lie outside the project constraints (strips, other
+// tile sizes, band counts, band-interleaved) and must be refused with the reason named.
 #include "geotiff/geotiff.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -20,6 +23,20 @@
 
 static long g_checks = 0, g_failed = 0;
 static std::string g_name;
+
+// CRC-32 as zlib computes it (polynomial 0xEDB88320).
+static std::uint32_t crc32(const unsigned char* data, std::size_t size) {
+    static std::uint32_t table[256];
+    if (table[1] == 0)
+        for (std::uint32_t i = 0; i < 256; ++i) {
+            std::uint32_t c = i;
+            for (int k = 0; k < 8; ++k) c = (c & 1u) ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+            table[i] = c;
+        }
+    std::uint32_t crc = 0xFFFFFFFFu;
+    for (std::size_t i = 0; i < size; ++i) crc = table[(crc ^ data[i]) & 0xFFu] ^ (crc >> 8);
+    return crc ^ 0xFFFFFFFFu;
+}
 
 static bool check(bool cond, const char* what) {
     ++g_checks;
@@ -104,7 +121,7 @@ static void checkFile(const std::string& dir, const std::string& name) {
     // Every block of every band of every level against GDAL's ReadBlock.
     std::FILE* dump = std::fopen((dir + "/" + name + ".blocks").c_str(), "rb");
     if (!check(dump != nullptr, "open the .blocks of the oracle")) return;
-    std::vector<unsigned char> want, got;
+    std::vector<unsigned char> got;
     long blocks = 0, mismatches = 0;
     for (std::size_t level = 0; level < e.levels.size() && level <= r.overviewCount(); ++level) {
         const std::size_t image = level == 0 ? 0 : r.overviewImage(level - 1);
@@ -114,25 +131,29 @@ static void checkFile(const std::string& dir, const std::string& name) {
         if (!check(in.width == l.w && in.height == l.h && in.blockWidth == l.bw && in.blockHeight == l.bh,
                    "level size and block size"))
             break;
-        want.resize(static_cast<std::size_t>(in.blockBytes));
-        got.resize(want.size());
+        check(in.blockWidth == geotiff::kTileSize && in.blockBytes ==
+                  geotiff::kTileSamples * geotiff::dataTypeSize(in.dataType), "block bytes");
+        got.resize(static_cast<std::size_t>(in.blockBytes));
         for (unsigned band = 0; band < in.bands; ++band)
             for (unsigned by = 0; by < in.blocksY; ++by)
                 for (unsigned bx = 0; bx < in.blocksX; ++bx, ++blocks) {
                     const int present = std::fgetc(dump);
-                    if (present == EOF || std::fread(want.data(), 1, want.size(), dump) != want.size()) {
+                    unsigned char c[4];
+                    if (present == EOF || std::fread(c, 1, 4, dump) != 4) {
                         check(false, "block dump is cut short");
                         std::fclose(dump);
                         return;
                     }
+                    const std::uint32_t want = c[0] | c[1] << 8 | c[2] << 16 | static_cast<std::uint32_t>(c[3]) << 24;
                     std::memset(got.data(), 0xA5, got.size());
                     const geotiff::Status rs = r.readBlock(image, bx, by, band, got.data(), got.size());
+                    const bool equal = crc32(got.data(), got.size()) == want;
                     const bool same = rs == (present ? geotiff::Status::Ok : geotiff::Status::Sparse) &&
-                                      r.blockPresent(image, bx, by, band) == (present != 0) && got == want;
+                                      r.blockPresent(image, bx, by, band) == (present != 0) && equal;
                     if (!same && ++mismatches <= 3)
                         std::printf("  level %u band %u block (%u, %u): status %s, present in GDAL %d, bytes %s\n",
                                     static_cast<unsigned>(level), band, bx, by, geotiff::statusName(rs), present,
-                                    got == want ? "equal" : "differ");
+                                    equal ? "equal" : "differ");
                 }
     }
     check(mismatches == 0, "all blocks equal GDAL's ReadBlock");
@@ -148,7 +169,7 @@ int main(int argc, char** argv) {
     const std::string dir = argv[1];
     std::ifstream index(dir + "/index.txt");
     std::string name;
-    long files = 0, rejects = 0;
+    long files = 0, rejects = 0, outsides = 0;
     while (std::getline(index, name))
         if (!name.empty()) {
             checkFile(dir, name);
@@ -164,8 +185,20 @@ int main(int argc, char** argv) {
         check(!r.isOpen(), "reader stays closed");
         ++rejects;
     }
+    std::ifstream outside(dir + "/outside.txt");
+    std::string word;
+    while (outside >> name >> word) {
+        g_name = name;
+        geotiff::Reader r;
+        check(r.open((dir + "/" + name + ".tif").c_str()) == geotiff::Status::Unsupported, "file outside the subset refused");
+        if (!check(std::strstr(r.message(), word.c_str()) != nullptr, "message names the reason"))
+            std::printf("  message: %s\n", r.message());
+        check(!r.isOpen(), "reader stays closed");
+        ++outsides;
+    }
     g_name = "index";
-    check(files > 0 && rejects > 0, "oracle directory holds files");
-    std::printf("oracle_check: %ld files, %ld rejects, %ld checks, %ld failed\n", files, rejects, g_checks, g_failed);
+    check(files > 0 && rejects > 0 && outsides > 0, "oracle directory holds files");
+    std::printf("oracle_check: %ld files, %ld rejects, %ld outside the subset, %ld checks, %ld failed\n", files,
+                rejects, outsides, g_checks, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

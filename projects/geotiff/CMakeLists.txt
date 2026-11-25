@@ -7,8 +7,8 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(geotiff
-    VERSION 0.1.0
-    DESCRIPTION "Dependency-free C++17 GeoTIFF block reader (GDAL sparse files, no exceptions)"
+    VERSION 0.2.0
+    DESCRIPTION "Dependency-free C++17 GeoTIFF tile reader (256x256 tiles, GDAL sparse files, no exceptions)"
     LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -51,11 +51,22 @@ endif()
 # --- tests --------------------------------------------------------------------------------
 if(GEOTIFF_BUILD_TESTS)
     enable_testing()
+    # The unit suite twice: with the tile size the header ships with, and with 16x16 tiles,
+    # where the files are small enough to truncate and mutate at every byte.
     geotiff_program(geotiff_test tests/geotiff_test.cpp)
     add_test(NAME geotiff.unit COMMAND geotiff_test)
+    geotiff_program(geotiff_test_small tests/geotiff_test.cpp)
+    target_compile_definitions(geotiff_test_small PRIVATE GEOTIFF_TILE_SIZE=16)
+    add_test(NAME geotiff.unit_small_tiles COMMAND geotiff_test_small)
     add_test(NAME geotiff.no_exceptions
         COMMAND ${CMAKE_COMMAND} -DHEADER=${CMAKE_CURRENT_SOURCE_DIR}/include/geotiff/geotiff.hpp
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_no_exceptions.cmake)
+
+    add_test(NAME geotiff.knowledge
+        COMMAND ${CMAKE_COMMAND} -DHEADER=${CMAKE_CURRENT_SOURCE_DIR}/include/geotiff/geotiff.hpp
+                -DTEST=${CMAKE_CURRENT_SOURCE_DIR}/tests/geotiff_test.cpp
+                -DKNOWLEDGE=${CMAKE_CURRENT_SOURCE_DIR}/llm/knowledge.md
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_knowledge.cmake)
 
     # GDAL oracle — only if a Python 3 with the GDAL bindings (python-gdal) is found:
     # GDAL writes the files and dumps every block with ReadBlock, the reader must agree.
@@ -74,7 +85,7 @@ if(GEOTIFF_BUILD_TESTS)
         set_tests_properties(geotiff.oracle_generate PROPERTIES FIXTURES_SETUP geotiff_oracle)
         set_tests_properties(geotiff.oracle_check PROPERTIES FIXTURES_REQUIRED geotiff_oracle)
         if(GEOTIFF_BUILD_EXAMPLES)
-            add_test(NAME geotiff.example_info COMMAND geotiff_info ${_oracle}/big_tiles_sparse.tif)
+            add_test(NAME geotiff.example_info COMMAND geotiff_info ${_oracle}/overviews_sparse.tif)
             set_tests_properties(geotiff.example_info PROPERTIES FIXTURES_REQUIRED geotiff_oracle)
         endif()
         message(STATUS "geotiff: GDAL oracle tests enabled (${Python3_EXECUTABLE})")

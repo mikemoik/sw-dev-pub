@@ -6,4 +6,4 @@ __pycache__/
 *.py[cod]
 
 # written by the unit test
-geotiff_test_tmp.tif
+geotiff_test*_tmp.tif

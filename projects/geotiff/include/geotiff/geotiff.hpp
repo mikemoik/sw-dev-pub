@@ -1,10 +1,15 @@
 // geotiff.hpp — dependency-free GeoTIFF block reader, C++17, single header.
 //
 // Reads GeoTIFF files as GDAL writes them, block by block (the equivalent of GDAL's
-// ReadBlock): classic TIFF and BigTIFF, both byte orders, tiles and strips, pixel- and
-// band-interleaved, 8/16/32/64-bit integer and 32/64-bit float samples, overviews, and
-// GDAL sparse files (SPARSE_OK=TRUE: absent blocks read back as nodata or 0).
-// Uncompressed data only; compressed files are rejected at open().
+// ReadBlock): classic TIFF and BigTIFF, both byte orders, 8/16/32/64-bit integer and
+// 32/64-bit float samples, overviews, and GDAL sparse files (SPARSE_OK=TRUE: absent
+// blocks read back as nodata or 0).
+//
+// Project constraints — everything else is refused at open() with Status::Unsupported:
+//   - tiles only, no strips
+//   - tiles of kTileSize x kTileSize pixels, fixed at compile time (GEOTIFF_TILE_SIZE, 256)
+//   - 1 band, or 3 pixel-interleaved bands (RGB); no band-interleaved data
+//   - uncompressed data, no predictor
 //
 // No exceptions, no RTTI: every fallible call returns a geotiff::Status, the text for
 // the last failure is in Reader::message(). Standard library only.
@@ -24,10 +29,21 @@
 #include <limits>
 
 #define GEOTIFF_VERSION_MAJOR 0
-#define GEOTIFF_VERSION_MINOR 1
+#define GEOTIFF_VERSION_MINOR 2
 #define GEOTIFF_VERSION_PATCH 0
 
+// Tile width and height in pixels. The reader is built for one tile size; define the
+// macro before including the header (in every translation unit alike) to change it.
+#ifndef GEOTIFF_TILE_SIZE
+#define GEOTIFF_TILE_SIZE 256
+#endif
+
 namespace geotiff {
+
+constexpr std::uint32_t kTileSize = GEOTIFF_TILE_SIZE;
+static_assert(GEOTIFF_TILE_SIZE >= 1 && GEOTIFF_TILE_SIZE <= 4096, "GEOTIFF_TILE_SIZE must be 1..4096");
+// Samples in one block of one band: readBlock needs kTileSamples * sample size bytes.
+constexpr std::size_t kTileSamples = static_cast<std::size_t>(kTileSize) * kTileSize;
 
 // ---------------------------------------------------------------------------------------
 // Status
@@ -39,7 +55,7 @@ enum class Status : std::uint8_t {
     Io,             // the file cannot be opened or read
     NotTiff,        // no TIFF / BigTIFF header
     Corrupt,        // inconsistent or out-of-file structure
-    Unsupported,    // valid TIFF outside the supported subset (compression, bit depth, ...)
+    Unsupported,    // valid TIFF outside the supported subset (strips, tile size, compression, ...)
     OutOfRange,     // image, block or band index out of range
     BufferTooSmall, // caller buffer smaller than ImageInfo::blockBytes
     OutOfMemory,
@@ -197,21 +213,19 @@ inline const char* dataTypeName(DataType t) noexcept {
 struct ImageInfo {
     std::uint32_t width;
     std::uint32_t height;
-    std::uint32_t blockWidth;   // tile width, or the image width for strips
-    std::uint32_t blockHeight;  // tile height, or rows per strip
-    std::uint32_t blocksX;
-    std::uint32_t blocksY;
-    std::uint16_t bands;
+    std::uint32_t blockWidth;   // tile width in the file (kTileSize if readable; 0 = strips)
+    std::uint32_t blockHeight;  // tile height in the file
+    std::uint32_t blocksX;      // tiles per row (0 = strips)
+    std::uint32_t blocksY;      // tile rows
+    std::uint16_t bands;        // samples per pixel (1 or 3 if readable)
     std::uint16_t bitsPerSample;
     DataType dataType;
-    bool tiled;
-    bool planarSeparate;        // one block per band in the file (INTERLEAVE=BAND)
     bool overview;              // reduced-resolution image
     bool mask;                  // transparency mask (listed, not interpreted)
     std::uint16_t compression;  // TIFF Compression tag
     std::uint16_t predictor;    // TIFF Predictor tag
     std::uint16_t photometric;
-    std::uint64_t blockBytes;   // size of one band block = buffer size for readBlock
+    std::uint64_t blockBytes;   // size of one band block = buffer size for readBlock (0 if not readable)
     Status status;              // Ok, or Unsupported: listed, but its blocks cannot be read
 };
 
@@ -328,8 +342,8 @@ public:
         return s == Status::Ok ? s : failLookup(s, image, bx, by, band);
     }
 
-    // Decode block (bx, by) of `band` (0-based) of image `image` into `buffer`
-    // (>= ImageInfo::blockBytes): blockWidth x blockHeight samples of that band, row by
+    // Decode tile (bx, by) of `band` (0-based) of image `image` into `buffer`
+    // (>= ImageInfo::blockBytes): kTileSize x kTileSize samples of that band, row by
     // row, in host byte order — the same bytes GDAL's ReadBlock gives.
     //   Status::Ok      block read from the file
     //   Status::Sparse  block absent: buffer filled with the nodata value, or 0
@@ -352,42 +366,25 @@ public:
             return Status::Sparse;
         }
 
-        // Rows stored for this block: the last strip is short, tiles are always full.
-        std::uint64_t rows = in.blockHeight;
-        if (!in.tiled) {
-            const std::uint64_t left =
-                in.height - static_cast<std::uint64_t>(by) * in.blockHeight;
-            if (left < rows) rows = left;
-        }
+        // A tile is always stored full size, also at the right and bottom image edge.
         const unsigned sampleBytes = dataTypeSize(in.dataType);
-        const unsigned samplesPerPixel = in.planarSeparate ? 1u : in.bands;
-        const std::size_t bandBytes =
-            static_cast<std::size_t>(static_cast<std::uint64_t>(in.blockWidth) * rows * sampleBytes);
-        std::uint64_t chunkBytes = 0;
-        if (mulOverflow(bandBytes, samplesPerPixel, chunkBytes) ||
-            chunkBytes > std::numeric_limits<std::size_t>::max())
-            return fail(Status::Corrupt, "block (%u, %u) is too large", bx, by);
-        const std::size_t need = static_cast<std::size_t>(chunkBytes);
-
         const bool swap = sampleBytes > 1 && le_ != hostLittleEndian();
-        if (samplesPerPixel == 1) {
-            const Status d = decodeChunk(in, bx, by, offset, stored, out, need);
+        if (in.bands == 1) {
+            const Status d = decodeChunk(in, bx, by, offset, stored, out, blockBytes);
             if (d != Status::Ok) return d;
-            if (swap) swapSamples(out, bandBytes, sampleBytes);
+            if (swap) swapSamples(out, blockBytes, sampleBytes);
         } else {
-            const std::uint64_t chunkIndex =
-                static_cast<std::uint64_t>(by) * in.blocksX + bx;
+            // Pixel-interleaved: the stored tile holds all bands. It is decoded once into
+            // the scratch buffer and kept, so reading the other bands costs no file access.
+            const std::size_t need = blockBytes * in.bands;
+            const std::uint64_t chunkIndex = static_cast<std::uint64_t>(by) * in.blocksX + bx;
             if (!(cacheValid_ && cacheImage_ == image && cacheChunk_ == chunkIndex)) {
                 cacheValid_ = false;
-                // An uncompressed block cannot be larger than the file: checked before
-                // the scratch buffer grows, so a corrupt size cannot drive the allocation.
-                if (chunkBytes > size_)
-                    return fail(Status::Corrupt, "block (%u, %u) lies outside the file", bx, by);
                 if (need > scratchSize_) {
                     void* p = std::realloc(scratch_, need);
                     if (p == nullptr)
                         return fail(Status::OutOfMemory, "no memory for a %llu byte block",
-                                    static_cast<unsigned long long>(chunkBytes));
+                                    static_cast<unsigned long long>(need));
                     scratch_ = static_cast<unsigned char*>(p);
                     scratchSize_ = need;
                 }
@@ -397,11 +394,9 @@ public:
                 cacheChunk_ = chunkIndex;
                 cacheValid_ = true;
             }
-            deinterleave(scratch_ + static_cast<std::size_t>(band) * sampleBytes, out,
-                         bandBytes / sampleBytes, sampleBytes,
-                         static_cast<std::size_t>(samplesPerPixel) * sampleBytes, swap);
+            deinterleave(scratch_ + static_cast<std::size_t>(band) * sampleBytes, out, kTileSamples,
+                         sampleBytes, static_cast<std::size_t>(in.bands) * sampleBytes, swap);
         }
-        if (bandBytes < blockBytes) std::memset(out + bandBytes, 0, blockBytes - bandBytes);
         return Status::Ok;
     }
 
@@ -411,7 +406,6 @@ private:
         std::uint64_t* offsets;   // blockCount entries
         std::uint64_t* counts;    // blockCount entries
         std::uint64_t blockCount;
-        bool split;               // one stored strip per plane, exposed row by row
         char reason[96];
     };
     struct Entry {
@@ -428,8 +422,8 @@ private:
 
     enum : std::uint16_t {
         kNewSubfileType = 254, kImageWidth = 256, kImageLength = 257, kBitsPerSample = 258,
-        kCompression = 259, kPhotometric = 262, kStripOffsets = 273, kSamplesPerPixel = 277,
-        kRowsPerStrip = 278, kStripByteCounts = 279, kPlanarConfig = 284, kPredictor = 317,
+        kCompression = 259, kPhotometric = 262, kSamplesPerPixel = 277, kPlanarConfig = 284,
+        kPredictor = 317,
         kTileWidth = 322, kTileLength = 323, kTileOffsets = 324, kTileByteCounts = 325,
         kSampleFormat = 339, kModelPixelScale = 33550, kModelTiepoint = 33922,
         kModelTransformation = 34264, kGeoKeyDirectory = 34735, kGdalMetadata = 42112,
@@ -537,23 +531,8 @@ private:
         if (im.info.status != Status::Ok) return im.info.status;
         if (bx >= im.info.blocksX || by >= im.info.blocksY || band >= im.info.bands)
             return Status::OutOfRange;
-        if (im.split) {
-            const unsigned plane = im.info.planarSeparate ? band : 0u;
-            const std::uint64_t base = im.offsets[plane], total = im.counts[plane];
-            offset = bytes = 0;
-            if (base == 0 || total == 0) return Status::Ok;  // the whole strip is absent
-            const std::uint64_t rowBytes = static_cast<std::uint64_t>(im.info.width) *
-                                           (im.info.planarSeparate ? 1u : im.info.bands);
-            const std::uint64_t start = by * rowBytes;
-            if (start >= total || base > std::numeric_limits<std::uint64_t>::max() - start)
-                return Status::Corrupt;
-            offset = base + start;
-            bytes = total - start;
-            return Status::Ok;
-        }
-        std::uint64_t index = static_cast<std::uint64_t>(by) * im.info.blocksX + bx;
-        if (im.info.planarSeparate)
-            index += static_cast<std::uint64_t>(band) * im.info.blocksX * im.info.blocksY;
+        // Tiles are numbered row by row; all bands of a pixel share one stored tile.
+        const std::uint64_t index = static_cast<std::uint64_t>(by) * im.info.blocksX + bx;
         offset = im.offsets[index];
         bytes = im.counts[index];
         return Status::Ok;
@@ -562,7 +541,6 @@ private:
                       unsigned band) noexcept {
         if (s == Status::NotOpen) return fail(s, "no file open");
         if (s == Status::Unsupported) return fail(s, "%s", images_[image].reason);
-        if (s == Status::Corrupt) return fail(s, "block (%u, %u) lies beyond the stored strip", bx, by);
         return fail(s, "image %llu, block (%u, %u), band %u is out of range",
                     static_cast<unsigned long long>(image), bx, by, band);
     }
@@ -922,7 +900,7 @@ private:
 
         std::uint64_t width = 0, height = 0, bands = 1, bits = 1, format = 1, compression = 1,
                       predictor = 1, photometric = 0, planar = 1, subfile = 0, tileWidth = 0,
-                      tileHeight = 0, rowsPerStrip = 0xFFFFFFFFull;
+                      tileHeight = 0;
         bool haveWidth = false, haveHeight = false, tiled = false, haveTileHeight = false,
              uniformBits = true, uniformFormat = true;
         if ((s = scalar(ifd, kImageWidth, 0, width, &haveWidth)) != Status::Ok) return s;
@@ -937,7 +915,6 @@ private:
         if ((s = scalar(ifd, kNewSubfileType, 0, subfile)) != Status::Ok) return s;
         if ((s = scalar(ifd, kTileWidth, 0, tileWidth, &tiled)) != Status::Ok) return s;
         if ((s = scalar(ifd, kTileLength, 0, tileHeight, &haveTileHeight)) != Status::Ok) return s;
-        if ((s = scalar(ifd, kRowsPerStrip, 0xFFFFFFFFull, rowsPerStrip)) != Status::Ok) return s;
 
         const std::uint64_t max32 = 0xFFFFFFFFull;
         if (!haveWidth || !haveHeight || width == 0 || height == 0 || width > max32 || height > max32)
@@ -948,26 +925,18 @@ private:
         if (planar != 1 && planar != 2)
             return fail(Status::Corrupt, "image %u: invalid PlanarConfiguration %llu",
                         static_cast<unsigned>(index), static_cast<unsigned long long>(planar));
-        std::uint64_t blockWidth = width, blockHeight = rowsPerStrip < height ? rowsPerStrip : height;
-        if (tiled) {
-            blockWidth = tileWidth;
-            blockHeight = tileHeight;
-            if (!haveTileHeight || tileWidth == 0 || tileHeight == 0 || tileWidth > max32 || tileHeight > max32)
-                return fail(Status::Corrupt, "image %u: invalid tile size", static_cast<unsigned>(index));
-        } else if (blockHeight == 0) {
-            return fail(Status::Corrupt, "image %u: RowsPerStrip is 0", static_cast<unsigned>(index));
-        }
+        if (tiled && (!haveTileHeight || tileWidth == 0 || tileHeight == 0 || tileWidth > max32 ||
+                      tileHeight > max32))
+            return fail(Status::Corrupt, "image %u: invalid tile size", static_cast<unsigned>(index));
 
         in.width = static_cast<std::uint32_t>(width);
         in.height = static_cast<std::uint32_t>(height);
-        in.blockWidth = static_cast<std::uint32_t>(blockWidth);
-        in.blockHeight = static_cast<std::uint32_t>(blockHeight);
-        in.blocksX = static_cast<std::uint32_t>((width + blockWidth - 1) / blockWidth);
-        in.blocksY = static_cast<std::uint32_t>((height + blockHeight - 1) / blockHeight);
+        in.blockWidth = static_cast<std::uint32_t>(tileWidth);    // 0 for strips
+        in.blockHeight = static_cast<std::uint32_t>(tileHeight);
+        in.blocksX = tiled ? static_cast<std::uint32_t>((width + tileWidth - 1) / tileWidth) : 0u;
+        in.blocksY = tiled ? static_cast<std::uint32_t>((height + tileHeight - 1) / tileHeight) : 0u;
         in.bands = static_cast<std::uint16_t>(bands);
         in.bitsPerSample = static_cast<std::uint16_t>(bits > 0xFFFFu ? 0xFFFFu : bits);
-        in.tiled = tiled;
-        in.planarSeparate = planar == 2 && bands > 1;
         in.overview = (subfile & 1u) != 0;
         in.mask = (subfile & 4u) != 0;
         in.compression = static_cast<std::uint16_t>(compression > 0xFFFFu ? 0xFFFFu : compression);
@@ -990,15 +959,7 @@ private:
         }
 
         // Outside the supported subset: the image stays listed, its blocks are not readable.
-        const std::uint64_t blockSamples = blockWidth * blockHeight;  // < 2^64
-        std::uint64_t blockBytes = 0, blockCount = 0;
-        const unsigned sampleBytes = dataTypeSize(in.dataType);
-        const bool tooBig =
-            sampleBytes != 0 &&
-            (mulOverflow(blockSamples, sampleBytes, blockBytes) ||
-             blockBytes > std::numeric_limits<std::size_t>::max() ||
-             mulOverflow(static_cast<std::uint64_t>(in.blocksX) * in.blocksY,
-                         in.planarSeparate ? bands : 1u, blockCount));
+        // (PlanarConfiguration has no meaning for one band; GDAL writes 2 for INTERLEAVE=BAND.)
         const unsigned id = static_cast<unsigned>(index);
         if (compression != 1)
             std::snprintf(im.reason, sizeof im.reason, "image %u: compression %llu (%s) is not supported",
@@ -1012,96 +973,48 @@ private:
                           static_cast<unsigned long long>(bits), static_cast<unsigned long long>(format));
         else if (photometric == 6)
             std::snprintf(im.reason, sizeof im.reason, "image %u: YCbCr data is not supported", id);
-        else if (tooBig)
-            std::snprintf(im.reason, sizeof im.reason, "image %u: block size too large", id);
+        else if (!tiled)
+            std::snprintf(im.reason, sizeof im.reason, "image %u: strips are not supported (tiles only)", id);
+        else if (tileWidth != kTileSize || tileHeight != kTileSize)
+            std::snprintf(im.reason, sizeof im.reason, "image %u: %llux%llu tiles are not supported (%ux%u only)",
+                          id, static_cast<unsigned long long>(tileWidth),
+                          static_cast<unsigned long long>(tileHeight), static_cast<unsigned>(kTileSize),
+                          static_cast<unsigned>(kTileSize));
+        else if (bands != 1 && bands != 3)
+            std::snprintf(im.reason, sizeof im.reason, "image %u: %llu bands are not supported (1 or 3 only)", id,
+                          static_cast<unsigned long long>(bands));
+        else if (planar == 2 && bands != 1)
+            std::snprintf(im.reason, sizeof im.reason, "image %u: band-interleaved data is not supported", id);
         if (im.reason[0] != '\0') {
-            in.blockBytes = tooBig ? 0 : blockBytes;
+            in.blockBytes = 0;
             in.status = Status::Unsupported;
         } else {
-            in.blockBytes = blockBytes;
+            in.blockBytes = static_cast<std::uint64_t>(kTileSamples) * dataTypeSize(in.dataType);
+            const std::uint64_t blockCount = static_cast<std::uint64_t>(in.blocksX) * in.blocksY;
             Entry offsets, counts;
-            if (!find(ifd, tiled ? kTileOffsets : kStripOffsets, offsets) ||
-                !find(ifd, tiled ? kTileByteCounts : kStripByteCounts, counts))
-                return fail(Status::Corrupt, "image %u: block offsets or byte counts are missing", id);
+            if (!find(ifd, kTileOffsets, offsets) || !find(ifd, kTileByteCounts, counts))
+                return fail(Status::Corrupt, "image %u: tile offsets or byte counts are missing", id);
             // Check the tables lie inside the file before sizing memory by their count.
             std::uint64_t bytes = 0, at = 0;
             bool inlined = false;
             if ((s = entryData(offsets, bytes, inlined, at)) != Status::Ok) return s;
             if ((s = entryData(counts, bytes, inlined, at)) != Status::Ok) return s;
             if (offsets.count < blockCount || counts.count < blockCount)
-                return fail(Status::Corrupt, "image %u: %llu blocks, but the offset tables hold fewer", id,
+                return fail(Status::Corrupt, "image %u: %llu tiles, but the offset tables hold fewer", id,
                             static_cast<unsigned long long>(blockCount));
             if (blockCount > std::numeric_limits<std::size_t>::max() / sizeof(std::uint64_t))
-                return fail(Status::OutOfMemory, "image %u: too many blocks", id);
+                return fail(Status::OutOfMemory, "image %u: too many tiles", id);
             const std::size_t tableBytes = static_cast<std::size_t>(blockCount) * sizeof(std::uint64_t);
             im.offsets = static_cast<std::uint64_t*>(std::malloc(tableBytes));
             im.counts = static_cast<std::uint64_t*>(std::malloc(tableBytes));
             if (im.offsets == nullptr || im.counts == nullptr)
-                return fail(Status::OutOfMemory, "image %u: no memory for the block tables", id);
+                return fail(Status::OutOfMemory, "image %u: no memory for the tile tables", id);
             im.blockCount = blockCount;
             if ((s = readUInts(offsets, 0, blockCount, im.offsets)) != Status::Ok) return s;
             if ((s = readUInts(counts, 0, blockCount, im.counts)) != Status::Ok) return s;
-            if (!tiled && (s = virtualStrips(im, rowsPerStrip, planar == 1)) != Status::Ok) return s;
         }
 
         return index == 0 ? parseGeo(ifd) : Status::Ok;
-    }
-
-    // GDAL does not expose a large single strip as one block; ReadBlock follows two rules,
-    // mirrored here so block sizes and contents stay the same as GDAL's:
-    //  1. libtiff "strip chopping": one uncompressed pixel-interleaved strip of more than
-    //     8192 bytes is presented as virtual strips of at most 8192 bytes (whole rows).
-    //  2. GDAL "split" mode: an 8-bit image still in one strip (per plane) with more than
-    //     2000 rows is presented row by row (block height 1).
-    // Not mirrored: libtiff's re-chopping of strips larger than 2 GB.
-    Status virtualStrips(Image& im, std::uint64_t rowsPerStripTag, bool contiguous) noexcept {
-        ImageInfo& in = im.info;
-        const unsigned sampleBytes = dataTypeSize(in.dataType);
-        if (contiguous && im.blockCount == 1) {
-            const std::uint64_t rowBytes = static_cast<std::uint64_t>(in.width) * in.bands * sampleBytes;
-            const std::uint64_t rows = rowBytes > 8192 ? 1 : 8192 / rowBytes;
-            const std::uint64_t strips = (in.height + rows - 1) / rows;
-            const std::uint64_t stripBytes = rows * rowBytes;
-            std::uint64_t offset = im.offsets[0], left = im.counts[0];
-            bool chop = rows < rowsPerStripTag && offset <= std::numeric_limits<std::uint64_t>::max() - left;
-            // As libtiff: a huge table only if the file is really that large.
-            if (strips > 1000000 && (offset >= size_ || stripBytes > (size_ - offset) / (strips - 1)))
-                chop = false;
-            if (chop) {
-                if (strips > std::numeric_limits<std::size_t>::max() / sizeof(std::uint64_t))
-                    return fail(Status::OutOfMemory, "too many strips");
-                const std::size_t tableBytes = static_cast<std::size_t>(strips) * sizeof(std::uint64_t);
-                std::uint64_t* offsets = static_cast<std::uint64_t*>(std::malloc(tableBytes));
-                std::uint64_t* counts = static_cast<std::uint64_t*>(std::malloc(tableBytes));
-                if (offsets == nullptr || counts == nullptr) {
-                    std::free(offsets);
-                    std::free(counts);
-                    return fail(Status::OutOfMemory, "no memory for the strip tables");
-                }
-                for (std::uint64_t i = 0; i < strips; ++i) {
-                    const std::uint64_t n = stripBytes < left ? stripBytes : left;
-                    counts[i] = n;
-                    offsets[i] = n != 0 ? offset : 0;
-                    offset += n;
-                    left -= n;
-                }
-                std::free(im.offsets);
-                std::free(im.counts);
-                im.offsets = offsets;
-                im.counts = counts;
-                im.blockCount = strips;
-                in.blockHeight = static_cast<std::uint32_t>(rows < in.height ? rows : in.height);
-                in.blocksY = static_cast<std::uint32_t>(strips);
-                in.blockBytes = static_cast<std::uint64_t>(in.width) * in.blockHeight * sampleBytes;
-            }
-        }
-        if (in.bitsPerSample == 8 && in.blockHeight == in.height && in.height > 2000) {
-            im.split = true;
-            in.blockHeight = 1;
-            in.blocksY = in.height;
-            in.blockBytes = in.width;
-        }
-        return Status::Ok;
     }
 
     // Georeferencing, nodata and GDAL metadata of the main image.
@@ -1206,7 +1119,7 @@ private:
     std::uint16_t* geoKeys_ = nullptr;
     std::size_t geoKeyCount_ = 0;
 
-    // Decode scratch: the last pixel-interleaved block read, reused across bands.
+    // Decode scratch: the last 3-band tile read, reused across bands.
     unsigned char* scratch_ = nullptr;
     std::size_t scratchSize_ = 0;
     std::size_t cacheImage_ = 0;

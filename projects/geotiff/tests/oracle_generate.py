@@ -3,27 +3,32 @@
 
     python3 oracle_generate.py OUTDIR
 
-Writes GeoTIFFs with the system GDAL across layout x planar config x data type x byte
-order x BigTIFF x sparse (+ nodata, georeferencing, overviews, masks), and next to each
-<name>.tif
+Writes GeoTIFFs with the system GDAL inside the reader's subset (256x256 tiles, 1 band or
+3 pixel-interleaved bands) across data type x byte order x BigTIFF x sparse (+ nodata,
+georeferencing, overviews, masks), and next to each <name>.tif
 
     <name>.txt     what gdalinfo reports (size, type, block, nodata, geotransform, EPSG)
     <name>.blocks  every block of every band of every level, read with GDAL's ReadBlock:
-                   1 byte "present in the file" + the block bytes, level/band/row/column order
+                   1 byte "present in the file" + the CRC-32 of the block bytes (4 bytes,
+                   little endian), level/band/row/column order
 
-plus index.txt (one name per line) and reject.txt (compressed files: "<name> <codec>").
+plus index.txt (one name per line), reject.txt (compressed files: "<name> <codec>") and
+outside.txt (valid files outside the subset: "<name> <word of the message>").
 oracle_check (C++) reads all of it back through geotiff.hpp. Needs python-gdal only.
 """
 import array
 import itertools
 import os
+import struct
 import sys
+import zlib
 
 from osgeo import gdal, osr
 
 gdal.UseExceptions()
 
-W, H = 40, 37
+W, H = 300, 280   # 2 x 2 tiles, both edges cut a tile
+W1, H1 = 300, 200  # 2 x 1 tiles
 DTYPES = [  # GDAL name, array typecode
     ("Byte", "B"), ("Int8", "b"), ("UInt16", "H"), ("Int16", "h"), ("UInt32", "I"),
     ("Int32", "i"), ("UInt64", "Q"), ("Int64", "q"), ("Float32", "f"), ("Float64", "d"),
@@ -44,32 +49,28 @@ GEO = [  # geotransform, EPSG, PixelIsPoint
 ]
 
 
+FORMULA = {  # sample for v = 1 + 7x + 13y + 31 band; never all zero
+    "B": lambda v, x: v % 251 + 1,
+    "b": lambda v, x: v % 250 - 125 or 3,
+    "H": lambda v, x: v * 3 % 65000 + 1,
+    "h": lambda v, x: v * 3 % 60000 - 30000 or 3,
+    "I": lambda v, x: v * 70001,
+    "i": lambda v, x: v * 70001 - 50000000,
+    "Q": lambda v, x: v * 0x100000001 + 2 ** 63,
+    "q": lambda v, x: -v * 0x100000001,
+    "f": lambda v, x: v * 0.25 - 100.0,
+    "d": lambda v, x: v * 0.125 - 1000.0 + 1e-9 * x,
+}
+
+
 def values(code, band, x0, y0, w, h):
-    """Deterministic samples for a window, never all zero."""
+    """Deterministic samples for a window."""
+    f = FORMULA[code]
+    xs = range(x0, x0 + w)
     out = array.array(code)
     for y in range(y0, y0 + h):
-        for x in range(x0, x0 + w):
-            v = 1 + x * 7 + y * 13 + band * 31
-            if code == "B":
-                out.append(v % 251 + 1)
-            elif code == "b":
-                out.append(v % 250 - 125 or 3)
-            elif code == "H":
-                out.append(v * 3 % 65000 + 1)
-            elif code == "h":
-                out.append(v * 3 % 60000 - 30000 or 3)
-            elif code == "I":
-                out.append(v * 70001)
-            elif code == "i":
-                out.append(v * 70001 - 50000000)
-            elif code == "Q":
-                out.append(v * 0x100000001 + 2 ** 63)
-            elif code == "q":
-                out.append(-v * 0x100000001)
-            elif code == "f":
-                out.append(v * 0.25 - 100.0)
-            else:
-                out.append(v * 0.125 - 1000.0 + 1e-9 * x)
+        base = 1 + y * 13 + band * 31
+        out.extend([f(base + x * 7, x) for x in xs])
     return out.tobytes()
 
 
@@ -99,8 +100,8 @@ def create(path, gdt_name, code, bands, options, sparse, nodata, geo, overviews,
             else:
                 band.SetNoDataValue(nodata)
         for by, bx in itertools.product(range((h + bh - 1) // bh), range((w + bw - 1) // bw)):
-            if sparse and (bx + 2 * by + b) % 3 == 0:
-                continue  # never written: stays absent with SPARSE_OK=TRUE
+            if sparse is None or (sparse and (bx + 2 * by) % 3 == 0):
+                continue  # no band written: the tile stays absent with SPARSE_OK=TRUE
             x0, y0 = bx * bw, by * bh
             ww, hh = min(bw, w - x0), min(bh, h - y0)
             band.WriteRaster(x0, y0, ww, hh, values(code, b, x0, y0, ww, hh), buf_type=gdt)
@@ -116,7 +117,7 @@ def create(path, gdt_name, code, bands, options, sparse, nodata, geo, overviews,
         ds = None
 
 
-def dump(path, split=False):
+def dump(path):
     """<name>.txt from gdalinfo, <name>.blocks from ReadBlock."""
     info = gdal.Info(path, format="json")
     ds = gdal.Open(path)
@@ -160,50 +161,51 @@ def dump(path, split=False):
             nx, ny = (bands[0].XSize + bw - 1) // bw, (bands[0].YSize + bh - 1) // bh
             for band in bands:
                 for by, bx in itertools.product(range(ny), range(nx)):
-                    # Split mode (one strip shown row by row): GDAL has an offset for row 0 only.
-                    key = "BLOCK_OFFSET_%d_%d" % (bx, 0 if split else by)
-                    present = band.GetMetadataItem(key, "TIFF") is not None
+                    present = band.GetMetadataItem("BLOCK_OFFSET_%d_%d" % (bx, by), "TIFF") is not None
                     out.write(b"\x01" if present else b"\x00")
-                    out.write(band.ReadBlock(bx, by))
+                    out.write(struct.pack("<I", zlib.crc32(band.ReadBlock(bx, by))))
 
 
 def main():
     outdir = sys.argv[1]
     os.makedirs(outdir, exist_ok=True)
-    names, rejects = [], []
+    names, rejects, outsides = [], [], []
     i = 0
-    for big, big_endian, tiled, planar, (gdt_name, code), sparse in itertools.product(
-            (False, True), (False, True), (False, True), (0, 1, 2), DTYPES, (False, True)):
-        bands = 1 if planar == 0 else 3
-        options = ["BIGTIFF=" + ("YES" if big else "NO"), "ENDIANNESS=" + ("BIG" if big_endian else "LITTLE"),
-                   "INTERLEAVE=" + ("BAND" if planar == 2 else "PIXEL")]
-        options += ["TILED=YES", "BLOCKXSIZE=16", "BLOCKYSIZE=16"] if tiled else ["BLOCKYSIZE=5"]
+    # Byte order x bands x type x sparse; BigTIFF alternates so every type has both.
+    for big_endian, bands, (gdt_name, code), sparse in itertools.product(
+            (False, True), (1, 3), DTYPES, (False, True)):
+        big = (i // 2 + big_endian) % 2 == 1
+        options = ["TILED=YES", "BIGTIFF=" + ("YES" if big else "NO"),
+                   "ENDIANNESS=" + ("BIG" if big_endian else "LITTLE")]
         if sparse:
             options.append("SPARSE_OK=TRUE")
         candidates = NODATA[gdt_name]
-        name = "%s_%s_%s_p%d_%s%s" % ("big" if big else "classic", "be" if big_endian else "le",
-                                      "tiled" if tiled else "strips", planar, gdt_name,
-                                      "_sparse" if sparse else "")
+        name = "%s_%s_b%d_%s%s" % ("big" if big else "classic", "be" if big_endian else "le", bands,
+                                   gdt_name, "_sparse" if sparse else "")
         path = os.path.join(outdir, name + ".tif")
         nodata = candidates[i % len(candidates)]
         # GDAL 3.13 does not return from BuildOverviews on a 64-bit integer band whose
         # nodata value is no exact double: those files get no overviews.
         inexact = isinstance(nodata, int) and int(float(nodata)) != nodata
         create(path, gdt_name, code, bands, options, sparse, nodata, GEO[i % len(GEO)],
-               [2, 4] if i % 4 == 0 and not inexact else None)
+               [2, 4] if i % 4 == 0 and not inexact else None, size=(W, H) if sparse else (W1, H1))
         dump(path)
         names.append(name)
         i += 1
 
     extra = [  # name, type, bands, options, sparse, nodata, geo, overviews, mask, size
-        ("default_strips", "Byte", 3, [], False, None, GEO[1], None, False, (W, H)),
-        ("default_strips_sparse", "Int16", 1, ["SPARSE_OK=TRUE"], True, -9999, GEO[2], None, False, (W, H)),
-        ("big_tiles", "Float32", 2, ["TILED=YES"], False, -9999.0, GEO[2], [2, 4, 8], False, (600, 500)),
-        ("big_tiles_sparse", "UInt16", 1, ["TILED=YES", "BLOCKXSIZE=128", "BLOCKYSIZE=64", "SPARSE_OK=TRUE"],
-         True, 65535, GEO[4], [2, 4], False, (600, 500)),
-        ("mask", "Byte", 3, ["TILED=YES", "BLOCKXSIZE=16", "BLOCKYSIZE=16"], False, None, GEO[1], [2], True, (W, H)),
-        ("mask_strips", "UInt16", 1, [], False, None, None, None, True, (W, H)),
-        ("one_strip", "Float64", 1, ["BLOCKYSIZE=%d" % H], False, float("nan"), GEO[3], None, False, (W, H)),
+        ("rgb", "Byte", 3, ["TILED=YES", "PHOTOMETRIC=RGB"], False, None, GEO[1], [2, 4], False, (700, 520)),
+        ("overviews", "Float32", 1, ["TILED=YES"], False, -9999.0, GEO[2], [2, 4, 8], False, (700, 520)),
+        ("overviews_sparse", "UInt16", 1, ["TILED=YES", "SPARSE_OK=TRUE"], True, 65535, GEO[4], [2, 4],
+         False, (700, 520)),
+        ("explicit_256", "Int16", 3, ["TILED=YES", "BLOCKXSIZE=256", "BLOCKYSIZE=256"], False, -9999, GEO[2],
+         None, False, (W, H)),
+        ("one_band_interleave_band", "Float64", 1, ["TILED=YES", "INTERLEAVE=BAND"], False, float("nan"),
+         GEO[3], None, False, (W, H)),
+        ("small", "Byte", 3, ["TILED=YES"], False, 0, GEO[1], None, False, (40, 37)),
+        ("whole_tiles", "UInt16", 1, ["TILED=YES"], False, None, None, None, False, (512, 256)),
+        ("all_absent", "Float32", 3, ["TILED=YES", "SPARSE_OK=TRUE"], None, 1.5, GEO[1], None, False, (W, H)),
+        ("mask", "Byte", 3, ["TILED=YES"], False, None, GEO[1], [2], True, (W, H)),
     ]
     for name, gdt_name, bands, options, sparse, nodata, geo, overviews, mask, size in extra:
         path = os.path.join(outdir, name + ".tif")
@@ -211,38 +213,20 @@ def main():
         dump(path)
         names.append(name)
 
-    # One strip for the whole image: GDAL shows virtual strips of <= 8192 bytes (libtiff
-    # strip chopping), or single rows for 8-bit images of more than 2000 rows (split).
-    # (An absent strip in split mode is left out: GDAL fails to read it.)
-    single = [  # name, type, bands, interleave, size, written, split
-        ("chop_byte", "Byte", 1, "PIXEL", (300, 2500), True, False),
-        ("chop_byte_absent", "Byte", 1, "PIXEL", (300, 2500), False, False),
-        ("chop_rgb", "Byte", 3, "PIXEL", (300, 2500), True, False),
-        ("chop_float64", "Float64", 2, "PIXEL", (40, 37), True, False),
-        ("chop_wide_row", "UInt16", 1, "PIXEL", (5000, 3), True, False),
-        ("chop_exact_8192", "Byte", 1, "PIXEL", (64, 128), True, False),
-        ("chop_none_separate", "UInt16", 3, "BAND", (300, 2001), True, False),
-        ("split_separate", "Byte", 3, "BAND", (300, 2001), True, True),
-        ("split_int8", "Int8", 3, "BAND", (30, 2001), True, True),
-        ("split_one_band_separate", "Byte", 1, "BAND", (300, 2001), True, True),
-        ("split_narrow", "Byte", 3, "PIXEL", (1, 2001), True, True),
-        ("split_not_2000", "Byte", 3, "BAND", (30, 2000), True, False),
+    # Valid GeoTIFFs outside the reader's subset: refused at open, the message says why.
+    outside = [  # name, bands, options, word of the message
+        ("outside_strips", 1, [], "strips"),
+        ("outside_strips_rgb", 3, ["BLOCKYSIZE=5"], "strips"),
+        ("outside_tiles_512", 1, ["TILED=YES", "BLOCKXSIZE=512", "BLOCKYSIZE=512"], "tiles"),
+        ("outside_tiles_128", 3, ["TILED=YES", "BLOCKXSIZE=128", "BLOCKYSIZE=128"], "tiles"),
+        ("outside_tiles_256x512", 1, ["TILED=YES", "BLOCKXSIZE=256", "BLOCKYSIZE=512"], "tiles"),
+        ("outside_2_bands", 2, ["TILED=YES"], "bands"),
+        ("outside_rgba", 4, ["TILED=YES"], "bands"),
+        ("outside_band_interleaved", 3, ["TILED=YES", "INTERLEAVE=BAND"], "band-interleaved"),
     ]
-    for name, gdt_name, bands, interleave, size, written, split in single:
-        path = os.path.join(outdir, name + ".tif")
-        gdt = gdal.GetDataTypeByName(gdt_name)
-        ds = gdal.GetDriverByName("GTiff").Create(
-            path, size[0], size[1], bands, gdt,
-            options=["BLOCKYSIZE=%d" % size[1], "INTERLEAVE=" + interleave, "SPARSE_OK=TRUE"])
-        for b in range(1, bands + 1):
-            ds.GetRasterBand(b).SetNoDataValue(9)
-            if written:
-                ds.GetRasterBand(b).WriteRaster(0, 0, size[0], size[1],
-                                                values(dict(DTYPES)[gdt_name], b, 0, 0, size[0], size[1]),
-                                                buf_type=gdt)
-        ds = None
-        dump(path, split)
-        names.append(name)
+    for name, bands, options, word in outside:
+        create(os.path.join(outdir, name + ".tif"), "Byte", "B", bands, options, False, None, GEO[1], None)
+        outsides.append("%s %s" % (name, word))
 
     creation = gdal.GetDriverByName("GTiff").GetMetadataItem("DMD_CREATIONOPTIONLIST")
     for codec, reported in (("DEFLATE", "DEFLATE"), ("LZW", "LZW"), ("PACKBITS", "PackBits"), ("ZSTD", "ZSTD"),
@@ -262,7 +246,10 @@ def main():
         f.write("\n".join(names) + "\n")
     with open(os.path.join(outdir, "reject.txt"), "w") as f:
         f.write("\n".join(rejects) + "\n")
-    print("oracle: GDAL %s, %d files, %d rejects in %s" % (gdal.__version__, len(names), len(rejects), outdir))
+    with open(os.path.join(outdir, "outside.txt"), "w") as f:
+        f.write("\n".join(outsides) + "\n")
+    print("oracle: GDAL %s, %d files, %d rejects, %d outside the subset in %s"
+          % (gdal.__version__, len(names), len(rejects), len(outsides), outdir))
 
 
 if __name__ == "__main__":

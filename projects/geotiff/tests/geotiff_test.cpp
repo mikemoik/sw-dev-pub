@@ -1,7 +1,11 @@
 // geotiff_test.cpp — unit tests for geotiff.hpp. No GDAL, no Python: an in-test TIFF
-// writer builds the files in memory (layout x planar config x data type x byte order x
-// BigTIFF x sparse), plus georeferencing, nodata, overviews, unsupported subsets and
-// truncated / corrupted input. Exit code 0 = all checks passed.
+// writer builds the files in memory (1 / 3 bands x data type x byte order x BigTIFF x
+// sparse), plus georeferencing, nodata, overviews, the project constraints (tiles only,
+// one tile size, 1 or 3 pixel-interleaved bands), unsupported subsets and truncated /
+// corrupted input. Exit code 0 = all checks passed.
+//
+// Built twice: with the default tile size (256), and with GEOTIFF_TILE_SIZE=16, where the
+// files are small enough to mutate every byte (testCorrupt).
 #include "geotiff/geotiff.hpp"
 
 #include <algorithm>
@@ -15,6 +19,12 @@
 using geotiff::DataType;
 using geotiff::Reader;
 using geotiff::Status;
+
+static const std::uint32_t T = geotiff::kTileSize;
+static const bool kSmallTiles = T <= 16;
+// Default image: 3 x 3 tiles with small tiles, 2 x 1 otherwise; both edges cut a tile.
+static const std::uint32_t kW = kSmallTiles ? 2 * T + T / 2 : T + T / 2;
+static const std::uint32_t kH = kSmallTiles ? 2 * T + 5 : T - 3;
 
 // --- tiny check harness -----------------------------------------------------------------
 
@@ -70,11 +80,11 @@ static Field ascii(std::uint16_t tag, const std::string& text) {
 }
 
 struct ImageSpec {
-    std::uint32_t w = 40, h = 37;
-    bool tiled = true;
-    std::uint32_t bw = 16, bh = 16;  // tile size, or bh = rows per strip
+    std::uint32_t w = kW, h = kH;
+    bool tiled = true;               // false: strips (not supported by the reader)
+    std::uint32_t bw = T, bh = T;    // tile size, or bh = rows per strip
     unsigned bands = 1;
-    bool separate = false;
+    bool separate = false;           // band-interleaved (not supported for 3 bands)
     DataType dt = DataType::UInt8;
     bool sparse = false;
     bool allAbsent = false;
@@ -311,8 +321,6 @@ static void checkAgainstSpec(const FileSpec& spec, const std::vector<std::uint8_
         CHECK(in.bands == im.bands);
         CHECK(in.dataType == im.dt);
         CHECK(in.bitsPerSample == geotiff::dataTypeSize(im.dt) * 8);
-        CHECK(in.tiled == im.tiled);
-        CHECK(in.planarSeparate == (im.separate && im.bands > 1));
         CHECK(in.blockBytes == std::uint64_t(bw) * bh * geotiff::dataTypeSize(im.dt));
         std::vector<std::uint8_t> got(static_cast<std::size_t>(in.blockBytes));
         for (unsigned band = 0; band < im.bands; ++band)
@@ -338,128 +346,137 @@ static void testMatrix() {
     int files = 0;
     for (int big = 0; big < 2; ++big)
         for (int le = 0; le < 2; ++le)
-            for (int tiled = 0; tiled < 2; ++tiled)
-                for (int planar = 0; planar < 3; ++planar)  // 1 band, 3 pixel-interleaved, 3 band-interleaved
-                    for (DataType dt : kTypes)
-                        for (int sparse = 0; sparse < 2; ++sparse) {
-                            FileSpec f;
-                            f.big = big != 0;
-                            f.le = le != 0;
-                            ImageSpec im;
-                            im.tiled = tiled != 0;
-                            if (!im.tiled) im.bh = 5;
-                            im.bands = planar == 0 ? 1 : 3;
-                            im.separate = planar == 2;
-                            im.dt = dt;
-                            im.sparse = sparse != 0;
-                            f.images.push_back(im);
-                            char name[128];
-                            std::snprintf(name, sizeof name, "%s %s %s planar%d %s%s", big ? "bigtiff" : "classic",
-                                          le ? "LE" : "BE", tiled ? "tiled" : "strips", planar,
-                                          geotiff::dataTypeName(dt), sparse ? " sparse" : "");
-                            g_context = name;
-                            checkAgainstSpec(f, build(f));
-                            ++files;
-                        }
+            for (unsigned bands = 1; bands <= 3; bands += 2)
+                for (DataType dt : kTypes)
+                    for (int sparse = 0; sparse < 2; ++sparse) {
+                        FileSpec f;
+                        f.big = big != 0;
+                        f.le = le != 0;
+                        ImageSpec im;
+                        im.bands = bands;
+                        im.dt = dt;
+                        im.sparse = sparse != 0;
+                        f.images.push_back(im);
+                        char name[128];
+                        std::snprintf(name, sizeof name, "%s %s %u band(s) %s%s", big ? "bigtiff" : "classic",
+                                      le ? "LE" : "BE", bands, geotiff::dataTypeName(dt), sparse ? " sparse" : "");
+                        g_context = name;
+                        checkAgainstSpec(f, build(f));
+                        ++files;
+                    }
     g_context = "matrix";
-    CHECK(files == 480);
+    CHECK(files == 160);
 }
 
 static void testLayouts() {
-    // One strip for the whole image (RowsPerStrip absent), 1-row strips, tiles larger than
-    // the image, a single pixel.
-    struct Case { const char* name; std::uint32_t w, h, bw, bh; bool tiled; bool noRows; };
-    const Case cases[] = {{"one strip, no RowsPerStrip", 13, 7, 0, 7, false, true},
-                          {"one strip, RowsPerStrip > height", 13, 7, 0, 1000, false, false},
-                          {"1-row strips", 9, 6, 0, 1, false, false},
-                          {"tile larger than image", 5, 3, 32, 16, true, false},
-                          {"single pixel strip", 1, 1, 0, 1, false, false},
-                          {"single pixel tile", 1, 1, 16, 16, true, false}};
+    // Image smaller than a tile, a single pixel, image sizes that are whole tiles.
+    struct Case { const char* name; std::uint32_t w, h; };
+    const Case cases[] = {{"tile larger than image", 5, 3},
+                          {"single pixel", 1, 1},
+                          {"exactly one tile", T, T},
+                          {"whole tiles", 2 * T, T},
+                          {"one pixel more than a tile", T + 1, T + 1}};
     for (const Case& c : cases) {
         g_context = c.name;
         FileSpec f;
         ImageSpec im;
         im.w = c.w;
         im.h = c.h;
-        im.tiled = c.tiled;
-        im.bw = c.bw;
-        im.bh = c.bh;
-        im.bands = 2;
+        im.bands = 3;
         im.dt = DataType::Int16;
-        if (c.noRows) im.omit.push_back(278);
         f.images.push_back(im);
         checkAgainstSpec(f, build(f));
     }
-    // BitsPerSample / SampleFormat given once for several bands; SampleFormat absent.
-    g_context = "per-sample tags given once";
-    FileSpec f;
-    ImageSpec im;
-    im.bands = 3;
-    im.dt = DataType::UInt16;
-    im.extra.push_back(ints(258, 3, {16}));
-    im.omit.push_back(339);
-    f.images.push_back(im);
-    checkAgainstSpec(f, build(f));
-}
-
-// One stored strip is presented as GDAL presents it: virtual strips of <= 8192 bytes, or
-// single rows for 8-bit images of more than 2000 rows.
-static void testVirtualStrips() {
-    struct Case { const char* name; std::uint32_t w, h; unsigned bands; bool separate; DataType dt;
-                  bool absentStrip; std::uint32_t rows; };
-    const Case cases[] = {
-        {"chop 2 bands int16", 100, 50, 2, false, DataType::Int16, false, 20},
-        {"chop absent", 100, 50, 2, false, DataType::Int16, true, 20},
-        {"chop row > 8192", 3000, 3, 1, false, DataType::Float32, false, 1},
-        {"no chop: exactly 8192", 64, 128, 1, false, DataType::UInt8, false, 128},
-        {"no chop: band-interleaved", 100, 50, 3, true, DataType::Int16, false, 50},
-        {"split band-interleaved", 5, 2001, 3, true, DataType::UInt8, false, 1},
-        {"split absent", 5, 2001, 3, true, DataType::Int8, true, 1},
-        {"split pixel-interleaved", 1, 2001, 3, false, DataType::UInt8, false, 1},
-        {"no split: 2000 rows", 4, 2000, 1, false, DataType::UInt8, false, 2000},
-        {"no split: 16 bit", 3, 2001, 3, true, DataType::UInt16, false, 2001},
-    };
-    for (const Case& c : cases) {
-        g_context = std::string("virtual strips: ") + c.name;
-        FileSpec stored;
-        ImageSpec im;
-        im.w = c.w; im.h = c.h; im.tiled = false; im.bh = c.h; im.bands = c.bands; im.separate = c.separate;
-        im.dt = c.dt; im.allAbsent = c.absentStrip;
-        stored.images.push_back(im);
-        const std::vector<std::uint8_t> bytes = build(stored);
-        FileSpec shown = stored;       // what the reader must present
-        shown.images[0].bh = c.rows;
-        Reader r;
-        CHECK(r.open(bytes.data(), bytes.size()) == Status::Ok);
-        const geotiff::ImageInfo& in = r.image();
-        CHECK(in.blockHeight == c.rows && in.blocksY == (c.h + c.rows - 1) / c.rows);
-        CHECK(in.blockBytes == std::uint64_t(c.w) * c.rows * geotiff::dataTypeSize(c.dt));
-        std::vector<std::uint8_t> got(static_cast<std::size_t>(in.blockBytes));
-        bool same = in.blockHeight == c.rows;
-        for (unsigned band = 0; same && band < c.bands; ++band)
-            for (std::uint32_t by = 0; by < in.blocksY; ++by) {
-                const Status s = r.readBlock(0, 0, by, band, got.data(), got.size());
-                same = same && s == (c.absentStrip ? Status::Sparse : Status::Ok) &&
-                       r.blockPresent(0, 0, by, band) == !c.absentStrip &&
-                       got == expectedBlock(shown.images[0], 0, by, band);
-            }
-        CHECK(same);
-    }
-    {
-        g_context = "virtual strips: truncated strip";
+    {   // BitsPerSample / SampleFormat given once for several bands; SampleFormat absent.
+        g_context = "per-sample tags given once";
         FileSpec f;
         ImageSpec im;
-        im.w = 5; im.h = 2001; im.tiled = false; im.bh = 2001; im.bands = 2; im.separate = true;
-        im.countCut = 5 * 2001 - 12;  // 12 bytes stored per band
+        im.bands = 3;
+        im.dt = DataType::UInt16;
+        im.extra.push_back(ints(258, 3, {16}));
+        im.omit.push_back(339);
+        f.images.push_back(im);
+        checkAgainstSpec(f, build(f));
+    }
+    {   // One band with PlanarConfiguration 2, as GDAL writes it for INTERLEAVE=BAND.
+        g_context = "one band, PlanarConfiguration 2";
+        FileSpec f;
+        ImageSpec im;
+        im.separate = true;
+        im.dt = DataType::Float32;
+        f.images.push_back(im);
+        checkAgainstSpec(f, build(f));
+    }
+}
+
+// The project constraints: tiles only, kTileSize x kTileSize, 1 or 3 pixel-interleaved bands.
+static void testConstraints() {
+    auto openStatus = [](const ImageSpec& im, std::string& message) {
+        FileSpec f;
         f.images.push_back(im);
         const std::vector<std::uint8_t> bytes = build(f);
         Reader r;
-        unsigned char row[5];
+        const Status s = r.open(bytes.data(), bytes.size());
+        CHECK(s == Status::Ok || (!r.isOpen() && r.imageCount() == 0));
+        message = r.message();
+        return s;
+    };
+    std::string m;
+    for (std::uint32_t rows : {1u, 5u, 100000u}) {
+        g_context = "constraint: strips";
+        ImageSpec im;
+        im.tiled = false;
+        im.bh = rows;
+        CHECK(openStatus(im, m) == Status::Unsupported && m.find("strips") != std::string::npos);
+    }
+    struct Size { std::uint32_t bw, bh; };
+    for (const Size& t : {Size{T / 2, T / 2}, Size{2 * T, 2 * T}, Size{T, 2 * T}, Size{2 * T, T}, Size{T + 16, T}}) {
+        g_context = "constraint: tile size " + std::to_string(t.bw) + "x" + std::to_string(t.bh);
+        ImageSpec im;
+        im.bw = t.bw;
+        im.bh = t.bh;
+        CHECK(openStatus(im, m) == Status::Unsupported && m.find("tiles are not supported") != std::string::npos);
+        CHECK(m.find(std::to_string(t.bw) + "x" + std::to_string(t.bh)) != std::string::npos);
+    }
+    for (unsigned bands : {2u, 4u, 5u}) {
+        g_context = "constraint: " + std::to_string(bands) + " bands";
+        ImageSpec im;
+        im.bands = bands;
+        CHECK(openStatus(im, m) == Status::Unsupported && m.find("bands are not supported") != std::string::npos);
+    }
+    {
+        g_context = "constraint: band-interleaved";
+        ImageSpec im;
+        im.bands = 3;
+        im.separate = true;
+        CHECK(openStatus(im, m) == Status::Unsupported && m.find("band-interleaved") != std::string::npos);
+    }
+    {
+        g_context = "constraint: overviews outside the subset stay listed";
+        FileSpec f;
+        ImageSpec main, strips, halfTiles, ok;
+        main.bands = 3;
+        strips = halfTiles = ok = main;
+        strips.subfile = halfTiles.subfile = ok.subfile = 1;
+        strips.tiled = false;
+        strips.bh = 4;
+        halfTiles.bw = halfTiles.bh = T / 2;
+        ok.w = 7; ok.h = 5; ok.level = 3;
+        f.images = {main, strips, halfTiles, ok};
+        const std::vector<std::uint8_t> bytes = build(f);
+        checkAgainstSpec(f, bytes);
+        Reader r;
         CHECK(r.open(bytes.data(), bytes.size()) == Status::Ok);
-        CHECK(r.readBlock(0, 0, 1, 0, row, sizeof row) == Status::Ok);
-        CHECK(r.readBlock(0, 0, 2, 0, row, sizeof row) == Status::Corrupt);   // 2 of 5 bytes left
-        CHECK(r.readBlock(0, 0, 3, 0, row, sizeof row) == Status::Corrupt);   // beyond the strip
-        CHECK(std::strstr(r.message(), "beyond the stored strip") != nullptr);
+        CHECK(r.image(0).status == Status::Ok && r.image(3).status == Status::Ok);
+        CHECK(r.image(1).status == Status::Unsupported && r.image(1).blockBytes == 0);
+        CHECK(r.image(1).blockWidth == 0 && r.image(1).blocksX == 0);
+        CHECK(std::strstr(r.imageMessage(1), "strips") != nullptr);
+        CHECK(r.image(2).status == Status::Unsupported && r.image(2).blockWidth == T / 2);
+        CHECK(r.overviewCount() == 3);
+        unsigned char one[1];
+        CHECK(r.readBlock(1, 0, 0, 0, one, sizeof one) == Status::Unsupported);
+        CHECK(std::strstr(r.message(), "strips") != nullptr);
+        CHECK(!r.blockPresent(1, 0, 0, 0) && !r.blockPresent(2, 0, 0, 0));
     }
 }
 
@@ -530,25 +547,25 @@ static void testGeo() {
     }
 }
 
-template <typename T>
-static void noDataCase(DataType dt, const char* text, T expected, bool expectNaN = false) {
+template <typename V>
+static void noDataCase(DataType dt, const char* text, V expected, bool expectNaN = false) {
     g_context = std::string("nodata ") + geotiff::dataTypeName(dt) + " '" + text + "'";
     FileSpec f;
     ImageSpec im;
     im.dt = dt;
     im.allAbsent = true;
-    im.w = im.h = 16;
+    im.w = im.h = T;
     im.extra.push_back(ascii(42113, text));
     f.images.push_back(im);
     const std::vector<std::uint8_t> bytes = build(f);
     Reader r;
     CHECK(r.open(bytes.data(), bytes.size()) == Status::Ok);
-    std::vector<T> block(16 * 16);
-    CHECK(r.image().blockBytes == block.size() * sizeof(T));
-    CHECK(r.readBlock(0, 0, 0, 0, block.data(), block.size() * sizeof(T)) == Status::Sparse);
+    std::vector<V> block(geotiff::kTileSamples);
+    CHECK(r.image().blockBytes == block.size() * sizeof(V));
+    CHECK(r.readBlock(0, 0, 0, 0, block.data(), block.size() * sizeof(V)) == Status::Sparse);
     CHECK(!r.blockPresent(0, 0, 0, 0));
     bool all = true;
-    for (T v : block) all = all && (expectNaN ? v != v : v == expected);
+    for (V v : block) all = all && (expectNaN ? v != v : v == expected);
     CHECK(all);
 }
 
@@ -591,8 +608,8 @@ static void testOverviews() {
     main.dt = DataType::Float32;
     main.sparse = true;
     ImageSpec ov1 = main, ov2 = main, mask;
-    ov1.w = 20; ov1.h = 19; ov1.subfile = 1; ov1.level = 1;
-    ov2.w = 10; ov2.h = 10; ov2.subfile = 1; ov2.level = 2; ov2.tiled = false; ov2.bh = 4; ov2.separate = true;
+    ov1.w = kW / 2; ov1.h = kH / 2; ov1.subfile = 1; ov1.level = 1;
+    ov2.w = kW / 4; ov2.h = kH / 4; ov2.subfile = 1; ov2.level = 2;
     mask.subfile = 4; mask.compression = 8;       // like GDAL's internal mask: 1-bit DEFLATE
     mask.extra.push_back(ints(258, 3, {1}));
     f.images = {main, ov1, mask, ov2};
@@ -701,11 +718,11 @@ static void testApi() {
     g_context = "api";
     FileSpec f;
     ImageSpec im;
-    im.bands = 2;
+    im.bands = 3;
     im.dt = DataType::UInt16;
     f.images.push_back(im);
     const std::vector<std::uint8_t> bytes = build(f);
-    std::vector<std::uint8_t> buffer(16 * 16 * 2);
+    std::vector<std::uint8_t> buffer(geotiff::kTileSamples * 2);
 
     Reader r;
     CHECK(!r.isOpen() && r.imageCount() == 0 && std::strcmp(r.message(), "") == 0);
@@ -719,14 +736,15 @@ static void testApi() {
     CHECK(r.readBlock(1, 0, 0, 0, buffer.data(), buffer.size()) == Status::OutOfRange);
     CHECK(r.readBlock(0, 3, 0, 0, buffer.data(), buffer.size()) == Status::OutOfRange);
     CHECK(r.readBlock(0, 0, 3, 0, buffer.data(), buffer.size()) == Status::OutOfRange);
-    CHECK(r.readBlock(0, 0, 0, 2, buffer.data(), buffer.size()) == Status::OutOfRange);
+    CHECK(r.readBlock(0, 0, 0, 3, buffer.data(), buffer.size()) == Status::OutOfRange);
     CHECK(std::strstr(r.message(), "out of range") != nullptr);
     CHECK(r.readBlock(0, 0, 0, 0, buffer.data(), buffer.size() - 1) == Status::BufferTooSmall);
     CHECK(r.readBlock(0, 0, 0, 0, nullptr, buffer.size()) == Status::BufferTooSmall);
-    CHECK(!r.blockPresent(0, 3, 0, 0) && !r.blockPresent(5, 0, 0, 0) && r.blockPresent(0, 2, 2, 1));
+    CHECK(!r.blockPresent(0, 3, 0, 0) && !r.blockPresent(5, 0, 0, 0) && r.blockPresent(0, 1, 0, 2));
+    CHECK(r.image().blockBytes == buffer.size() && r.image().blockWidth == T && r.image().blockHeight == T);
     std::uint64_t offset = 0, count = 0;
-    CHECK(r.blockLocation(0, 1, 1, 0, offset, count) == Status::Ok);
-    CHECK(offset != 0 && count == 16u * 16 * 2 * 2);
+    CHECK(r.blockLocation(0, 1, 0, 0, offset, count) == Status::Ok);
+    CHECK(offset != 0 && count == geotiff::kTileSamples * 2 * 3);
     CHECK(r.blockLocation(0, 9, 9, 0, offset, count) == Status::OutOfRange);
     CHECK(geotiff::ok(Status::Ok) && geotiff::ok(Status::Sparse) && !geotiff::ok(Status::Corrupt));
     CHECK(std::strcmp(geotiff::statusName(Status::Unsupported), "Unsupported") == 0);
@@ -736,15 +754,15 @@ static void testApi() {
     CHECK(!r.isOpen() && r.readBlock(0, 0, 0, 0, buffer.data(), buffer.size()) == Status::NotOpen);
 
     // By path, and reopening the same Reader on another file.
-    const char* path = "geotiff_test_tmp.tif";
+    const char* path = kSmallTiles ? "geotiff_test_small_tmp.tif" : "geotiff_test_tmp.tif";
     std::FILE* file = std::fopen(path, "wb");
     CHECK(file != nullptr);
     if (file != nullptr) {
         CHECK(std::fwrite(bytes.data(), 1, bytes.size(), file) == bytes.size());
         std::fclose(file);
         CHECK(r.open(path) == Status::Ok);
-        CHECK(r.readBlock(0, 2, 2, 1, buffer.data(), buffer.size()) == Status::Ok);
-        CHECK(buffer == expectedBlock(im, 2, 2, 1));
+        CHECK(r.readBlock(0, 1, 0, 2, buffer.data(), buffer.size()) == Status::Ok);
+        CHECK(buffer == expectedBlock(im, 1, 0, 2));
         CHECK(r.open(bytes.data(), bytes.size()) == Status::Ok);
         CHECK(r.readBlock(0, 1, 0, 0, buffer.data(), buffer.size()) == Status::Ok);
         CHECK(buffer == expectedBlock(im, 1, 0, 0));
@@ -872,14 +890,10 @@ static void testCorrupt() {
         f.images[0].extra = {ints(277, 3, {0})};
         CHECK(openStatus(build(f), m) == Status::Corrupt);
         f = base;
-        f.images[0].extra = {ints(324, 4, {8, 8})};  // 9 tiles, table of 2
+        f.images[0].extra = {ints(324, 4, {8})};  // several tiles, table of 1
         CHECK(openStatus(build(f), m) == Status::Corrupt);
         f = base;
         f.images[0].extra = {doubles(256, {40.0})};  // width as DOUBLE
-        CHECK(openStatus(build(f), m) == Status::Corrupt);
-        f = base;
-        f.images[0].tiled = false;
-        f.images[0].extra = {ints(278, 4, {0})};
         CHECK(openStatus(build(f), m) == Status::Corrupt);
         f = base;
         f.images[0].extra = {ints(42113, 3, {1})};  // nodata not ASCII
@@ -890,7 +904,7 @@ static void testCorrupt() {
     }
     {
         g_context = "corrupt: block outside the file / too short";
-        std::vector<std::uint8_t> buffer(16 * 16 * 3);
+        std::vector<std::uint8_t> buffer(geotiff::kTileSamples);
         for (int bands = 1; bands <= 3; bands += 2) {
             FileSpec f = base;
             f.images[0].bands = static_cast<unsigned>(bands);
@@ -904,38 +918,42 @@ static void testCorrupt() {
             f.images[0].countCut = 1;
             b = build(f);
             CHECK(r.open(b.data(), b.size()) == Status::Ok);
-            CHECK(r.readBlock(0, 1, 1, 0, buffer.data(), buffer.size()) == Status::Corrupt);
+            CHECK(r.readBlock(0, 1, 0, 0, buffer.data(), buffer.size()) == Status::Corrupt);
             CHECK(std::strstr(r.message(), "expected") != nullptr);
         }
     }
 
     // Every truncation and a set of byte mutations at every position of three files:
-    // any status is fine, crashes and sanitizer reports are not.
+    // any status is fine, crashes and sanitizer reports are not. Small tiles only — with
+    // the default tile size the files are too large to mutate byte by byte.
+    if (!kSmallTiles) return;
     std::vector<FileSpec> files;
     {
-        FileSpec a;  // classic LE, tiled, pixel-interleaved, georeferenced, sparse, overview
+        FileSpec a;  // classic LE, 3 bands, georeferenced, sparse, overview
         ImageSpec im;
-        im.w = 20; im.h = 18; im.bands = 2; im.dt = DataType::UInt16; im.sparse = true;
+        im.w = T + 4; im.h = T + 2; im.bands = 3; im.dt = DataType::UInt16; im.sparse = true;
         im.extra = {doubles(33550, {2.5, 2.5, 0}), doubles(33922, {0, 0, 0, 500000, 4649776, 0}),
                     ints(34735, 3, {1, 1, 0, 3, 1024, 0, 1, 1, 1025, 0, 1, 1, 3072, 0, 1, 32632}),
                     ascii(42112, "<GDALMetadata></GDALMetadata>"), ascii(42113, "-9999")};
         ImageSpec ov = im;
-        ov.w = 10; ov.h = 9; ov.subfile = 1; ov.extra.clear();
+        ov.w = T / 2 + 2; ov.h = T / 2 + 1; ov.subfile = 1; ov.extra.clear();
         a.images = {im, ov};
         files.push_back(a);
-        FileSpec b;  // BigTIFF BE, strips, band-interleaved
+        FileSpec b;  // BigTIFF BE, one band
         b.big = true;
         b.le = false;
-        ImageSpec st;
-        st.w = 11; st.h = 9; st.tiled = false; st.bh = 4; st.bands = 3; st.separate = true; st.dt = DataType::Float64;
-        b.images = {st};
+        ImageSpec one;
+        one.w = T + 3; one.h = T - 2; one.dt = DataType::Float64;
+        b.images = {one};
         files.push_back(b);
-        FileSpec c;  // classic BE, strips, single band
+        FileSpec c;  // classic BE, one band, transformation matrix, an overview in strips
         c.le = false;
         ImageSpec sb;
-        sb.w = 7; sb.h = 5; sb.tiled = false; sb.bh = 2; sb.dt = DataType::Int32;
+        sb.w = 7; sb.h = 5; sb.dt = DataType::Int32;
         sb.extra = {doubles(34264, {2, 0.5, 0, 1000, -0.5, -2, 0, 2000, 0, 0, 0, 0, 0, 0, 0, 1})};
-        c.images = {sb};
+        ImageSpec strips = sb;
+        strips.subfile = 1; strips.tiled = false; strips.bh = 2; strips.extra.clear();
+        c.images = {sb, strips};
         files.push_back(c);
     }
     for (std::size_t k = 0; k < files.size(); ++k) {
@@ -975,13 +993,13 @@ static void testCorrupt() {
 int main() {
     testMatrix();
     testLayouts();
-    testVirtualStrips();
+    testConstraints();
     testGeo();
     testNoData();
     testOverviews();
     testUnsupported();
     testApi();
     testCorrupt();
-    std::printf("geotiff_test: %ld checks, %ld failed\n", g_checks, g_failed);
+    std::printf("geotiff_test (tile size %u): %ld checks, %ld failed\n", static_cast<unsigned>(T), g_checks, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

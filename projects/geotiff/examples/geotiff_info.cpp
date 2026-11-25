@@ -30,10 +30,11 @@ int main(int argc, char** argv) {
     std::vector<unsigned char> block;
     for (std::size_t i = 0; i < reader.imageCount(); ++i) {
         const geotiff::ImageInfo& image = reader.image(i);
-        std::printf("image %u: %ux%u, %u band(s) %s, %s %ux%u%s%s", static_cast<unsigned>(i), image.width,
-                    image.height, image.bands, geotiff::dataTypeName(image.dataType),
-                    image.tiled ? "tiles" : "strips", image.blockWidth, image.blockHeight,
-                    image.overview ? ", overview" : "", image.mask ? ", mask" : "");
+        std::printf("image %u: %ux%u, %u band(s) %s", static_cast<unsigned>(i), image.width, image.height,
+                    image.bands, geotiff::dataTypeName(image.dataType));
+        if (image.blockWidth != 0) std::printf(", tiles %ux%u", image.blockWidth, image.blockHeight);
+        else std::printf(", strips");
+        std::printf("%s%s", image.overview ? ", overview" : "", image.mask ? ", mask" : "");
         if (image.status != geotiff::Status::Ok) {
             std::printf(" — not readable: %s\n", reader.imageMessage(i));
             continue;
