@@ -29,6 +29,11 @@ refuses with `Status::Unsupported` and a message that names the reason. It is no
 | C6 | Samples 8/16/32/64-bit integer, 32/64-bit float | 1/2/4/12-bit, 16-bit float, complex, mixed depths | `-bit samples` |
 | C7 | No YCbCr | `PhotometricInterpretation` 6 | `YCbCr` |
 
+Target platform: 64-bit Linux. File access is standard C only (`fopen`, `fseek`, `fread`), no
+platform calls. `fseek` takes a `long`: 64 bit on the target, so any file size works. Where
+`long` is 32 bit (Windows, 32-bit systems) offsets past 2 GB fail cleanly; do not add
+`fseeko` / `_fseeki64` branches for that.
+
 Consequences to keep in mind when changing code:
 
 - All checks sit in one `if / else if` chain in `parseImage()`. The order is the order of

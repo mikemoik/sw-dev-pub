@@ -146,26 +146,13 @@ public:
     }
 
 private:
-    // 64-bit file positions: the platform call where there is one, plain fseek otherwise.
+    // Standard fseek/ftell: the offset is a long, 64 bit on 64-bit Linux (the target). Where long
+    // is 32 bit (Windows, 32-bit systems) offsets past 2 GB fail here instead of wrapping.
     bool seek(std::uint64_t offset, int whence) noexcept {
-#if defined(_WIN32)
-        return _fseeki64(file_, static_cast<long long>(offset), whence) == 0;
-#elif defined(__unix__) || defined(__APPLE__)
-        return fseeko(file_, static_cast<off_t>(offset), whence) == 0;
-#else
         if (offset > static_cast<std::uint64_t>(std::numeric_limits<long>::max())) return false;
         return std::fseek(file_, static_cast<long>(offset), whence) == 0;
-#endif
     }
-    std::int64_t tell() noexcept {
-#if defined(_WIN32)
-        return static_cast<std::int64_t>(_ftelli64(file_));
-#elif defined(__unix__) || defined(__APPLE__)
-        return static_cast<std::int64_t>(ftello(file_));
-#else
-        return static_cast<std::int64_t>(std::ftell(file_));
-#endif
-    }
+    std::int64_t tell() noexcept { return static_cast<std::int64_t>(std::ftell(file_)); }
 
     std::FILE* file_ = nullptr;
     std::uint64_t size_ = 0;
