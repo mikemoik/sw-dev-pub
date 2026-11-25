@@ -26,26 +26,33 @@ refuses with `Status::Unsupported` and a message that names the reason. It is no
 | C3 | 1 band, or 3 bands (RGB) | 2, 4 and more samples per pixel (also RGBA) | `bands are not supported` |
 | C4 | Pixel-interleaved only | 3 bands with `PlanarConfiguration` 2 (`INTERLEAVE=BAND`) | `band-interleaved` |
 | C5 | Uncompressed, no predictor | every `Compression` ≠ 1, every `Predictor` ≠ 1 | codec name / `predictor` |
-| C6 | Samples 8/16/32/64-bit integer, 32/64-bit float | 1/2/4/12-bit, 16-bit float, complex, mixed depths | `-bit samples` |
+| C6 | Samples `Byte`, `UInt16`, `Int16` | every other depth or format: Int8, 32/64-bit integer, float, complex, 1/2/4/12-bit, mixed depths | `-bit samples` |
 | C7 | No YCbCr | `PhotometricInterpretation` 6 | `YCbCr` |
+| C8 | Little-endian files | `MM` header (GDAL `ENDIANNESS=BIG`) | `big-endian` |
 
-Target platform: 64-bit Linux. File access is standard C only (`fopen`, `fseek`, `fread`), no
-platform calls. `fseek` takes a `long`: 64 bit on the target, so any file size works. Where
-`long` is 32 bit (Windows, 32-bit systems) offsets past 2 GB fail cleanly; do not add
-`fseeko` / `_fseeki64` branches for that.
+One more constraint refuses nothing: **only the main image is read** (section 6).
+
+Target platform: 64-bit little-endian Linux (x86-64, AArch64).
+
+- File access is standard C only (`fopen`, `fseek`, `fread`), no platform calls. `fseek`
+  takes a `long`: 64 bit on the target, so any file size works. Where `long` is 32 bit
+  (Windows, 32-bit systems) offsets past 2 GB fail cleanly; do not add `fseeko` /
+  `_fseeki64` branches for that.
+- File and host have the same byte order (C8), so the reader copies bytes: tile data is
+  the samples, DOUBLE and SHORT tag arrays are read with one `entryBytes()` call. There is
+  no byte swapping anywhere. The header stops the build (`#error`) on a big-endian host.
 
 Consequences to keep in mind when changing code:
 
-- All checks sit in one `if / else if` chain in `parseImage()`. The order is the order of
-  the table rows C5, C6, C7, C1, C2, C3, C4: a compressed strip file reports the codec,
-  not the strips. Tests rely on that order.
-- The rule applies **per image**. If the main image (image 0) is outside the subset,
-  `open` fails. An overview or mask outside the subset stays listed with
-  `ImageInfo::status == Unsupported` and `blockBytes == 0`; `readBlock()` on it returns
-  `Unsupported`. The main image stays readable.
+- C8 is checked in `parse()` on the file header. All other checks are a sequence of `if`
+  in `parseImage()`, each returning `Status::Unsupported`. The order is C5, C6, C7, C1,
+  C2, C3, C4: a compressed strip file reports the codec, not the strips. Tests rely on
+  that order.
+- A file outside the constraints never opens: there is no "listed but not readable"
+  state. After a failed `open` the reader is closed and `image()` is all zero.
 - "3 bands" means `SamplesPerPixel` = 3. The photometric value is not checked (except
   C7): GDAL writes 3 Byte bands as RGB (2), but 3 bands of other types as MinIsBlack (1)
-  plus `ExtraSamples` (observed for UInt16 and Float32). Both are read.
+  plus `ExtraSamples` (observed for UInt16). Both are read.
 - For one band `PlanarConfiguration` has no meaning. GDAL writes 2 for a single band with
   `INTERLEAVE=BAND` (observed), so C4 applies to 3 bands only.
 - A block of one band is always `kTileSamples` = `kTileSize`² samples.
@@ -56,6 +63,9 @@ Consequences to keep in mind when changing code:
 - Strips, band-interleaved files and free tile sizes were supported up to release
   `geotiff-v0.1.0` (incl. libtiff strip chopping and GDAL split mode). That code was
   removed on purpose; the tag is the place to look if it is ever needed again.
+- Up to release `geotiff-v0.2.1` the reader also listed and read overviews, listed masks,
+  read big-endian files and the sample types Int8, UInt32, Int32, UInt64, Int64, Float32,
+  Float64. Removed on purpose as well; same advice.
 
 Files that fit (GDAL): `gdal_translate -co TILED=YES in.tif out.tif` (tile size 256 and
 `INTERLEAVE=PIXEL` are the GTiff defaults, no compression), optionally
@@ -64,24 +74,24 @@ Files that fit (GDAL): `gdal_translate -co TILED=YES in.tif out.tif` (tile size 
 
 ## 2. TIFF container
 
-All multi-byte values in the file use the byte order of the header. `rd16()`, `rd32()`,
-`rd64()` read them.
+All multi-byte values in the file use the byte order of the header. The reader accepts
+little endian only (C8); `rd16()`, `rd32()`, `rd64()` read little-endian integers.
 
 Header:
 
 | | Classic TIFF | BigTIFF |
 |---|---|---|
-| bytes 0–1 | `II` (little endian) or `MM` (big endian) | same |
+| bytes 0–1 | `II` (little endian) or `MM` (big endian, refused) | same |
 | bytes 2–3 | 42 | 43 |
 | then | bytes 4–7: offset of the first IFD | bytes 4–5: 8 (offset size), 6–7: 0, 8–15: offset of the first IFD |
 
-Image file directory (IFD), one per image — `ifdLayout()`:
+Image file directory (IFD), one per image — `loadIfd()` reads the entries of the first one:
 
 | | Classic | BigTIFF |
 |---|---|---|
 | entry count | 2 bytes | 8 bytes |
 | entry | 12 bytes: tag 2, type 2, count 4, value/offset 4 | 20 bytes: tag 2, type 2, count 8, value/offset 8 |
-| after the entries | 4 bytes: offset of the next IFD, 0 = last | 8 bytes |
+| after the entries | 4 bytes: offset of the next IFD, 0 = last (not read) | 8 bytes (not read) |
 
 - `count` is the number of values, not bytes. Data size = count × type size.
 - If the data fits the value/offset field (≤ 4 bytes classic, ≤ 8 BigTIFF) it is stored
@@ -93,7 +103,7 @@ Image file directory (IFD), one per image — `ifdLayout()`:
   12 DOUBLE, 16 LONG8, 17 SLONG8, 18 IFD8 = 8.
 - A writer may choose any unsigned type for a number (width as SHORT or LONG, offsets as
   LONG or LONG8). `readUInts()` therefore accepts types 1, 3, 4, 13, 16, 18.
-- The IFD chain can be corrupt or loop: `parse()` stops at `kMaxImages`.
+- The chain of further IFDs is not followed, so a corrupt or looping chain does no harm.
 
 ## 3. Tags the reader uses
 
@@ -101,7 +111,6 @@ The names are the constants in the header. Default = value if the tag is absent.
 
 | Constant | Tag | Meaning | Default |
 |---|---|---|---|
-| `kNewSubfileType` | 254 | bit 0 (1) = reduced-resolution image (overview), bit 2 (4) = mask | 0 |
 | `kImageWidth` | 256 | pixels per row | required |
 | `kImageLength` | 257 | rows | required |
 | `kBitsPerSample` | 258 | one value per sample (or one for all) | 1 |
@@ -122,7 +131,8 @@ The names are the constants in the header. Default = value if the tag is absent.
 | `kGdalMetadata` | 42112 | GDAL, ASCII: XML | — |
 | `kGdalNoData` | 42113 | GDAL, ASCII: the nodata value as text | — |
 
-Not read on purpose: `StripOffsets` 273, `RowsPerStrip` 278, `StripByteCounts` 279 (an
+Not read on purpose: `NewSubfileType` 254 (bit 0 = overview, bit 2 = mask; section 6),
+`StripOffsets` 273, `RowsPerStrip` 278, `StripByteCounts` 279 (an
 image without `TileWidth` is a strip image → C1), `ExtraSamples` 338, the GeoKey
 parameter tags `GeoDoubleParams` 34736 and `GeoAsciiParams` 34737 (only SHORT keys are
 needed), colour maps.
@@ -135,19 +145,19 @@ CCITT, 5 LZW, 6 and 7 JPEG, 8 and 32946 DEFLATE, 32773 PackBits, 34712 JPEG 2000
 
 - The image is cut into a grid of `kTileSize` × `kTileSize` tiles, starting at the top
   left. `blocksX` = ceil(width / tile width), `blocksY` = ceil(height / tile height).
-- Tiles are numbered row by row: index = `by` × `blocksX` + `bx` — `lookup()`.
+- Tiles are numbered row by row: index = `by` × `blocksX` + `bx` — `tileIndex()`.
   `TileOffsets[index]` and `TileByteCounts[index]` describe the tile.
 - **Every tile is stored full size**, also at the right and bottom edge and when the
   image is smaller than one tile. The pixels beyond the image are padding with no defined
   content; the reader returns them as stored, like GDAL's `ReadBlock`.
-- Uncompressed tile size = `kTileSamples` × bands × sample bytes. `decodeChunk()` rejects
+- Uncompressed tile size = `kTileSamples` × bands × sample bytes. `readTile()` rejects
   a smaller `TileByteCounts` value (`Corrupt`) and reads exactly that many bytes.
 - Pixel-interleaved 3-band tile: samples in the order R G B R G B …, row by row. One
-  stored tile holds all three bands. `readBlock()` returns **one band**: it decodes the
-  tile into a scratch buffer once, keeps it (one-tile cache), and `deinterleave()` picks
-  every third sample. Reading band 0, 1, 2 of the same tile costs one file read.
-- Samples are stored in file byte order; `readBlock()` returns host byte order
-  (`swapSamples()`, or inside `deinterleave()`).
+  stored tile holds all three bands. `readBlock()` returns **one band**: it reads the
+  tile into a scratch buffer once, keeps it (one-tile cache), and copies every third
+  sample. Reading band 0, 1, 2 of the same tile costs one file read. The scratch buffer
+  is allocated at `open`, for 3-band files only.
+- Samples are stored little endian = host byte order: no conversion.
 
 ### Sparse files (GDAL `SPARSE_OK=TRUE`)
 
@@ -158,36 +168,33 @@ CCITT, 5 LZW, 6 and 7 JPEG, 8 and 32946 DEFLATE, 32773 PackBits, 34712 JPEG 2000
   it). This is what GDAL's `ReadBlock` returns — `fillNoData()`.
 - With 3 bands a tile is present as soon as one band was written; the other bands of
   that tile are then stored too, with whatever the writer put there.
-- `blockPresent()` and `blockLocation()` answer from the tables without file access.
+- `blockPresent()` answers from the tables without file access.
 
 ## 5. Samples
 
 | `DataType` | GDAL name | Bits | `SampleFormat` |
 |---|---|---|---|
 | `UInt8` | Byte | 8 | 1 (or 4) |
-| `Int8` | Int8 | 8 | 2 |
-| `UInt16` / `Int16` | UInt16 / Int16 | 16 | 1 / 2 |
-| `UInt32` / `Int32` | UInt32 / Int32 | 32 | 1 / 2 |
-| `UInt64` / `Int64` | UInt64 / Int64 | 64 | 1 / 2 |
-| `Float32` / `Float64` | Float32 / Float64 | 32 / 64 | 3 |
+| `UInt16` | UInt16 | 16 | 1 (or 4) |
+| `Int16` | Int16 | 16 | 2 |
+
+Every other combination is `DataType::Unknown` → C6.
 
 `BitsPerSample` and `SampleFormat` hold one value per band, but a writer may give a single
 value for all bands — `perSample()`. Bands with different depths or formats → C6.
 
 ## 6. Images in one file
 
-GDAL stores overviews and masks as further IFDs in the same chain.
+GDAL stores overviews and masks as further IFDs in the same chain; `NewSubfileType` bit 0
+marks an overview, bit 2 a mask.
 
-- Image 0 is the main image. `NewSubfileType` bit 0 marks an overview, bit 2 a mask; an
-  overview of a mask has both (5).
-- Overviews come in the order they were built, usually largest first. Each has its own
-  size and its own tile tables; its tile size is checked against C2 like any image.
-- Observed: `BuildOverviews` on a file with 256×256 tiles writes 256×256 overview tiles.
-  With the configuration option `GDAL_TIFF_OVR_BLOCKSIZE=128` it writes 128×128 tiles:
-  such an overview is listed but not readable.
-- GDAL's internal mask (`GDAL_TIFF_INTERNAL_MASK=YES`) is a 1-bit DEFLATE image: listed
-  with `mask == true`, status `Unsupported` (C5). Masks are not interpreted.
-- Georeferencing, nodata and metadata are read from image 0 only — `parseGeo()`.
+- The reader reads the **first IFD only**. That is the main (full-resolution) image.
+  `parse()` takes its offset from the file header and never follows the chain.
+- Overviews and masks are therefore ignored, whatever they are: compressed, in strips,
+  with another tile size. Observed: files with `BuildOverviews` levels and with GDAL's
+  internal mask (`GDAL_TIFF_INTERNAL_MASK=YES`, a 1-bit DEFLATE image) open, and the main
+  image equals GDAL's (oracle files `rgb`, `overviews`, `overviews_sparse`, `mask`).
+- Georeferencing, nodata and metadata come from the same IFD — `parseGeo()`.
 
 ## 7. GeoTIFF georeferencing
 
@@ -239,24 +246,19 @@ Keys the reader uses:
 
 ## 8. GDAL tags
 
-- **`GDAL_NODATA` (42113)**: ASCII text of one number for all bands, e.g. `-9999`, `nan`,
-  `-inf`, `1.5e+300`, `18446744073709551615`. `GeoInfo::noData` is the value as a
-  double, `noDataText()` the raw text. Text that is no number counts as "no nodata".
+- **`GDAL_NODATA` (42113)**: ASCII text of one number for all bands, e.g. `-9999`, `255`,
+  `nan`. `GeoInfo::noData` is the value as a double. Text that is no number counts as
+  "no nodata".
 - Conversion to the sample type for sparse tiles, as GDAL does (`fillNoData()`,
-  `testNoData()`): integers round to nearest and saturate at the type limits; NaN gives 0
-  for integer types; 64-bit integers are parsed from the text, because a double is exact
-  only up to 2^53; Float32 beyond its range gives ±infinity.
+  `testNoData()`): round to nearest and saturate at the type limits; NaN gives 0.
 - **`GDAL_METADATA` (42112)**: ASCII XML,
   `<GDALMetadata>\n  <Item name="FOO">bar</Item>\n</GDALMetadata>`. Returned raw by
   `gdalMetadata()`, not parsed.
 - `AREA_OR_POINT=Point` is not stored in the XML; it is `GTRasterTypeGeoKey` = 2.
-- GDAL 3.13.3 quirk (test generator only): `BuildOverviews` does not return on a 64-bit
-  integer band whose nodata value is no exact double. `tests/oracle_generate.py` gives
-  those files no overviews.
 
 ## 9. Rules of the code
 
-- No exceptions, no RTTI, no `new`: memory comes from `malloc` / `realloc` / `calloc` and
+- No exceptions, no RTTI, no `new`: memory comes from `malloc` and
   every result is checked (`Status::OutOfMemory`). `geotiff.no_exceptions` fails on the
   keywords. Standard library only, C++17.
 - Every fallible function returns `Status`; the text goes through `fail()` into
@@ -269,15 +271,17 @@ Keys the reader uses:
   must stay clean.
 - `Corrupt` = the file contradicts itself or points outside itself. `Unsupported` = valid
   but outside section 1. Keep the two apart.
-- `decodeChunk()` is the only place that knows about compression and predictor.
+- All memory is allocated at `open` and freed in `release()`; `readBlock()` allocates nothing.
 
 ## 10. Where to change what
 
 | Change | Place |
 |---|---|
 | Another tile size | build with `-DGEOTIFF_TILE_SIZE=n`; nothing else |
-| Accept another band count | chain in `parseImage()`; `readBlock()` already handles any pixel-interleaved count |
-| Add a codec | case in `decodeChunk()`, admit the code in `parseImage()`, add oracle files |
+| Accept another band count | `if` in `parseImage()`; the scratch buffer size and the copy loop in `readBlock()` assume 3 |
+| Accept another sample type | `DataType`, `dataTypeSize()`, `dataTypeName()`, the type mapping in `parseImage()`, `fillNoData()`; add matrix and oracle files |
+| Add a codec | decode in `readTile()`, admit the code in `parseImage()`, add oracle files |
+| Read overviews again | follow the IFD chain in `parse()`; see release `geotiff-v0.2.1` |
 | Read a further tag | add the constant to the enum and to section 3, read it in `parseImage()` or `parseGeo()` |
 | Report a further GeoKey | `geoKey()` already returns any SHORT key |
 
@@ -293,7 +297,7 @@ cmake --preset asan-clang && cmake --build --preset asan-clang && ctest --preset
 
 | Test | Covers |
 |---|---|
-| `geotiff.unit` | `tests/geotiff_test.cpp` with 256×256 tiles: `testMatrix()` (bands × type × byte order × BigTIFF × sparse), `testLayouts()`, `testConstraints()` (section 1), `testGeo()`, `testNoData()`, `testOverviews()`, `testUnsupported()`, `testApi()`, `testCorrupt()` |
+| `geotiff.unit` | `tests/geotiff_test.cpp` with 256×256 tiles: `testMatrix()` (bands × type × BigTIFF × sparse), `testLayouts()`, `testConstraints()` (section 1, further images ignored), `testGeo()`, `testNoData()`, `testUnsupported()`, `testApi()`, `testCorrupt()` |
 | `geotiff.unit_small_tiles` | the same source with `GEOTIFF_TILE_SIZE=16`, plus every truncation and byte mutation in `testCorrupt()` |
 | `geotiff.no_exceptions` | no exception / RTTI keyword in the header |
 | `geotiff.knowledge` | this file agrees with the header |

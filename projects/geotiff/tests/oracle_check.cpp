@@ -3,12 +3,13 @@
 //     oracle_check DIR
 //
 // DIR is written by oracle_generate.py: for every name in index.txt the CRC-32 of every
-// block as GDAL's ReadBlock gives it (<name>.blocks) must equal the CRC-32 of what
-// Reader::readBlock gives, absent blocks must be reported as sparse, and size / type /
-// block size / nodata / geotransform / EPSG must equal what gdalinfo reported
-// (<name>.txt). Files in reject.txt are compressed and must be refused at open with the
-// codec named; files in outside.txt lie outside the project constraints (strips, other
-// tile sizes, band counts, band-interleaved) and must be refused with the reason named.
+// block of the main image as GDAL's ReadBlock gives it (<name>.blocks) must equal the
+// CRC-32 of what Reader::readBlock gives, absent blocks must be reported as sparse, and
+// size / type / block size / nodata / geotransform / EPSG must equal what gdalinfo
+// reported (<name>.txt). Files in reject.txt are compressed and must be refused at open
+// with the codec named; files in outside.txt lie outside the project constraints (strips,
+// other tile sizes, band counts, band-interleaved, big-endian, other data types) and must
+// be refused with the reason named.
 #include "geotiff/geotiff.hpp"
 
 #include <cmath>
@@ -44,14 +45,12 @@ static bool check(bool cond, const char* what) {
     return cond;
 }
 
-struct Level { unsigned w = 0, h = 0, bw = 0, bh = 0; };
 struct Expected {
     unsigned w = 0, h = 0, bands = 0, bw = 0, bh = 0;
     std::string type, nodata = "none";
-    bool hasGt = false, point = false, mask = false;
+    bool hasGt = false, point = false;
     double gt[6] = {0, 0, 0, 0, 0, 0};
     unsigned epsg = 0;
-    std::vector<Level> levels;
 };
 
 static bool readExpected(const std::string& path, Expected& e) {
@@ -69,20 +68,15 @@ static bool readExpected(const std::string& path, Expected& e) {
         else if (key == "nodata") s >> e.nodata;
         else if (key == "epsg") s >> e.epsg;
         else if (key == "point") s >> e.point;
-        else if (key == "mask") s >> e.mask;
         else if (key == "geotransform") {
             std::string v;
             for (int i = 0; i < 6 && (s >> v) && v != "none"; ++i) {
                 e.gt[i] = std::strtod(v.c_str(), nullptr);
                 e.hasGt = i == 5;
             }
-        } else if (key == "level") {
-            Level l;
-            s >> l.w >> l.h >> l.bw >> l.bh;
-            e.levels.push_back(l);
         }
     }
-    return !e.levels.empty();
+    return e.w != 0;
 }
 
 static void checkFile(const std::string& dir, const std::string& name) {
@@ -97,11 +91,12 @@ static void checkFile(const std::string& dir, const std::string& name) {
     }
 
     // Metadata as gdalinfo reports it.
-    const geotiff::ImageInfo& main = r.image(0);
+    const geotiff::ImageInfo& main = r.image();
     check(main.width == e.w && main.height == e.h, "image size");
     check(main.bands == e.bands, "band count");
     check(e.type == geotiff::dataTypeName(main.dataType), "data type");
-    check(main.blockWidth == e.bw && main.blockHeight == e.bh, "block size");
+    check(e.bw == geotiff::kTileSize && e.bh == geotiff::kTileSize, "block size");
+    check(main.blockBytes == geotiff::kTileSamples * geotiff::dataTypeSize(main.dataType), "block bytes");
     const geotiff::GeoInfo& g = r.geo();
     check(g.hasNoData == (e.nodata != "none"), "nodata presence");
     if (g.hasNoData && e.nodata != "none") {
@@ -113,49 +108,32 @@ static void checkFile(const std::string& dir, const std::string& name) {
         check(std::fabs(g.geoTransform[i] - e.gt[i]) <= 1e-12 * (1.0 + std::fabs(e.gt[i])), "geotransform value");
     check(g.epsg == e.epsg, "EPSG code");
     check(g.pixelIsPoint == e.point, "AREA_OR_POINT");
-    check(r.overviewCount() + 1 == e.levels.size(), "overview count");
-    bool haveMask = false;
-    for (std::size_t i = 0; i < r.imageCount(); ++i) haveMask = haveMask || r.image(i).mask;
-    check(haveMask == e.mask, "mask listed");
 
-    // Every block of every band of every level against GDAL's ReadBlock.
+    // Every block of every band against GDAL's ReadBlock.
     std::FILE* dump = std::fopen((dir + "/" + name + ".blocks").c_str(), "rb");
     if (!check(dump != nullptr, "open the .blocks of the oracle")) return;
-    std::vector<unsigned char> got;
+    std::vector<unsigned char> got(main.blockBytes);
     long blocks = 0, mismatches = 0;
-    for (std::size_t level = 0; level < e.levels.size() && level <= r.overviewCount(); ++level) {
-        const std::size_t image = level == 0 ? 0 : r.overviewImage(level - 1);
-        const geotiff::ImageInfo& in = r.image(image);
-        const Level& l = e.levels[level];
-        if (!check(in.status == geotiff::Status::Ok, "level readable")) break;
-        if (!check(in.width == l.w && in.height == l.h && in.blockWidth == l.bw && in.blockHeight == l.bh,
-                   "level size and block size"))
-            break;
-        check(in.blockWidth == geotiff::kTileSize && in.blockBytes ==
-                  geotiff::kTileSamples * geotiff::dataTypeSize(in.dataType), "block bytes");
-        got.resize(static_cast<std::size_t>(in.blockBytes));
-        for (unsigned band = 0; band < in.bands; ++band)
-            for (unsigned by = 0; by < in.blocksY; ++by)
-                for (unsigned bx = 0; bx < in.blocksX; ++bx, ++blocks) {
-                    const int present = std::fgetc(dump);
-                    unsigned char c[4];
-                    if (present == EOF || std::fread(c, 1, 4, dump) != 4) {
-                        check(false, "block dump is cut short");
-                        std::fclose(dump);
-                        return;
-                    }
-                    const std::uint32_t want = c[0] | c[1] << 8 | c[2] << 16 | static_cast<std::uint32_t>(c[3]) << 24;
-                    std::memset(got.data(), 0xA5, got.size());
-                    const geotiff::Status rs = r.readBlock(image, bx, by, band, got.data(), got.size());
-                    const bool equal = crc32(got.data(), got.size()) == want;
-                    const bool same = rs == (present ? geotiff::Status::Ok : geotiff::Status::Sparse) &&
-                                      r.blockPresent(image, bx, by, band) == (present != 0) && equal;
-                    if (!same && ++mismatches <= 3)
-                        std::printf("  level %u band %u block (%u, %u): status %s, present in GDAL %d, bytes %s\n",
-                                    static_cast<unsigned>(level), band, bx, by, geotiff::statusName(rs), present,
-                                    equal ? "equal" : "differ");
+    for (unsigned band = 0; band < main.bands; ++band)
+        for (unsigned by = 0; by < main.blocksY; ++by)
+            for (unsigned bx = 0; bx < main.blocksX; ++bx, ++blocks) {
+                const int present = std::fgetc(dump);
+                unsigned char c[4];
+                if (present == EOF || std::fread(c, 1, 4, dump) != 4) {
+                    check(false, "block dump is cut short");
+                    std::fclose(dump);
+                    return;
                 }
-    }
+                const std::uint32_t want = c[0] | c[1] << 8 | c[2] << 16 | static_cast<std::uint32_t>(c[3]) << 24;
+                std::memset(got.data(), 0xA5, got.size());
+                const geotiff::Status rs = r.readBlock(bx, by, band, got.data(), got.size());
+                const bool equal = crc32(got.data(), got.size()) == want;
+                const bool same = rs == (present ? geotiff::Status::Ok : geotiff::Status::Sparse) &&
+                                  r.blockPresent(bx, by) == (present != 0) && equal;
+                if (!same && ++mismatches <= 3)
+                    std::printf("  band %u block (%u, %u): status %s, present in GDAL %d, bytes %s\n", band, bx, by,
+                                geotiff::statusName(rs), present, equal ? "equal" : "differ");
+            }
     check(mismatches == 0, "all blocks equal GDAL's ReadBlock");
     check(blocks > 0 && std::fgetc(dump) == EOF, "block dump fully consumed");
     std::fclose(dump);

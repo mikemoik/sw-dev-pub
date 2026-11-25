@@ -9,8 +9,8 @@ file(READ "${TEST}" test)
 file(READ "${KNOWLEDGE}" knowledge)
 set(errors "")
 
-# Tag constants: the enum between kNewSubfileType and kMaxImages.
-string(REGEX MATCH "kNewSubfileType = [^}]*}" enum "${header}")
+# Tag constants: the enum that starts with kImageWidth.
+string(REGEX MATCH "kImageWidth = [^}]*}" enum "${header}")
 string(REGEX MATCHALL "k[A-Za-z]+ = [0-9]+" constants "${enum}")
 string(REGEX MATCHALL "\\| `k[A-Za-z]+` \\| [0-9]+ \\|" rows "${knowledge}")
 list(LENGTH constants constantCount)

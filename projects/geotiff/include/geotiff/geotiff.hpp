@@ -1,15 +1,17 @@
-// geotiff.hpp — dependency-free GeoTIFF block reader, C++17, single header.
+// geotiff.hpp — dependency-free GeoTIFF tile reader, C++17, single header.
 //
-// Reads GeoTIFF files as GDAL writes them, block by block (the equivalent of GDAL's
-// ReadBlock): classic TIFF and BigTIFF, both byte orders, 8/16/32/64-bit integer and
-// 32/64-bit float samples, overviews, and GDAL sparse files (SPARSE_OK=TRUE: absent
-// blocks read back as nodata or 0).
+// Reads the main image of a GeoTIFF as GDAL writes it, tile by tile (the equivalent of
+// GDAL's ReadBlock), with its georeferencing, nodata value and GDAL metadata. Classic TIFF
+// and BigTIFF, GDAL sparse files (SPARSE_OK=TRUE: absent tiles read back as nodata or 0).
 //
 // Project constraints — everything else is refused at open() with Status::Unsupported:
+//   - little-endian files (and a little-endian 64-bit host: Linux x86-64 / AArch64)
 //   - tiles only, no strips
 //   - tiles of kTileSize x kTileSize pixels, fixed at compile time (GEOTIFF_TILE_SIZE, 256)
 //   - 1 band, or 3 pixel-interleaved bands (RGB); no band-interleaved data
+//   - samples Byte, UInt16 or Int16
 //   - uncompressed data, no predictor
+// Only the first image directory is read: overviews and masks in the file are ignored.
 //
 // No exceptions, no RTTI: every fallible call returns a geotiff::Status, the text for
 // the last failure is in Reader::message(). Standard library only.
@@ -29,8 +31,13 @@
 #include <limits>
 
 #define GEOTIFF_VERSION_MAJOR 0
-#define GEOTIFF_VERSION_MINOR 2
-#define GEOTIFF_VERSION_PATCH 1
+#define GEOTIFF_VERSION_MINOR 3
+#define GEOTIFF_VERSION_PATCH 0
+
+// The reader copies file bytes straight into samples and tag values.
+#if !defined(__BYTE_ORDER__) || __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+#error "geotiff.hpp needs a little-endian host"
+#endif
 
 // Tile width and height in pixels. The reader is built for one tile size; define the
 // macro before including the header (in every translation unit alike) to change it.
@@ -55,8 +62,8 @@ enum class Status : std::uint8_t {
     Io,             // the file cannot be opened or read
     NotTiff,        // no TIFF / BigTIFF header
     Corrupt,        // inconsistent or out-of-file structure
-    Unsupported,    // valid TIFF outside the supported subset (strips, tile size, compression, ...)
-    OutOfRange,     // image, block or band index out of range
+    Unsupported,    // valid TIFF outside the project constraints (strips, tile size, compression, ...)
+    OutOfRange,     // block or band index out of range
     BufferTooSmall, // caller buffer smaller than ImageInfo::blockBytes
     OutOfMemory,
     NotOpen,
@@ -162,61 +169,36 @@ private:
 // Image description
 // ---------------------------------------------------------------------------------------
 
-enum class DataType : std::uint8_t {
-    Unknown = 0, UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, Float32, Float64
-};
+enum class DataType : std::uint8_t { Unknown = 0, UInt8, UInt16, Int16 };
 
 inline unsigned dataTypeSize(DataType t) noexcept {
-    switch (t) {
-        case DataType::UInt8: case DataType::Int8: return 1;
-        case DataType::UInt16: case DataType::Int16: return 2;
-        case DataType::UInt32: case DataType::Int32: case DataType::Float32: return 4;
-        case DataType::UInt64: case DataType::Int64: case DataType::Float64: return 8;
-        case DataType::Unknown: break;
-    }
-    return 0;
+    return t == DataType::Unknown ? 0u : t == DataType::UInt8 ? 1u : 2u;
 }
 
-// GDAL's names (Byte, Int8, UInt16, ...).
+// GDAL's names (Byte, UInt16, Int16).
 inline const char* dataTypeName(DataType t) noexcept {
     switch (t) {
         case DataType::UInt8: return "Byte";
-        case DataType::Int8: return "Int8";
         case DataType::UInt16: return "UInt16";
         case DataType::Int16: return "Int16";
-        case DataType::UInt32: return "UInt32";
-        case DataType::Int32: return "Int32";
-        case DataType::UInt64: return "UInt64";
-        case DataType::Int64: return "Int64";
-        case DataType::Float32: return "Float32";
-        case DataType::Float64: return "Float64";
         case DataType::Unknown: break;
     }
     return "Unknown";
 }
 
-// One image file directory (IFD): image 0 is the main image, the others are overviews
-// (`overview`), masks (`mask`) or further pages.
+// The main image of the file: its first image directory. Further directories (overviews,
+// masks) are not read.
 struct ImageInfo {
     std::uint32_t width;
     std::uint32_t height;
-    std::uint32_t blockWidth;   // tile width in the file (kTileSize if readable; 0 = strips)
-    std::uint32_t blockHeight;  // tile height in the file
-    std::uint32_t blocksX;      // tiles per row (0 = strips)
-    std::uint32_t blocksY;      // tile rows
-    std::uint16_t bands;        // samples per pixel (1 or 3 if readable)
-    std::uint16_t bitsPerSample;
+    std::uint32_t blocksX;   // tiles per row
+    std::uint32_t blocksY;   // tile rows
+    std::uint16_t bands;     // 1 or 3
     DataType dataType;
-    bool overview;              // reduced-resolution image
-    bool mask;                  // transparency mask (listed, not interpreted)
-    std::uint16_t compression;  // TIFF Compression tag
-    std::uint16_t predictor;    // TIFF Predictor tag
-    std::uint16_t photometric;
-    std::uint64_t blockBytes;   // size of one band block = buffer size for readBlock (0 if not readable)
-    Status status;              // Ok, or Unsupported: listed, but its blocks cannot be read
+    std::size_t blockBytes;  // one band of one tile = buffer size for readBlock
 };
 
-// Georeferencing of the main image, as GDAL reports it.
+// Georeferencing of the image, as GDAL reports it.
 struct GeoInfo {
     bool hasGeoTransform;
     // x = gt[0] + col*gt[1] + row*gt[2];  y = gt[3] + col*gt[4] + row*gt[5]
@@ -268,35 +250,9 @@ public:
     const char* message() const noexcept { return message_; }
 
     bool bigTiff() const noexcept { return big_; }
-    bool littleEndian() const noexcept { return le_; }
-
-    // Number of IFDs; image 0 is the main image.
-    std::size_t imageCount() const noexcept { return imageCount_; }
-    const ImageInfo& image(std::size_t index = 0) const noexcept {
-        static const ImageInfo none{};
-        return index < imageCount_ ? images_[index].info : none;
-    }
-    // Why image `index` has status Unsupported ("" otherwise).
-    const char* imageMessage(std::size_t index) const noexcept {
-        return index < imageCount_ ? images_[index].reason : "";
-    }
-
-    // Overviews of the main image, largest first as stored: overviewImage(k) is the
-    // image index to pass to readBlock.
-    std::size_t overviewCount() const noexcept {
-        std::size_t n = 0;
-        for (std::size_t i = 1; i < imageCount_; ++i) n += isOverview(i) ? 1u : 0u;
-        return n;
-    }
-    std::size_t overviewImage(std::size_t k) const noexcept {
-        for (std::size_t i = 1; i < imageCount_; ++i)
-            if (isOverview(i) && k-- == 0) return i;
-        return imageCount_;
-    }
-
+    // All zero while no file is open.
+    const ImageInfo& image() const noexcept { return info_; }
     const GeoInfo& geo() const noexcept { return geo_; }
-    // Raw GDAL_NODATA text ("" if the tag is absent).
-    const char* noDataText() const noexcept { return noDataText_; }
     // Raw GDAL_METADATA XML ("" if the tag is absent).
     const char* gdalMetadata() const noexcept { return metadata_ ? metadata_ : ""; }
     // A GeoKey stored as a SHORT in the GeoKey directory (e.g. 3072 ProjectedCSType).
@@ -314,87 +270,55 @@ public:
         return false;
     }
 
-    // False for an absent (sparse) block and for any index out of range.
-    bool blockPresent(std::size_t image, std::uint32_t bx, std::uint32_t by,
-                      unsigned band = 0) const noexcept {
-        std::uint64_t offset = 0, bytes = 0;
-        return lookup(image, bx, by, band, offset, bytes) == Status::Ok && offset != 0 &&
-               bytes != 0;
+    // False for an absent (sparse) tile and for an index out of range.
+    bool blockPresent(std::uint32_t bx, std::uint32_t by) const noexcept {
+        if (bx >= info_.blocksX || by >= info_.blocksY) return false;
+        const std::uint64_t tile = tileIndex(bx, by);
+        return offsets_[tile] != 0 && counts_[tile] != 0;
     }
 
-    // File offset and stored byte count of a block (0 / 0 = absent).
-    Status blockLocation(std::size_t image, std::uint32_t bx, std::uint32_t by, unsigned band,
-                         std::uint64_t& offset, std::uint64_t& byteCount) noexcept {
-        const Status s = lookup(image, bx, by, band, offset, byteCount);
-        return s == Status::Ok ? s : failLookup(s, image, bx, by, band);
-    }
-
-    // Decode tile (bx, by) of `band` (0-based) of image `image` into `buffer`
-    // (>= ImageInfo::blockBytes): kTileSize x kTileSize samples of that band, row by
-    // row, in host byte order — the same bytes GDAL's ReadBlock gives.
-    //   Status::Ok      block read from the file
-    //   Status::Sparse  block absent: buffer filled with the nodata value, or 0
+    // Read tile (bx, by) of `band` (0-based) into `buffer` (>= ImageInfo::blockBytes):
+    // kTileSize x kTileSize samples of that band, row by row — the same bytes GDAL's
+    // ReadBlock gives.
+    //   Status::Ok      tile read from the file
+    //   Status::Sparse  tile absent: buffer filled with the nodata value, or 0
     //   anything else   failure, buffer contents unspecified
-    Status readBlock(std::size_t image, std::uint32_t bx, std::uint32_t by, unsigned band,
-                     void* buffer, std::size_t bufferSize) noexcept {
-        std::uint64_t offset = 0, stored = 0;
-        const Status s = lookup(image, bx, by, band, offset, stored);
-        if (s != Status::Ok) return failLookup(s, image, bx, by, band);
-        const ImageInfo& in = images_[image].info;
-        if (buffer == nullptr || bufferSize < in.blockBytes)
+    Status readBlock(std::uint32_t bx, std::uint32_t by, unsigned band, void* buffer,
+                     std::size_t bufferSize) noexcept {
+        if (src_ == nullptr) return fail(Status::NotOpen, "no file open");
+        if (bx >= info_.blocksX || by >= info_.blocksY || band >= info_.bands)
+            return fail(Status::OutOfRange, "block (%u, %u), band %u is out of range", bx, by, band);
+        if (buffer == nullptr || bufferSize < info_.blockBytes)
             return fail(Status::BufferTooSmall, "buffer of %llu bytes, block needs %llu",
                         static_cast<unsigned long long>(buffer ? bufferSize : 0),
-                        static_cast<unsigned long long>(in.blockBytes));
+                        static_cast<unsigned long long>(info_.blockBytes));
         unsigned char* out = static_cast<unsigned char*>(buffer);
-        const std::size_t blockBytes = static_cast<std::size_t>(in.blockBytes);
-
-        if (offset == 0 || stored == 0) {
-            fillNoData(in.dataType, out, blockBytes);
+        const std::uint64_t tile = tileIndex(bx, by);
+        if (offsets_[tile] == 0 || counts_[tile] == 0) {
+            fillNoData(out);
             return Status::Sparse;
         }
 
         // A tile is always stored full size, also at the right and bottom image edge.
-        const unsigned sampleBytes = dataTypeSize(in.dataType);
-        const bool swap = sampleBytes > 1 && le_ != hostLittleEndian();
-        if (in.bands == 1) {
-            const Status d = decodeChunk(in, bx, by, offset, stored, out, blockBytes);
-            if (d != Status::Ok) return d;
-            if (swap) swapSamples(out, blockBytes, sampleBytes);
-        } else {
-            // Pixel-interleaved: the stored tile holds all bands. It is decoded once into
-            // the scratch buffer and kept, so reading the other bands costs no file access.
-            const std::size_t need = blockBytes * in.bands;
-            const std::uint64_t chunkIndex = static_cast<std::uint64_t>(by) * in.blocksX + bx;
-            if (!(cacheValid_ && cacheImage_ == image && cacheChunk_ == chunkIndex)) {
-                cacheValid_ = false;
-                if (need > scratchSize_) {
-                    void* p = std::realloc(scratch_, need);
-                    if (p == nullptr)
-                        return fail(Status::OutOfMemory, "no memory for a %llu byte block",
-                                    static_cast<unsigned long long>(need));
-                    scratch_ = static_cast<unsigned char*>(p);
-                    scratchSize_ = need;
-                }
-                const Status d = decodeChunk(in, bx, by, offset, stored, scratch_, need);
-                if (d != Status::Ok) return d;
-                cacheImage_ = image;
-                cacheChunk_ = chunkIndex;
-                cacheValid_ = true;
-            }
-            deinterleave(scratch_ + static_cast<std::size_t>(band) * sampleBytes, out, kTileSamples,
-                         sampleBytes, static_cast<std::size_t>(in.bands) * sampleBytes, swap);
+        if (info_.bands == 1) return readTile(bx, by, out, info_.blockBytes);
+
+        // 3 bands, pixel-interleaved: the stored tile holds all of them. It is read once
+        // into the scratch buffer and kept, so the other two bands cost no file access.
+        if (!(cacheValid_ && cacheTile_ == tile)) {
+            cacheValid_ = false;
+            const Status s = readTile(bx, by, scratch_, 3 * info_.blockBytes);
+            if (s != Status::Ok) return s;
+            cacheTile_ = tile;
+            cacheValid_ = true;
         }
+        const unsigned size = dataTypeSize(info_.dataType);
+        const unsigned char* src = scratch_ + band * size;
+        for (std::size_t i = 0; i < kTileSamples; ++i, src += 3 * size, out += size)
+            std::memcpy(out, src, size);
         return Status::Ok;
     }
 
 private:
-    struct Image {
-        ImageInfo info;
-        std::uint64_t* offsets;   // blockCount entries
-        std::uint64_t* counts;    // blockCount entries
-        std::uint64_t blockCount;
-        char reason[96];
-    };
     struct Entry {
         std::uint16_t tag;
         std::uint16_t type;
@@ -408,7 +332,7 @@ private:
     };
 
     enum : std::uint16_t {
-        kNewSubfileType = 254, kImageWidth = 256, kImageLength = 257, kBitsPerSample = 258,
+        kImageWidth = 256, kImageLength = 257, kBitsPerSample = 258,
         kCompression = 259, kPhotometric = 262, kSamplesPerPixel = 277, kPlanarConfig = 284,
         kPredictor = 317,
         kTileWidth = 322, kTileLength = 323, kTileOffsets = 324, kTileByteCounts = 325,
@@ -416,7 +340,6 @@ private:
         kModelTransformation = 34264, kGeoKeyDirectory = 34735, kGdalMetadata = 42112,
         kGdalNoData = 42113
     };
-    static constexpr std::size_t kMaxImages = 4096;
 
     // --- helpers -------------------------------------------------------------------------
 
@@ -431,136 +354,81 @@ private:
         return s;
     }
 
-    static bool hostLittleEndian() noexcept {
-        const std::uint16_t one = 1;
-        unsigned char first;
-        std::memcpy(&first, &one, 1);
-        return first == 1;
-    }
     static bool mulOverflow(std::uint64_t a, std::uint64_t b, std::uint64_t& r) noexcept {
         if (a != 0 && b > std::numeric_limits<std::uint64_t>::max() / a) return true;
         r = a * b;
         return false;
     }
-    std::uint16_t rd16(const unsigned char* p) const noexcept {
-        return le_ ? static_cast<std::uint16_t>(p[0] | (p[1] << 8))
-                   : static_cast<std::uint16_t>(p[1] | (p[0] << 8));
+    // Little-endian integers of the file structure.
+    static std::uint16_t rd16(const unsigned char* p) noexcept {
+        return static_cast<std::uint16_t>(p[0] | (p[1] << 8));
     }
-    std::uint32_t rd32(const unsigned char* p) const noexcept {
-        return le_ ? (static_cast<std::uint32_t>(p[0]) | static_cast<std::uint32_t>(p[1]) << 8 |
-                      static_cast<std::uint32_t>(p[2]) << 16 | static_cast<std::uint32_t>(p[3]) << 24)
-                   : (static_cast<std::uint32_t>(p[3]) | static_cast<std::uint32_t>(p[2]) << 8 |
-                      static_cast<std::uint32_t>(p[1]) << 16 | static_cast<std::uint32_t>(p[0]) << 24);
+    static std::uint32_t rd32(const unsigned char* p) noexcept {
+        return static_cast<std::uint32_t>(p[0]) | static_cast<std::uint32_t>(p[1]) << 8 |
+               static_cast<std::uint32_t>(p[2]) << 16 | static_cast<std::uint32_t>(p[3]) << 24;
     }
-    std::uint64_t rd64(const unsigned char* p) const noexcept {
-        return le_ ? (static_cast<std::uint64_t>(rd32(p + 4)) << 32 | rd32(p))
-                   : (static_cast<std::uint64_t>(rd32(p)) << 32 | rd32(p + 4));
-    }
-    static void swapSamples(unsigned char* p, std::size_t bytes, unsigned size) noexcept {
-        for (std::size_t i = 0; i + size <= bytes; i += size)
-            for (unsigned a = 0, b = size - 1; a < b; ++a, --b) {
-                const unsigned char t = p[i + a];
-                p[i + a] = p[i + b];
-                p[i + b] = t;
-            }
-    }
-    static void deinterleave(const unsigned char* src, unsigned char* dst, std::size_t samples,
-                             unsigned size, std::size_t stride, bool swap) noexcept {
-        if (!swap) {
-            for (std::size_t i = 0; i < samples; ++i, src += stride, dst += size)
-                std::memcpy(dst, src, size);
-        } else {
-            for (std::size_t i = 0; i < samples; ++i, src += stride, dst += size)
-                for (unsigned b = 0; b < size; ++b) dst[b] = src[size - 1 - b];
-        }
+    static std::uint64_t rd64(const unsigned char* p) noexcept {
+        return static_cast<std::uint64_t>(rd32(p + 4)) << 32 | rd32(p);
     }
 
-    bool isOverview(std::size_t i) const noexcept {
-        return images_[i].info.overview && !images_[i].info.mask;
+    // Tiles are numbered row by row; all bands of a pixel share one stored tile.
+    std::uint64_t tileIndex(std::uint32_t bx, std::uint32_t by) const noexcept {
+        return static_cast<std::uint64_t>(by) * info_.blocksX + bx;
     }
 
     void release() noexcept {
-        if (images_ != nullptr) {
-            for (std::size_t i = 0; i < imageCount_; ++i) {
-                std::free(images_[i].offsets);
-                std::free(images_[i].counts);
-            }
-            std::free(images_);
-        }
-        images_ = nullptr;
-        imageCount_ = 0;
+        std::free(offsets_);
+        std::free(counts_);
         std::free(scratch_);
-        scratch_ = nullptr;
-        scratchSize_ = 0;
-        cacheValid_ = false;
         std::free(metadata_);
-        metadata_ = nullptr;
         std::free(geoKeys_);
+        offsets_ = counts_ = nullptr;
+        scratch_ = nullptr;
+        metadata_ = nullptr;
         geoKeys_ = nullptr;
         geoKeyCount_ = 0;
-        noDataText_[0] = '\0';
+        cacheValid_ = false;
+        info_ = ImageInfo{};
         geo_ = GeoInfo{};
         file_.close();
         memory_ = MemorySource();
         src_ = nullptr;
         size_ = 0;
         big_ = false;
-        le_ = true;
     }
 
-    // --- block lookup --------------------------------------------------------------------
+    // --- tile data -----------------------------------------------------------------------
 
-    Status lookup(std::size_t image, std::uint32_t bx, std::uint32_t by, unsigned band,
-                  std::uint64_t& offset, std::uint64_t& bytes) const noexcept {
-        if (src_ == nullptr) return Status::NotOpen;
-        if (image >= imageCount_) return Status::OutOfRange;
-        const Image& im = images_[image];
-        if (im.info.status != Status::Ok) return im.info.status;
-        if (bx >= im.info.blocksX || by >= im.info.blocksY || band >= im.info.bands)
-            return Status::OutOfRange;
-        // Tiles are numbered row by row; all bands of a pixel share one stored tile.
-        const std::uint64_t index = static_cast<std::uint64_t>(by) * im.info.blocksX + bx;
-        offset = im.offsets[index];
-        bytes = im.counts[index];
-        return Status::Ok;
-    }
-    Status failLookup(Status s, std::size_t image, std::uint32_t bx, std::uint32_t by,
-                      unsigned band) noexcept {
-        if (s == Status::NotOpen) return fail(s, "no file open");
-        if (s == Status::Unsupported) return fail(s, "%s", images_[image].reason);
-        return fail(s, "image %llu, block (%u, %u), band %u is out of range",
-                    static_cast<unsigned long long>(image), bx, by, band);
-    }
-
-    // --- codec dispatch ------------------------------------------------------------------
-
-    // Stored bytes of one block -> `size` decoded bytes in file byte order. The single
-    // place that knows about Compression and Predictor: a codec is added as a case here
-    // (and admitted in parseImage); the container layer and the API stay as they are.
-    Status decodeChunk(const ImageInfo& in, std::uint32_t bx, std::uint32_t by, std::uint64_t offset,
-                       std::uint64_t stored, unsigned char* dst, std::size_t size) noexcept {
-        switch (in.compression) {
-            case 1:  // none
-                if (stored < size)
-                    return fail(Status::Corrupt, "block (%u, %u) stores %llu bytes, %llu expected", bx, by,
-                                static_cast<unsigned long long>(stored),
-                                static_cast<unsigned long long>(size));
-                if (offset > size_ || size > size_ - offset)
-                    return fail(Status::Corrupt, "block (%u, %u) lies outside the file", bx, by);
-                if (!src_->readAt(offset, dst, size))
-                    return fail(Status::Io, "read of block (%u, %u) failed", bx, by);
-                break;
-            default:
-                return fail(Status::Unsupported, "compression %u is not supported", in.compression);
-        }
-        switch (in.predictor) {
-            case 1: break;  // none
-            default: return fail(Status::Unsupported, "predictor %u is not supported", in.predictor);
-        }
+    // The first `size` stored bytes of tile (bx, by). Data is uncompressed little-endian,
+    // which is the host's byte order: the bytes are the samples.
+    Status readTile(std::uint32_t bx, std::uint32_t by, unsigned char* dst, std::size_t size) noexcept {
+        const std::uint64_t tile = tileIndex(bx, by), offset = offsets_[tile], stored = counts_[tile];
+        if (stored < size)
+            return fail(Status::Corrupt, "block (%u, %u) stores %llu bytes, %llu expected", bx, by,
+                        static_cast<unsigned long long>(stored), static_cast<unsigned long long>(size));
+        if (offset > size_ || size > size_ - offset)
+            return fail(Status::Corrupt, "block (%u, %u) lies outside the file", bx, by);
+        if (!src_->readAt(offset, dst, size)) return fail(Status::Io, "read of block (%u, %u) failed", bx, by);
         return Status::Ok;
     }
 
-    // --- nodata --------------------------------------------------------------------------
+    // An absent tile reads as the nodata value converted to the sample type the way GDAL
+    // does it (rounded, saturated, NaN -> 0), or as 0 if the file has no nodata value.
+    void fillNoData(unsigned char* out) const noexcept {
+        const double lo = info_.dataType == DataType::Int16 ? -32768.0 : 0.0;
+        const double hi = info_.dataType == DataType::UInt8 ? 255.0
+                        : info_.dataType == DataType::UInt16 ? 65535.0 : 32767.0;
+        const double d = geo_.noData;
+        long v = 0;
+        if (geo_.hasNoData && d == d)
+            v = static_cast<long>(d <= lo ? lo : d >= hi ? hi : d < 0 ? d - 0.5 : d + 0.5);
+        if (info_.dataType == DataType::UInt8) {
+            std::memset(out, static_cast<int>(v), kTileSamples);
+            return;
+        }
+        const std::uint16_t sample = static_cast<std::uint16_t>(v);  // Int16: the same two bytes
+        for (std::size_t i = 0; i < kTileSamples; ++i) std::memcpy(out + 2 * i, &sample, 2);
+    }
 
     static bool parseDouble(const char* text, double& value) noexcept {
         char* end = nullptr;
@@ -576,76 +444,6 @@ private:
             if (end == copy) return false;
         }
         return true;
-    }
-    static bool isIntegerText(const char* t) noexcept {
-        if (*t == '-' || *t == '+') ++t;
-        if (*t < '0' || *t > '9') return false;
-        while (*t >= '0' && *t <= '9') ++t;
-        while (*t == ' ') ++t;
-        return *t == '\0';
-    }
-    // Round to nearest and saturate, as GDAL converts a nodata value to the band type.
-    template <typename T>
-    static T toInteger(double d) noexcept {
-        const double lo = static_cast<double>(std::numeric_limits<T>::min());
-        const double hi = static_cast<double>(std::numeric_limits<T>::max());
-        if (d != d) return 0;
-        if (d <= lo) return std::numeric_limits<T>::min();
-        if (d >= hi) return std::numeric_limits<T>::max();
-        return static_cast<T>(d < 0 ? d - 0.5 : d + 0.5);
-    }
-    template <typename T>
-    static unsigned put(T v, unsigned char* sample) noexcept {
-        std::memcpy(sample, &v, sizeof v);
-        return sizeof v;
-    }
-    void fillNoData(DataType type, unsigned char* out, std::size_t bytes) const noexcept {
-        unsigned char sample[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-        unsigned size = dataTypeSize(type);
-        if (geo_.hasNoData) {
-            const double d = geo_.noData;
-            const char* text = noDataText_;
-            while (*text == ' ') ++text;
-            switch (type) {
-                case DataType::UInt8: put(toInteger<std::uint8_t>(d), sample); break;
-                case DataType::Int8: put(toInteger<std::int8_t>(d), sample); break;
-                case DataType::UInt16: put(toInteger<std::uint16_t>(d), sample); break;
-                case DataType::Int16: put(toInteger<std::int16_t>(d), sample); break;
-                case DataType::UInt32: put(toInteger<std::uint32_t>(d), sample); break;
-                case DataType::Int32: put(toInteger<std::int32_t>(d), sample); break;
-                case DataType::UInt64:
-                    if (isIntegerText(text))  // exact beyond 2^53; strtoull saturates
-                        put(static_cast<std::uint64_t>(
-                                *text == '-' ? 0ull : std::strtoull(text, nullptr, 10)), sample);
-                    else
-                        put(toInteger<std::uint64_t>(d), sample);
-                    break;
-                case DataType::Int64:
-                    if (isIntegerText(text))
-                        put(static_cast<std::int64_t>(std::strtoll(text, nullptr, 10)), sample);
-                    else
-                        put(toInteger<std::int64_t>(d), sample);
-                    break;
-                case DataType::Float32: {
-                    const double big = static_cast<double>(std::numeric_limits<float>::max());
-                    float f;
-                    if (d > big) f = std::numeric_limits<float>::infinity();
-                    else if (d < -big) f = -std::numeric_limits<float>::infinity();
-                    else f = static_cast<float>(d);
-                    put(f, sample);
-                    break;
-                }
-                case DataType::Float64: put(d, sample); break;
-                case DataType::Unknown: break;
-            }
-        }
-        bool zero = true;
-        for (unsigned i = 0; i < size; ++i) zero = zero && sample[i] == 0;
-        if (zero || size == 0) {
-            std::memset(out, 0, bytes);
-            return;
-        }
-        for (std::size_t i = 0; i + size <= bytes; i += size) std::memcpy(out + i, sample, size);
     }
 
     // --- TIFF structure ------------------------------------------------------------------
@@ -667,15 +465,17 @@ private:
         return s;
     }
 
+    // File header -> offset of the first image directory -> parseImage.
     Status parse() noexcept {
         size_ = src_->size();
         unsigned char head[16];
         if (size_ < 8) return fail(Status::NotTiff, "not a TIFF file (only %llu bytes)",
                                    static_cast<unsigned long long>(size_));
         if (!src_->readAt(0, head, 8)) return fail(Status::Io, "cannot read the file header");
-        if (head[0] == 'I' && head[1] == 'I') le_ = true;
-        else if (head[0] == 'M' && head[1] == 'M') le_ = false;
-        else return fail(Status::NotTiff, "not a TIFF file (no II/MM byte order mark)");
+        if (head[0] == 'M' && head[1] == 'M' && head[2] == 0 && (head[3] == 42 || head[3] == 43))
+            return fail(Status::Unsupported, "big-endian files are not supported");
+        if (head[0] != 'I' || head[1] != 'I')
+            return fail(Status::NotTiff, "not a TIFF file (no II byte order mark)");
         const std::uint16_t magic = rd16(head + 2);
         std::uint64_t first = 0;
         if (magic == 42) {
@@ -692,56 +492,26 @@ private:
             return fail(Status::NotTiff, "not a TIFF file (magic number %u)", magic);
         }
         if (first == 0) return fail(Status::Corrupt, "the file has no image directory");
-
-        // Pass 1: walk the IFD chain to count the images.
-        std::size_t n = 0;
-        for (std::uint64_t offset = first; offset != 0; ++n) {
-            if (n >= kMaxImages)
-                return fail(Status::Corrupt, "more than %u image directories (chain loop?)",
-                            static_cast<unsigned>(kMaxImages));
-            std::uint64_t count = 0, entries = 0, next = 0;
-            const Status s = ifdLayout(offset, count, entries, next);
-            if (s != Status::Ok) return s;
-            offset = next;
-        }
-        images_ = static_cast<Image*>(std::calloc(n, sizeof(Image)));
-        if (images_ == nullptr) return fail(Status::OutOfMemory, "no memory for %u images",
-                                            static_cast<unsigned>(n));
-        imageCount_ = n;
-
-        // Pass 2: parse each directory.
-        std::uint64_t offset = first;
-        for (std::size_t i = 0; i < n; ++i) {
-            std::uint64_t next = 0;
-            const Status s = parseImage(offset, i, next);
-            if (s != Status::Ok) return s;
-            offset = next;
-        }
-        if (images_[0].info.status != Status::Ok)
-            return fail(images_[0].info.status, "%s", images_[0].reason);
-        return Status::Ok;
+        return parseImage(first);
     }
 
-    // Entry count, position of the entries and the offset of the next IFD.
-    Status ifdLayout(std::uint64_t offset, std::uint64_t& count, std::uint64_t& entries,
-                     std::uint64_t& next) noexcept {
-        const unsigned countBytes = big_ ? 8 : 2, entryBytes = big_ ? 20 : 12,
-                       nextBytes = big_ ? 8 : 4;
+    // Read the entries of the image directory at `offset` into memory.
+    Status loadIfd(std::uint64_t offset, Ifd& ifd) noexcept {
+        const unsigned countBytes = big_ ? 8 : 2, entryBytes = big_ ? 20 : 12;
         unsigned char b[8];
         if (offset > size_ || size_ - offset < countBytes)
             return fail(Status::Corrupt, "image directory at %llu lies outside the file",
                         static_cast<unsigned long long>(offset));
-        if (!src_->readAt(offset, b, countBytes)) return fail(Status::Io, "cannot read an image directory");
-        count = big_ ? rd64(b) : rd16(b);
-        entries = offset + countBytes;
-        const std::uint64_t room = size_ - entries;
-        if (count == 0 || count > room / entryBytes || room - count * entryBytes < nextBytes)
+        if (!src_->readAt(offset, b, countBytes)) return fail(Status::Io, "cannot read the image directory");
+        ifd.count = big_ ? rd64(b) : rd16(b);
+        const std::uint64_t entries = offset + countBytes;
+        if (ifd.count == 0 || ifd.count > (size_ - entries) / entryBytes)
             return fail(Status::Corrupt, "image directory at %llu with %llu entries does not fit the file",
-                        static_cast<unsigned long long>(offset),
-                        static_cast<unsigned long long>(count));
-        if (!src_->readAt(entries + count * entryBytes, b, nextBytes))
-            return fail(Status::Io, "cannot read an image directory");
-        next = big_ ? rd64(b) : rd32(b);
+                        static_cast<unsigned long long>(offset), static_cast<unsigned long long>(ifd.count));
+        const std::size_t bytes = static_cast<std::size_t>(ifd.count * entryBytes);
+        ifd.raw = static_cast<unsigned char*>(std::malloc(bytes));
+        if (ifd.raw == nullptr) return fail(Status::OutOfMemory, "no memory for the image directory");
+        if (!src_->readAt(entries, ifd.raw, bytes)) return fail(Status::Io, "cannot read the image directory");
         return Status::Ok;
     }
 
@@ -817,14 +587,7 @@ private:
     Status readDoubles(const Entry& e, std::uint64_t n, double* out) noexcept {
         if (e.type != 12) return fail(Status::Corrupt, "tag %u: field type %u is not DOUBLE", e.tag, e.type);
         if (e.count < n) return fail(Status::Corrupt, "tag %u holds fewer values than needed", e.tag);
-        for (std::uint64_t i = 0; i < n; ++i) {
-            unsigned char b[8];
-            const Status s = entryBytes(e, i * 8, b, 8);
-            if (s != Status::Ok) return s;
-            const std::uint64_t bits = rd64(b);
-            std::memcpy(out + i, &bits, 8);
-        }
-        return Status::Ok;
+        return entryBytes(e, 0, out, static_cast<std::size_t>(n) * sizeof(double));
     }
     // First value of a tag, or `fallback` if the tag is absent.
     Status scalar(const Ifd& ifd, std::uint16_t tag, std::uint64_t fallback, std::uint64_t& v,
@@ -873,21 +636,15 @@ private:
         }
     }
 
-    Status parseImage(std::uint64_t ifdOffset, std::size_t index, std::uint64_t& next) noexcept {
-        Image& im = images_[index];
-        ImageInfo& in = im.info;
+    // The image directory at `ifdOffset`: layout tags -> info_, project constraints, tile
+    // tables, then the georeferencing (parseGeo).
+    Status parseImage(std::uint64_t ifdOffset) noexcept {
         Ifd ifd;
-        std::uint64_t entries = 0;
-        Status s = ifdLayout(ifdOffset, ifd.count, entries, next);
+        Status s = loadIfd(ifdOffset, ifd);
         if (s != Status::Ok) return s;
-        const std::size_t rawBytes = static_cast<std::size_t>(ifd.count * (big_ ? 20u : 12u));
-        ifd.raw = static_cast<unsigned char*>(std::malloc(rawBytes));
-        if (ifd.raw == nullptr) return fail(Status::OutOfMemory, "no memory for an image directory");
-        if (!src_->readAt(entries, ifd.raw, rawBytes)) return fail(Status::Io, "cannot read an image directory");
 
         std::uint64_t width = 0, height = 0, bands = 1, bits = 1, format = 1, compression = 1,
-                      predictor = 1, photometric = 0, planar = 1, subfile = 0, tileWidth = 0,
-                      tileHeight = 0;
+                      predictor = 1, photometric = 0, planar = 1, tileWidth = 0, tileHeight = 0;
         bool haveWidth = false, haveHeight = false, tiled = false, haveTileHeight = false,
              uniformBits = true, uniformFormat = true;
         if ((s = scalar(ifd, kImageWidth, 0, width, &haveWidth)) != Status::Ok) return s;
@@ -899,150 +656,117 @@ private:
         if ((s = scalar(ifd, kPredictor, 1, predictor)) != Status::Ok) return s;
         if ((s = scalar(ifd, kPhotometric, 0, photometric)) != Status::Ok) return s;
         if ((s = scalar(ifd, kPlanarConfig, 1, planar)) != Status::Ok) return s;
-        if ((s = scalar(ifd, kNewSubfileType, 0, subfile)) != Status::Ok) return s;
         if ((s = scalar(ifd, kTileWidth, 0, tileWidth, &tiled)) != Status::Ok) return s;
         if ((s = scalar(ifd, kTileLength, 0, tileHeight, &haveTileHeight)) != Status::Ok) return s;
 
+        // A broken file.
         const std::uint64_t max32 = 0xFFFFFFFFull;
         if (!haveWidth || !haveHeight || width == 0 || height == 0 || width > max32 || height > max32)
-            return fail(Status::Corrupt, "image %u: missing or invalid image size",
-                        static_cast<unsigned>(index));
-        if (bands == 0 || bands > 0xFFFFu)
-            return fail(Status::Corrupt, "image %u: invalid SamplesPerPixel", static_cast<unsigned>(index));
+            return fail(Status::Corrupt, "missing or invalid image size");
+        if (bands == 0 || bands > 0xFFFFu) return fail(Status::Corrupt, "invalid SamplesPerPixel");
         if (planar != 1 && planar != 2)
-            return fail(Status::Corrupt, "image %u: invalid PlanarConfiguration %llu",
-                        static_cast<unsigned>(index), static_cast<unsigned long long>(planar));
+            return fail(Status::Corrupt, "invalid PlanarConfiguration %llu", static_cast<unsigned long long>(planar));
         if (tiled && (!haveTileHeight || tileWidth == 0 || tileHeight == 0 || tileWidth > max32 ||
                       tileHeight > max32))
-            return fail(Status::Corrupt, "image %u: invalid tile size", static_cast<unsigned>(index));
+            return fail(Status::Corrupt, "invalid tile size");
 
-        in.width = static_cast<std::uint32_t>(width);
-        in.height = static_cast<std::uint32_t>(height);
-        in.blockWidth = static_cast<std::uint32_t>(tileWidth);    // 0 for strips
-        in.blockHeight = static_cast<std::uint32_t>(tileHeight);
-        in.blocksX = tiled ? static_cast<std::uint32_t>((width + tileWidth - 1) / tileWidth) : 0u;
-        in.blocksY = tiled ? static_cast<std::uint32_t>((height + tileHeight - 1) / tileHeight) : 0u;
-        in.bands = static_cast<std::uint16_t>(bands);
-        in.bitsPerSample = static_cast<std::uint16_t>(bits > 0xFFFFu ? 0xFFFFu : bits);
-        in.overview = (subfile & 1u) != 0;
-        in.mask = (subfile & 4u) != 0;
-        in.compression = static_cast<std::uint16_t>(compression > 0xFFFFu ? 0xFFFFu : compression);
-        in.predictor = static_cast<std::uint16_t>(predictor > 0xFFFFu ? 0xFFFFu : predictor);
-        in.photometric = static_cast<std::uint16_t>(photometric > 0xFFFFu ? 0xFFFFu : photometric);
-        in.dataType = DataType::Unknown;
-        in.status = Status::Ok;
+        // SampleFormat 1 = unsigned, 4 = "undefined" which GDAL reads as unsigned, 2 = signed.
+        DataType type = DataType::Unknown;
         if (uniformBits && uniformFormat) {
-            if (format == 1 || format == 4)  // unsigned, or "undefined" which GDAL reads as unsigned
-                in.dataType = bits == 8 ? DataType::UInt8 : bits == 16 ? DataType::UInt16
-                            : bits == 32 ? DataType::UInt32 : bits == 64 ? DataType::UInt64
-                            : DataType::Unknown;
-            else if (format == 2)
-                in.dataType = bits == 8 ? DataType::Int8 : bits == 16 ? DataType::Int16
-                            : bits == 32 ? DataType::Int32 : bits == 64 ? DataType::Int64
-                            : DataType::Unknown;
-            else if (format == 3)
-                in.dataType = bits == 32 ? DataType::Float32 : bits == 64 ? DataType::Float64
-                            : DataType::Unknown;
+            if ((format == 1 || format == 4) && bits == 8) type = DataType::UInt8;
+            else if ((format == 1 || format == 4) && bits == 16) type = DataType::UInt16;
+            else if (format == 2 && bits == 16) type = DataType::Int16;
         }
 
-        // Outside the supported subset: the image stays listed, its blocks are not readable.
-        // (PlanarConfiguration has no meaning for one band; GDAL writes 2 for INTERLEAVE=BAND.)
-        const unsigned id = static_cast<unsigned>(index);
+        // A valid file outside the project constraints. The first reason that applies is
+        // reported. (PlanarConfiguration has no meaning for one band; GDAL writes 2 for
+        // INTERLEAVE=BAND.)
         if (compression != 1)
-            std::snprintf(im.reason, sizeof im.reason, "image %u: compression %llu (%s) is not supported",
-                          id, static_cast<unsigned long long>(compression), compressionName(compression));
-        else if (predictor != 1)
-            std::snprintf(im.reason, sizeof im.reason, "image %u: predictor %llu is not supported", id,
-                          static_cast<unsigned long long>(predictor));
-        else if (in.dataType == DataType::Unknown)
-            std::snprintf(im.reason, sizeof im.reason,
-                          "image %u: %llu-bit samples of format %llu are not supported", id,
-                          static_cast<unsigned long long>(bits), static_cast<unsigned long long>(format));
-        else if (photometric == 6)
-            std::snprintf(im.reason, sizeof im.reason, "image %u: YCbCr data is not supported", id);
-        else if (!tiled)
-            std::snprintf(im.reason, sizeof im.reason, "image %u: strips are not supported (tiles only)", id);
-        else if (tileWidth != kTileSize || tileHeight != kTileSize)
-            std::snprintf(im.reason, sizeof im.reason, "image %u: %llux%llu tiles are not supported (%ux%u only)",
-                          id, static_cast<unsigned long long>(tileWidth),
-                          static_cast<unsigned long long>(tileHeight), static_cast<unsigned>(kTileSize),
-                          static_cast<unsigned>(kTileSize));
-        else if (bands != 1 && bands != 3)
-            std::snprintf(im.reason, sizeof im.reason, "image %u: %llu bands are not supported (1 or 3 only)", id,
-                          static_cast<unsigned long long>(bands));
-        else if (planar == 2 && bands != 1)
-            std::snprintf(im.reason, sizeof im.reason, "image %u: band-interleaved data is not supported", id);
-        if (im.reason[0] != '\0') {
-            in.blockBytes = 0;
-            in.status = Status::Unsupported;
-        } else {
-            in.blockBytes = static_cast<std::uint64_t>(kTileSamples) * dataTypeSize(in.dataType);
-            const std::uint64_t blockCount = static_cast<std::uint64_t>(in.blocksX) * in.blocksY;
-            Entry offsets, counts;
-            if (!find(ifd, kTileOffsets, offsets) || !find(ifd, kTileByteCounts, counts))
-                return fail(Status::Corrupt, "image %u: tile offsets or byte counts are missing", id);
-            // Check the tables lie inside the file before sizing memory by their count.
-            std::uint64_t bytes = 0, at = 0;
-            bool inlined = false;
-            if ((s = entryData(offsets, bytes, inlined, at)) != Status::Ok) return s;
-            if ((s = entryData(counts, bytes, inlined, at)) != Status::Ok) return s;
-            if (offsets.count < blockCount || counts.count < blockCount)
-                return fail(Status::Corrupt, "image %u: %llu tiles, but the offset tables hold fewer", id,
-                            static_cast<unsigned long long>(blockCount));
-            if (blockCount > std::numeric_limits<std::size_t>::max() / sizeof(std::uint64_t))
-                return fail(Status::OutOfMemory, "image %u: too many tiles", id);
-            const std::size_t tableBytes = static_cast<std::size_t>(blockCount) * sizeof(std::uint64_t);
-            im.offsets = static_cast<std::uint64_t*>(std::malloc(tableBytes));
-            im.counts = static_cast<std::uint64_t*>(std::malloc(tableBytes));
-            if (im.offsets == nullptr || im.counts == nullptr)
-                return fail(Status::OutOfMemory, "image %u: no memory for the tile tables", id);
-            im.blockCount = blockCount;
-            if ((s = readUInts(offsets, 0, blockCount, im.offsets)) != Status::Ok) return s;
-            if ((s = readUInts(counts, 0, blockCount, im.counts)) != Status::Ok) return s;
-        }
+            return fail(Status::Unsupported, "compression %llu (%s) is not supported",
+                        static_cast<unsigned long long>(compression), compressionName(compression));
+        if (predictor != 1)
+            return fail(Status::Unsupported, "predictor %llu is not supported",
+                        static_cast<unsigned long long>(predictor));
+        if (type == DataType::Unknown)
+            return fail(Status::Unsupported,
+                        "%llu-bit samples of format %llu are not supported (Byte, UInt16, Int16 only)",
+                        static_cast<unsigned long long>(bits), static_cast<unsigned long long>(format));
+        if (photometric == 6) return fail(Status::Unsupported, "YCbCr data is not supported");
+        if (!tiled) return fail(Status::Unsupported, "strips are not supported (tiles only)");
+        if (tileWidth != kTileSize || tileHeight != kTileSize)
+            return fail(Status::Unsupported, "%llux%llu tiles are not supported (%ux%u only)",
+                        static_cast<unsigned long long>(tileWidth), static_cast<unsigned long long>(tileHeight),
+                        static_cast<unsigned>(kTileSize), static_cast<unsigned>(kTileSize));
+        if (bands != 1 && bands != 3)
+            return fail(Status::Unsupported, "%llu bands are not supported (1 or 3 only)",
+                        static_cast<unsigned long long>(bands));
+        if (planar == 2 && bands != 1)
+            return fail(Status::Unsupported, "band-interleaved data is not supported");
 
-        return index == 0 ? parseGeo(ifd) : Status::Ok;
+        info_.width = static_cast<std::uint32_t>(width);
+        info_.height = static_cast<std::uint32_t>(height);
+        info_.blocksX = (info_.width - 1) / kTileSize + 1;
+        info_.blocksY = (info_.height - 1) / kTileSize + 1;
+        info_.bands = static_cast<std::uint16_t>(bands);
+        info_.dataType = type;
+        info_.blockBytes = kTileSamples * dataTypeSize(type);
+
+        // Tile tables. Check they lie inside the file before sizing memory by their count.
+        const std::uint64_t tiles = static_cast<std::uint64_t>(info_.blocksX) * info_.blocksY;
+        Entry offsets, counts;
+        if (!find(ifd, kTileOffsets, offsets) || !find(ifd, kTileByteCounts, counts))
+            return fail(Status::Corrupt, "tile offsets or byte counts are missing");
+        std::uint64_t bytes = 0, at = 0;
+        bool inlined = false;
+        if ((s = entryData(offsets, bytes, inlined, at)) != Status::Ok) return s;
+        if ((s = entryData(counts, bytes, inlined, at)) != Status::Ok) return s;
+        if (offsets.count < tiles || counts.count < tiles)
+            return fail(Status::Corrupt, "%llu tiles, but the offset tables hold fewer",
+                        static_cast<unsigned long long>(tiles));
+        const std::size_t tableBytes = static_cast<std::size_t>(tiles) * sizeof(std::uint64_t);
+        offsets_ = static_cast<std::uint64_t*>(std::malloc(tableBytes));
+        counts_ = static_cast<std::uint64_t*>(std::malloc(tableBytes));
+        if (info_.bands == 3) scratch_ = static_cast<unsigned char*>(std::malloc(3 * info_.blockBytes));
+        if (offsets_ == nullptr || counts_ == nullptr || (info_.bands == 3 && scratch_ == nullptr))
+            return fail(Status::OutOfMemory, "no memory for the tile tables");
+        if ((s = readUInts(offsets, 0, tiles, offsets_)) != Status::Ok) return s;
+        if ((s = readUInts(counts, 0, tiles, counts_)) != Status::Ok) return s;
+
+        return parseGeo(ifd);
     }
 
-    // Georeferencing, nodata and GDAL metadata of the main image.
+    // Nodata value, GDAL metadata, GeoKeys (CRS) and the geotransform -> geo_.
     Status parseGeo(const Ifd& ifd) noexcept {
         Entry e;
         Status s;
         if (find(ifd, kGdalNoData, e)) {
             if (e.type != 2) return fail(Status::Corrupt, "GDAL_NODATA is not ASCII");
-            const std::size_t n = e.count < sizeof noDataText_ - 1
-                                      ? static_cast<std::size_t>(e.count) : sizeof noDataText_ - 1;
-            if ((s = entryBytes(e, 0, noDataText_, n)) != Status::Ok) return s;
-            noDataText_[n] = '\0';
-            geo_.hasNoData = parseDouble(noDataText_, geo_.noData);
+            char text[64];
+            const std::size_t n = e.count < sizeof text - 1 ? static_cast<std::size_t>(e.count) : sizeof text - 1;
+            if ((s = entryBytes(e, 0, text, n)) != Status::Ok) return s;
+            text[n] = '\0';
+            geo_.hasNoData = parseDouble(text, geo_.noData);
         }
         if (find(ifd, kGdalMetadata, e)) {
             if (e.type != 2) return fail(Status::Corrupt, "GDAL_METADATA is not ASCII");
+            const std::size_t n = static_cast<std::size_t>(e.count);  // ASCII: bytes = count, <= file size
             std::uint64_t bytes = 0, at = 0;
             bool inlined = false;
             if ((s = entryData(e, bytes, inlined, at)) != Status::Ok) return s;
-            if (bytes >= std::numeric_limits<std::size_t>::max())
-                return fail(Status::OutOfMemory, "GDAL_METADATA too large");
-            metadata_ = static_cast<char*>(std::malloc(static_cast<std::size_t>(bytes) + 1));
+            metadata_ = static_cast<char*>(std::malloc(n + 1));
             if (metadata_ == nullptr) return fail(Status::OutOfMemory, "no memory for GDAL_METADATA");
-            if ((s = entryBytes(e, 0, metadata_, static_cast<std::size_t>(bytes))) != Status::Ok) return s;
-            metadata_[bytes] = '\0';
+            if ((s = entryBytes(e, 0, metadata_, n)) != Status::Ok) return s;
+            metadata_[n] = '\0';
         }
         if (find(ifd, kGeoKeyDirectory, e)) {
+            if (e.type != 3) return fail(Status::Corrupt, "GeoKeyDirectory is not of type SHORT");
             std::uint64_t bytes = 0, at = 0;
             bool inlined = false;
-            if (e.type != 3) return fail(Status::Corrupt, "GeoKeyDirectory is not of type SHORT");
             if ((s = entryData(e, bytes, inlined, at)) != Status::Ok) return s;
-            if (bytes > std::numeric_limits<std::size_t>::max() / 2)
-                return fail(Status::OutOfMemory, "GeoKeyDirectory too large");
-            const std::size_t n = static_cast<std::size_t>(e.count);
+            const std::size_t n = static_cast<std::size_t>(e.count);  // SHORTs, in the file: <= size / 2
             geoKeys_ = static_cast<std::uint16_t*>(std::malloc((n + 1) * sizeof(std::uint16_t)));
             if (geoKeys_ == nullptr) return fail(Status::OutOfMemory, "no memory for the GeoKeyDirectory");
-            for (std::size_t i = 0; i < n; ++i) {
-                std::uint64_t v = 0;
-                if ((s = readUInts(e, i, 1, &v)) != Status::Ok) return s;
-                geoKeys_[i] = static_cast<std::uint16_t>(v);
-            }
+            if ((s = entryBytes(e, 0, geoKeys_, n * sizeof(std::uint16_t))) != Status::Ok) return s;
             geoKeyCount_ = n;
         }
         std::uint16_t key = 0, model = 0, projected = 0, geographic = 0;
@@ -1095,22 +819,19 @@ private:
     MemorySource memory_;
     std::uint64_t size_ = 0;
     bool big_ = false;
-    bool le_ = true;
 
-    Image* images_ = nullptr;
-    std::size_t imageCount_ = 0;
+    ImageInfo info_{};
+    std::uint64_t* offsets_ = nullptr;  // file offset per tile, 0 = absent
+    std::uint64_t* counts_ = nullptr;   // stored bytes per tile, 0 = absent
 
     GeoInfo geo_{};
-    char noDataText_[64] = {0};
     char* metadata_ = nullptr;
     std::uint16_t* geoKeys_ = nullptr;
     std::size_t geoKeyCount_ = 0;
 
-    // Decode scratch: the last 3-band tile read, reused across bands.
+    // The last 3-band tile read, reused across bands (3 * blockBytes, 3-band files only).
     unsigned char* scratch_ = nullptr;
-    std::size_t scratchSize_ = 0;
-    std::size_t cacheImage_ = 0;
-    std::uint64_t cacheChunk_ = 0;
+    std::uint64_t cacheTile_ = 0;
     bool cacheValid_ = false;
 
     char message_[256];
