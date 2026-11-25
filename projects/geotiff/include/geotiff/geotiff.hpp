@@ -30,7 +30,7 @@
 
 #define GEOTIFF_VERSION_MAJOR 0
 #define GEOTIFF_VERSION_MINOR 2
-#define GEOTIFF_VERSION_PATCH 0
+#define GEOTIFF_VERSION_PATCH 1
 
 // Tile width and height in pixels. The reader is built for one tile size; define the
 // macro before including the header (in every translation unit alike) to change it.

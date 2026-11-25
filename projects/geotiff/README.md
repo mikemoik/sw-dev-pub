@@ -2,7 +2,7 @@
 
 Dependency-free GeoTIFF **block** reader in C++17, one header, standard library only (no libtiff, GDAL or zlib). It reads tiled GeoTIFFs as GDAL writes them — including GDAL's sparse files (`SPARSE_OK=TRUE`) — one tile at a time, the equivalent of GDAL's `ReadBlock`. No window reads, no resampling, no reprojection. Target: 64-bit Linux (standard C file I/O; files over 2 GB need a 64-bit `long`).
 
-**Owner:** swdevos · **Status:** tested against GDAL 3.13 (unit suite + 89-file GDAL oracle, clean under ASan/UBSan with GCC and clang) · **Version:** 0.2.0 (C++17) · **License:** MIT (repo root)
+**Owner:** swdevos · **Status:** tested against GDAL 3.13 (unit suite + 89-file GDAL oracle, clean under ASan/UBSan with GCC and clang) · **Version:** 0.2.1 (C++17) · **License:** MIT (repo root)
 
 ## Supported
 

@@ -7,7 +7,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(geotiff
-    VERSION 0.2.0
+    VERSION 0.2.1
     DESCRIPTION "Dependency-free C++17 GeoTIFF tile reader (256x256 tiles, GDAL sparse files, no exceptions)"
     LANGUAGES CXX)
 
