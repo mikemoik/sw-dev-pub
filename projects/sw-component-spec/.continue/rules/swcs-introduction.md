@@ -11,7 +11,14 @@ This file holds the scope, the referenced documents, the use cases and the terms
 
 - **`\Purpose{text}`:** optional. Only replaces the default purpose paragraph if the engineer wants other wording.
 - **`\Scope{text}`:** two paragraphs, "In scope: ..." (the component, its units, interfaces and configuration) and "Out of scope: ..." (the units' insides, verified by their unit test specs; neighbouring components; system integration).
-- **`\Reference{key}{internal|external}{document}{version}`:** one per document. `internal` is the organisation's own documents (SRS, design, plans). `external` is standards, guidelines and supplier documents. `key` is a short lowercase name, cited anywhere as `\DocRef{key}`. They are numbered [R1], [R2], ... in this order. Put the requirements and architecture documents first, then the unit test specifications of the units.
+- **`\DocumentReference{key}{attribute = value, ...}`:** one per document. `key` is a short lowercase name, cited anywhere as `\DocRef{key}`; every listed document must be cited somewhere. Put the requirements and architecture documents first, then the unit test specifications of the units. Attributes, any order:
+  - `title` (always), `number` (document number, e.g. `SRS-SPC-001`) and `issue` (version or edition) — both required for internal documents, `date` (YYYY-MM-DD).
+  - `scope = internal` (default: the organisation's own documents) or `scope = external` (standards, guidelines, supplier documents).
+  - `classification`: `public`, `internal`, `confidential` or `strictly confidential` (unless the project set other values).
+  - `url`: only if the engineer gives one; always in braces, `%` written as `\%`: `url = {https://…}`.
+  - `id`: a short label printed instead of [R1], [R2], ... (e.g. `id = SVP`); leave it out unless asked.
+  - A value containing `,` or `=` goes in braces: `title = {ISO 26262-6 -- Clauses 7, 10}`.
+  - The older `\Reference{key}{internal|external}{document}{version}` still works; write new ones as `\DocumentReference`. Never invent document numbers, issues or URLs: ask for them.
 - **`\UseCase{use case}{actor, actor}`:** system use cases the component contributes to, usually taken from the SRS. `\UseCaseNote{text}` adds a sentence above the diagram.
 - **`\Term{term}{definition}`:** abbreviations and project terms used in the document.
 
@@ -32,9 +39,19 @@ This file holds the scope, the referenced documents, the use cases and the terms
   Out of scope: the internals of each unit (verified by their unit test
   specifications), the basic software, the heater power stage (system test).
 }
-\Reference{arch}{internal}{Software Architecture Description, SAD-HC-002}{2.0}
-\Reference{suts-spc}{internal}{Software Unit Test Specification setpoint_ctrl, SUTS-SPC-001}{0.2}
-\Reference{26262}{external}{ISO 26262-6 -- Clauses 7 and 10}{2018}
+\DocumentReference{arch}{
+  title = Software Architecture Description,
+  number = SAD-HC-002, issue = 2.0, date = 2026-10-20,
+  classification = confidential,
+  url = {https://plm.example.com/docs/SAD-HC-002},
+}
+\DocumentReference{suts-spc}{
+  title = Software Unit Test Specification setpoint_ctrl,
+  number = SUTS-SPC-001, issue = 0.2,
+}
+\DocumentReference{26262}{
+  title = ISO 26262-6 -- Clauses 7 and 10, issue = 2018, scope = external,
+}
 \UseCase{Heat the cabin to the setpoint}{Vehicle occupant}
 \Term{CUT}{Component Under Test}
 ```
@@ -60,9 +77,20 @@ You also need `metadata.tex` and `component.tex` from the same component folder 
 %   Out of scope: ...
 % }
 
-% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
-% in this order. Cite them anywhere with \DocRef{key}.
-% \Reference{srs}{internal}{Software Requirements Specification, ...}{}
+% \DocumentReference{key}{attribute = value, ...} -- listed as internal and
+% external documents, labelled with id or [R1], [R2], ...; cite with \DocRef{key}
+% (one attribute: \DocRef[issue]{key}). Every listed document must be cited.
+% Attributes: id (label instead of R<n>), title, number (document number),
+% issue, date, scope (internal | external), url, classification (public,
+% internal, confidential, strictly confidential). Required: title; for internal
+% documents also number and issue. Values with , or = in braces, a url always
+% in braces, % in it as \%.
+% \DocumentReference{srs}{
+%   title = Software Requirements Specification,
+%   number = , issue = , date = ,
+%   classification = confidential,
+%   url = {},
+% }
 
 % Stakeholders and use cases (optional; usually taken over from the SRS).
 % {use case}{actor, actor} -- actors are collected automatically.
@@ -91,18 +119,60 @@ You also need `metadata.tex` and `component.tex` from the same component folder 
   heater power stage (system integration test).
 }
 
-% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
-% in this order. internal = your organisation's documents, external = standards,
-% guidelines, supplier documents. Cite them anywhere with \DocRef{key}.
-\Reference{srs}{internal}{Software Requirements Specification, SRS-SPC-001}{1.3}
-\Reference{arch}{internal}{Software Architecture Description, SAD-HC-002}{2.0}
-\Reference{suts-spc}{internal}{Software Unit Test Specification setpoint_ctrl, SUTS-SPC-001}{0.2}
-\Reference{suts-tf}{internal}{Software Unit Test Specification temp_filter, SUTS-TF-001}{1.0}
-\Reference{suts-pi}{internal}{Software Unit Test Specification heat_pi, SUTS-PI-001}{1.1}
-\Reference{plan}{internal}{Software Verification Plan, SVP-PRJ-002}{2.0}
-\Reference{29119}{external}{ISO/IEC/IEEE 29119-3 -- Test documentation}{2021}
-\Reference{aspice}{external}{Automotive SPICE PAM -- SWE.2, SWE.5}{4.0}
-\Reference{26262}{external}{ISO 26262-6 -- Clauses 7 and 10}{2018}
+% \DocumentReference{key}{attribute = value, ...} -- listed as internal and
+% external documents, labelled with id or [R1], [R2], ...; cite with \DocRef{key}
+% (one attribute: \DocRef[issue]{key}). Every listed document must be cited.
+% Attributes: id (label instead of R<n>), title, number (document number),
+% issue, date, scope (internal | external), url, classification (public,
+% internal, confidential, strictly confidential). Required: title; for internal
+% documents also number and issue. Values with , or = in braces, a url always
+% in braces, % in it as \%.
+\DocumentReference{srs}{
+  title = Software Requirements Specification,
+  number = SRS-SPC-001, issue = 1.3, date = 2026-09-14,
+  classification = confidential,
+  url = {https://plm.example.com/windchill/app/#ptc1/tcomp/infoPage?oid=VR\%3Awt.doc.WTDocument\%3A4711&u8=1},
+}
+\DocumentReference{arch}{
+  title = Software Architecture Description,
+  number = SAD-HC-002, issue = 2.0, date = 2026-10-20,
+  classification = confidential,
+  url = {https://plm.example.com/windchill/app/#ptc1/tcomp/infoPage?oid=VR\%3Awt.doc.WTDocument\%3A4720&u8=1},
+}
+\DocumentReference{suts-spc}{
+  title = Software Unit Test Specification setpoint_ctrl,
+  number = SUTS-SPC-001, issue = 0.2,
+  classification = internal,
+}
+\DocumentReference{suts-tf}{
+  title = Software Unit Test Specification temp_filter,
+  number = SUTS-TF-001, issue = 1.0,
+  classification = internal,
+}
+\DocumentReference{suts-pi}{
+  title = Software Unit Test Specification heat_pi,
+  number = SUTS-PI-001, issue = 1.1,
+  classification = internal,
+}
+\DocumentReference{plan}{
+  id = SVP, title = Software Verification Plan,
+  number = SVP-PRJ-002, issue = 2.0,
+  classification = internal,
+}
+\DocumentReference{29119}{
+  title = ISO/IEC/IEEE 29119-3 -- Test documentation,
+  issue = 2021, scope = external,
+  url = {https://www.iso.org/standard/79429.html},
+}
+\DocumentReference{aspice}{
+  title = {Automotive SPICE PAM -- SWE.2, SWE.5},
+  issue = 4.0, scope = external,
+  classification = public,
+}
+\DocumentReference{26262}{
+  title = ISO 26262-6 -- Clauses 7 and 10,
+  issue = 2018, scope = external,
+}
 
 % Stakeholders and use cases (optional; usually taken over from the SRS).
 % {use case}{actor, actor} -- actors are collected automatically.

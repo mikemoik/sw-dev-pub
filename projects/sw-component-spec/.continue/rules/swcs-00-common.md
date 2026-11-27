@@ -43,7 +43,7 @@ The project's `macros.tex` (template root) and the component's `components/<comp
 
 - **Values from `metadata.tex`:** `\TheComponent` (component name, typewriter), `\TheBaseline` (code baseline), `\TheIntegrityLevel`. Write `\TheComponent\ ` (with backslash-space) when a word follows.
 - **`\code{text}`:** an identifier or command line in typewriter font, same as `\texttt{}`.
-- **`\DocRef{key}`:** cites a `\Reference` from `introduction.tex` as [Rn]. An unknown key prints in red.
+- **`\DocRef{key}`:** cites a `\DocumentReference` from `introduction.tex` as [Rn] (or its `id`). `\DocRef[issue]{key}` prints one attribute (`id`, `title`, `number`, `issue`, `date`, `scope`, `url`, `classification`). An unknown key prints in red.
 - **Text commands as environments:** `\Purpose`, `\Scope`, `\UseCaseNote`, `\FunctionalDescription`, `\IntegrationStrategy`, `\PassFailCriteria`, `\ToolQualification` and `\ResultsNote` can also be written as `\begin{Scope}` ... `\end{Scope}` (`\end{...}` on its own line). Use this form only when the text needs a table, a listing or `verbatim`; it takes any LaTeX.
 - **`FreeText` block:** `\begin{FreeText}` ... `\end{FreeText}` takes any LaTeX. It works in every content file and is printed at the end of that file's chapter (metadata: end of *Document Control*). In `testcases.tex` it is printed exactly where it stands. It can't go inside a `TestCase`.
 - **Figures, code and data:** a component's own `figures/`, `code/` and `data/` folders are searched first, then the shared ones at the template root. Use them inside free text:

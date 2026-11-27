@@ -77,11 +77,11 @@ latexmk -pdf sw_component_spec.tex             # the default component (\LoadCom
 
 Exactly as `sw-unit-test-spec` (README there, *Using it for a project*), with `components/` for `units/`, `new_component.py` for `new_unit.py`, `\LoadComponent` for `\LoadUnit` and tags `<component>-v<version>`. In short: a private copy of the template with all components on `main`, project defaults in `components/empty/`, template updates merged one way from upstream, each component's spec baselined by its own tag. Keep it outside the code repository and reference the code baseline (`\ComponentBaseline`).
 
-Component specs and unit test specs may live in the same project repository as two template copies, or in two repositories. Either way, link a component's units to their unit test specs with `\Reference` + `\Unit{…}{…}{\DocRef{key}}`.
+Component specs and unit test specs may live in the same project repository as two template copies, or in two repositories. Either way, link a component's units to their unit test specs with `\DocumentReference` + `\Unit{…}{…}{\DocRef{key}}`.
 
 ## Writing content: the rules
 
-The same as in `sw-unit-test-spec`. Replace the text inside `{…}`. Underscores need no escaping. Escape only `\%` `\&` `\#` `\$` `\{ \}`. Anything left out shows as a grey `⟨placeholder⟩` or `none`. Values for your own text: `\TheComponent`, `\TheBaseline`, `\TheIntegrityLevel`. Cite a reference with `\DocRef{key}`.
+The same as in `sw-unit-test-spec`. Replace the text inside `{…}`. Underscores need no escaping. Escape only `\%` `\&` `\#` `\$` `\{ \}`. Anything left out shows as a grey `⟨placeholder⟩` or `none`. Values for your own text: `\TheComponent`, `\TheBaseline`, `\TheIntegrityLevel`. Cite a reference with `\DocRef{key}`, one of its attributes with `\DocRef[issue]{key}`.
 
 ## Document structure
 
@@ -96,6 +96,7 @@ The same as in `sw-unit-test-spec`. Replace the text inside `{…}`. Underscores
 | 6 Test Cases | `testcases.tex` |
 | 7 Traceability: requirements → test cases, uncovered requirements, integration steps → test cases | generated |
 | 8 Test Results Summary | `results.tex` |
+| A Document Locations: full URLs of the references (only if one has a `url`) | `introduction.tex` |
 
 ### Units, interfaces and integration
 
@@ -154,7 +155,8 @@ The text commands `\Purpose`, `\Scope`, `\UseCaseNote`, `\FunctionalDescription`
 | | `\ComponentName{}` `\ComponentBaseline{}` `\IntegrityLevel{}` `\SourceFiles{}` `\Language{}` `\ArchitectureReference{}` | title page, identification table |
 | | `\Revision{version}{date}{author}{change}` | revision history row |
 | introduction | `\Purpose{}` `\Scope{}` | text |
-| | `\Reference{key}{internal/external}{document}{version}` | row `[Rn]`; cite with `\DocRef{key}` |
+| | `\DocumentReference{key}{id=, title=, number=, issue=, date=, scope=, url=, classification=}` | entry in *Internal* or *External documents* (`scope`, default internal), labelled `id` or `[Rn]`; title links to `url` (↗), full URL in appendix *Document Locations*. Required: `title`; internal also `number`, `issue`. Values with `,` or `=` in braces, `url` always. Cite with `\DocRef{key}`, one attribute with `\DocRef[attr]{key}`. Same as in `sw-unit-test-spec` (README there) |
+| | `\Reference{key}{internal/external}{document}{version}` | older form of `\DocumentReference` (document → title, version → issue) |
 | | `\Term{term}{definition}` | terms table row |
 | | `\UseCase{use case}{actor, actor}` `\UseCaseNote{text}` | use case diagram |
 | requirements | `\SoftwareRequirement{ID}{kind}{text}{source}` | row in 2.1.x; traceability row |
@@ -195,7 +197,8 @@ Consistency checks, shown in red in the PDF:
 - a declared unit that is in no integration step
 - an integration step without a test case
 - an `\Integration` step that is not declared
-- `\DocRef` to an unknown key
+- `\DocRef` to an unknown key or attribute
+- `\DocumentReference` with an unknown key, a scope other than internal/external, a classification outside the allowed set, a missing required attribute, a duplicate id, or never cited (also LaTeX warnings)
 - a missing figure or code file
 
 LaTeX warnings: duplicate test case, requirement, unit or step IDs; `\Uses` from an undeclared unit (arrow not drawn); an unknown requirement kind or reference type.
@@ -209,6 +212,8 @@ LaTeX warnings: duplicate test case, requirement, unit or step IDs; `\Uses` from
 | `packages.tex` (root) | by `swcs.cls`, before `underscore` | `\usepackage` for all components (TeX Live 2022; others into `sty/`) |
 | `macros.tex` (root) | first when the component is loaded | macros, colours, TikZ styles for all components |
 | `components/<component>/macros.tex` | next, before `metadata.tex` | the component's macros; `\renewcommand` overrides a root one |
+
+Settings for references, in either `macros.tex`: `\SetClassifications{…}` (allowed `classification` values; default public, internal, confidential, strictly confidential) and `\SetDocumentURLs{appendix|inline|none}` (where full URLs go; default appendix, needs `\SpecDocumentLocations` in the main file).
 
 `\newcommand` stops on a name the template already uses. Example: `components/sample/macros.tex` (`\Api{Init}`, used in TC-HC-001). Components made with an older template get the new skeleton files with `scripts/new_component.py --add-missing --all` (existing files are not changed).
 

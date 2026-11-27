@@ -43,6 +43,7 @@ INDEX = {
     "UseCase": ("Use cases (use case, actors)", (0, 1)),
     "Tool": ("Tools (name, version)", (0, 2)),
     "Reference": ("References (key for \\DocRef, document)", (0, 2)),
+    "DocumentReference": ("References (key for \\DocRef, attributes)", (0, 1)),
 }
 CROSS_FILE_EXAMPLE = "a new unit in `component.tex` and its integration step in `testcases.tex`"
 # ---- end of the template-specific part ---------------------------------------

@@ -12,9 +12,20 @@
 %   Out of scope: ...
 % }
 
-% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
-% in this order. Cite them anywhere with \DocRef{key}.
-% \Reference{srs}{internal}{Software Requirements Specification, ...}{}
+% \DocumentReference{key}{attribute = value, ...} -- listed as internal and
+% external documents, labelled with id or [R1], [R2], ...; cite with \DocRef{key}
+% (one attribute: \DocRef[issue]{key}). Every listed document must be cited.
+% Attributes: id (label instead of R<n>), title, number (document number),
+% issue, date, scope (internal | external), url, classification (public,
+% internal, confidential, strictly confidential). Required: title; for internal
+% documents also number and issue. Values with , or = in braces, a url always
+% in braces, % in it as \%.
+% \DocumentReference{srs}{
+%   title = Software Requirements Specification,
+%   number = , issue = , date = ,
+%   classification = confidential,
+%   url = {},
+% }
 
 % Stakeholders and use cases (optional; usually taken over from the SRS).
 % {use case}{actor, actor} -- actors are collected automatically.
