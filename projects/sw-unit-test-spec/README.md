@@ -98,7 +98,7 @@ upstream (this template)  ──merge──▶  main of <project>-unit-test-spec
 - **`units/<unit>/`** holds one unit's content and its own figures, data and code. PDFs are build output (`build/`, gitignored): built by `scripts/build.py` from any commit, the released ones filed from the baseline tag (step 5).
 - Changes flow one way only: **upstream → `main`**. Template fixes go to upstream (not edited in the copy).
 
-**Outside the code repository.** Keep the spec repository separate from the unit's source code, not as a folder or submodule in it. The spec is a work product with its own versions, tags and releases (`\DocVersion`, `<unit>-v<version>`, review and approval). Its life cycle differs from the code's: a spec is often baselined before the code exists, and a code release does not imply a new spec version. To link the two, reference the code baseline under test in the spec (`\UnitBaseline`, `\SourceFiles`, a `\Reference` to the code repository and tag), never the other way round. Copies of source files for listings (`code/`) are excerpts for reading, not the code under test.
+**Outside the code repository.** Keep the spec repository separate from the unit's source code, not as a folder or submodule in it. The spec is a work product with its own versions, tags and releases (`\DocVersion`, `<unit>-v<version>`, review and approval). Its life cycle differs from the code's: a spec is often baselined before the code exists, and a code release does not imply a new spec version. To link the two, reference the code baseline under test in the spec (`\UnitBaseline`, `\SourceFiles`, a `\DocumentReference` to the code repository and tag), never the other way round. Copies of source files for listings (`code/`) are excerpts for reading, not the code under test.
 
 **A private copy, not a GitHub fork.** A fork of a public repository is public. For project work, create an empty **private** repository (e.g. `<project>-unit-test-specs`) and push the template into it, keeping upstream as a second remote.
 
@@ -181,7 +181,7 @@ The tagged commit's `units/setpoint_ctrl/` is the released document's source; th
 - Escape only these: `\%` `\&` `\#` `\$` `\{ \}` (a bare `%` starts a comment). Plain numbers given as coverage values get the `%` added for you.
 - Anything left out shows up as a grey `⟨placeholder⟩` or `none` — the document always builds. Missing content files in a unit folder are skipped.
 - Formatting is optional and up to you: `\textbf{…}`, `\emph{…}`, `\code{…}` (typewriter, for identifiers and command lines), lists etc. work in the text arguments.
-- Values for use in your own text: `\TheUnit`, `\TheBaseline`, `\TheIntegrityLevel`; cite a reference with `\DocRef{key}` → `[R2]`.
+- Values for use in your own text: `\TheUnit`, `\TheBaseline`, `\TheIntegrityLevel`; cite a reference with `\DocRef{key}` → `[R2]`, one of its attributes with `\DocRef[issue]{key}`.
 
 ## Document structure
 
@@ -195,6 +195,7 @@ The tagged commit's `units/setpoint_ctrl/` is the released document's source; th
 | 6 Test Cases | `testcases.tex` |
 | 7 Traceability — requirements → test cases, uncovered requirements | generated |
 | 8 Test Results Summary | `results.tex` |
+| A Document Locations — full URLs of the references (only if one has a `url`) | `introduction.tex` |
 
 ### Requirements
 
@@ -331,7 +332,8 @@ The text commands `\Purpose`, `\Scope`, `\UseCaseNote`, `\FunctionalDescription`
 | | `\Revision{version}{date}{author}{change}` | one row of the revision history |
 | introduction | `\Purpose{text}` | overrides the default purpose paragraph |
 | | `\Scope{text}` | scope |
-| | `\Reference{key}{internal/external}{document}{version}` | row `[Rn]` with type column, numbered in order; cite with `\DocRef{key}` (type also `int`/`ext`, `i`/`e`) |
+| | `\DocumentReference{key}{id=, title=, number=, issue=, date=, scope=, url=, classification=}` | entry in *Internal* or *External documents* (`scope`, default internal; also `int`/`ext`, `i`/`e`), labelled `id` or `[Rn]` (entries without id, internal first); title links to `url` (↗), full URL in appendix *Document Locations*. Required: `title`; internal also `number`, `issue`. A value with `,` or `=` in braces, `url` always (`url = {https://…}`, `%` as `\%`). Cite with `\DocRef{key}`, one attribute with `\DocRef[attr]{key}` |
+| | `\Reference{key}{internal/external}{document}{version}` | older form of `\DocumentReference` (document → title, version → issue, no number required) |
 | | `\Term{term}{definition}` | terms table row |
 | | `\UseCase{use case}{actor, actor}` `\UseCaseNote{text}` | use case diagram (actors collected automatically) |
 | unit | `\FunctionalDescription{text}` | functional description |
@@ -362,7 +364,7 @@ The text commands `\Purpose`, `\Scope`, `\UseCaseNote`, `\FunctionalDescription`
 | | `\CoverageResult{metric}{achieved}` | achieved coverage row |
 | | `\Deviation{ID}{test case}{description}{status}` | deviations table row |
 
-Consistency checks, shown in red in the PDF: a requirement in `\Verifies` that is not declared in `requirements.tex`; a declared requirement with no test case and no `\NotUnitTested` rationale (a stakeholder requirement defers to its derived requirements); an unknown *derived from* ID; `\DocRef` to an unknown key (also a LaTeX warning); a reference type other than internal/external (also a warning). Duplicate test case or requirement IDs and an unknown requirement kind give a LaTeX warning.
+Consistency checks, shown in red in the PDF: a requirement in `\Verifies` that is not declared in `requirements.tex`; a declared requirement with no test case and no `\NotUnitTested` rationale (a stakeholder requirement defers to its derived requirements); an unknown *derived from* ID; `\DocRef` to an unknown key or attribute; a reference with an unknown key, a scope other than internal/external, a classification outside the allowed set, a missing required attribute, a duplicate id, or one never cited with `\DocRef` (each also a LaTeX warning; *never cited* from the second run on). Duplicate test case or requirement IDs and an unknown requirement kind give a LaTeX warning.
 
 ## Customizing
 
@@ -373,6 +375,8 @@ Consistency checks, shown in red in the PDF: a requirement in `\Verifies` that i
 | `packages.tex` (root) | by `suts.cls`, before `underscore` | `\usepackage` for all units (TeX Live 2022; others into `sty/`) |
 | `macros.tex` (root) | first in `\LoadUnit` | macros, colours, TikZ styles for all units |
 | `units/<unit>/macros.tex` | next, before `metadata.tex` | the unit's macros; `\renewcommand` overrides a root one |
+
+Settings for references, in either `macros.tex`: `\SetClassifications{public, internal, confidential, strictly confidential}` (allowed `classification` values, this list is the default; compared ignoring case) and `\SetDocumentURLs{appendix}` (`appendix`: title links, full URLs in appendix *Document Locations*, default; `inline`: full URL under the entry; `none`: title links only). The appendix needs `\SpecDocumentLocations` in the main file (last chapter).
 
 `\newcommand` stops on a name the template already uses. Example: `units/sample/macros.tex` (`\Api{Set}`, `\SpMax`, used in TC-SPC-002).
 

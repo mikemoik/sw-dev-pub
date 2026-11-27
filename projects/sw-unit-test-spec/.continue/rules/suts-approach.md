@@ -77,9 +77,9 @@ You also need `metadata.tex` and `testcases.tex` from the same unit folder as th
 \Coverage{Branch}{100}{review of uncovered branches}
 \Coverage{MC/DC}{n.a.}{not required for ASIL B}
 
-\EntryCriterion{Unit source is baselined (\TheBaseline) and compiles without warnings.}
+\EntryCriterion{Unit source is baselined (\TheBaseline), compiles without warnings and is \DocRef{misra} compliant (issue \DocRef[issue]{misra}).}
 \EntryCriterion{Requirements \DocRef{srs} and design \DocRef{design} are reviewed.}
-\ExitCriterion{All test cases executed; all passed or deviations accepted.}
+\ExitCriterion{All test cases executed; all passed or deviations accepted (\DocRef{26262}, \DocRef{aspice}, \DocRef{29119}).}
 \ExitCriterion{Coverage targets reached or gaps justified.}
 
 \PassFailCriteria{

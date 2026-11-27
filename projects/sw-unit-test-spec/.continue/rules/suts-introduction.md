@@ -11,7 +11,14 @@ This file holds the scope, the referenced documents, the use cases and the terms
 
 - **`\Purpose{text}`:** optional. Only replaces the default purpose paragraph if the engineer wants other wording.
 - **`\Scope{text}`:** two paragraphs, "In scope: ..." (which interfaces, functions and configuration of the unit) and "Out of scope: ..." (what is tested elsewhere, and where).
-- **`\Reference{key}{internal|external}{document}{version}`:** one per document. `internal` is the organisation's own documents (SRS, design, plans). `external` is standards, guidelines and supplier documents. `key` is a short lowercase name, cited anywhere as `\DocRef{key}`. They are numbered [R1], [R2], ... in this order. Put the requirements and design documents first.
+- **`\DocumentReference{key}{attribute = value, ...}`:** one per document. `key` is a short lowercase name, cited anywhere as `\DocRef{key}`; every listed document must be cited somewhere. Attributes, any order:
+  - `title` (always), `number` (document number, e.g. `SRS-SPC-001`) and `issue` (version or edition) — both required for internal documents, `date` (YYYY-MM-DD).
+  - `scope = internal` (default: the organisation's own documents — SRS, design, plans) or `scope = external` (standards, guidelines, supplier documents).
+  - `classification`: `public`, `internal`, `confidential` or `strictly confidential` (unless the project set other values).
+  - `url`: only if the engineer gives one; always in braces, `%` written as `\%`: `url = {https://…}`.
+  - `id`: a short label printed instead of [R1], [R2], ... (e.g. `id = SVP`); leave it out unless asked.
+  - A value containing `,` or `=` goes in braces: `title = {ISO 26262-6 -- Part 6, Clause 9}`.
+  - Put the requirements and design documents first. The older `\Reference{key}{internal|external}{document}{version}` still works; write new ones as `\DocumentReference`.
 - **`\UseCase{use case}{actor, actor}`:** system use cases the unit contributes to, usually taken from the SRS. `\UseCaseNote{text}` adds a sentence above the diagram.
 - **`\Term{term}{definition}`:** abbreviations and project terms used in the document.
 
@@ -19,7 +26,8 @@ This file holds the scope, the referenced documents, the use cases and the terms
 
 - **Scope:** draft it from `unit.tex` and the engineer's notes.
 - **Terms:** list abbreviations used in the files but not yet defined as `\Term`.
-- **References:** suggest the usual standards as external references, e.g. ISO/IEC/IEEE 29119-3, Automotive SPICE SWE.4, ISO 26262-6 clause 9, MISRA C:2012. Only add the ones that apply to the project; ask about versions.
+- **References:** suggest the usual standards as external references, e.g. ISO/IEC/IEEE 29119-3, Automotive SPICE SWE.4, ISO 26262-6 clause 9, MISRA C:2012. Only add the ones that apply to the project; ask about versions. Never invent document numbers, issues or URLs: ask for them.
+- **Old form:** convert `\Reference{key}{scope}{document}{version}` lines to `\DocumentReference` when asked; split a document number out of the title into `number`.
 
 ## Example
 
@@ -31,8 +39,16 @@ This file holds the scope, the referenced documents, the use cases and the terms
   Out of scope: the NvM driver (tested in its own unit), integration with the
   heater power stage (integration test).
 }
-\Reference{srs}{internal}{Software Requirements Specification, SRS-SPC-001}{1.3}
-\Reference{26262}{external}{ISO 26262-6 -- Clause 9, Software unit verification}{2018}
+\DocumentReference{srs}{
+  title = Software Requirements Specification,
+  number = SRS-SPC-001, issue = 1.3, date = 2026-09-14,
+  classification = confidential,
+  url = {https://plm.example.com/docs/SRS-SPC-001},
+}
+\DocumentReference{26262}{
+  title = {ISO 26262-6 -- Road vehicles, Functional safety, Part 6},
+  issue = 2018, scope = external,
+}
 \UseCase{Restore setpoint after restart}{Vehicle occupant}
 \Term{NvM}{Non-volatile Memory manager}
 ```
@@ -58,9 +74,20 @@ You also need `metadata.tex` and `unit.tex` from the same unit folder as the `in
 %   Out of scope: ...
 % }
 
-% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
-% in this order. Cite them anywhere with \DocRef{key}.
-% \Reference{srs}{internal}{Software Requirements Specification, ...}{}
+% \DocumentReference{key}{attribute = value, ...} -- listed as internal and
+% external documents, labelled with id or [R1], [R2], ...; cite with \DocRef{key}
+% (one attribute: \DocRef[issue]{key}). Every listed document must be cited.
+% Attributes: id (label instead of R<n>), title, number (document number),
+% issue, date, scope (internal | external), url, classification (public,
+% internal, confidential, strictly confidential). Required: title; for internal
+% documents also number and issue. Values with , or = in braces, a url always
+% in braces, % in it as \%.
+% \DocumentReference{srs}{
+%   title = Software Requirements Specification,
+%   number = , issue = , date = ,
+%   classification = confidential,
+%   url = {},
+% }
 
 % Stakeholders and use cases (optional; usually taken over from the SRS).
 % {use case}{actor, actor} -- actors are collected automatically.
@@ -87,16 +114,46 @@ You also need `metadata.tex` and `unit.tex` from the same unit folder as the `in
   integration with the heater power stage (integration test).
 }
 
-% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
-% in this order. internal = your organisation's documents, external = standards,
-% guidelines, supplier documents. Cite them anywhere with \DocRef{key}.
-\Reference{srs}{internal}{Software Requirements Specification, SRS-SPC-001}{1.3}
-\Reference{design}{internal}{Software Detailed Design of setpoint_ctrl, SDD-SPC-004}{1.1}
-\Reference{plan}{internal}{Software Verification Plan, SVP-PRJ-002}{2.0}
-\Reference{misra}{external}{MISRA C:2012 Guidelines}{2019}
-\Reference{29119}{external}{ISO/IEC/IEEE 29119-3 -- Test documentation}{2021}
-\Reference{aspice}{external}{Automotive SPICE PAM -- SWE.4 Software Unit Verification}{4.0}
-\Reference{26262}{external}{ISO 26262-6 -- Clause 9, Software unit verification}{2018}
+% \DocumentReference{key}{attribute = value, ...} -- listed as internal and
+% external documents, labelled with id or [R1], [R2], ...; cite with \DocRef{key}
+% (one attribute: \DocRef[issue]{key}). Every listed document must be cited.
+% Attributes: id (label instead of R<n>), title, number (document number),
+% issue, date, scope (internal | external), url, classification (public,
+% internal, confidential, strictly confidential). Required: title; for internal
+% documents also number and issue. Values with , or = in braces, a url always in braces, % in it as \%.
+\DocumentReference{srs}{
+  title = Software Requirements Specification,
+  number = SRS-SPC-001, issue = 1.3, date = 2026-09-14,
+  classification = confidential,
+  url = {https://plm.example.com/windchill/app/#ptc1/tcomp/infoPage?oid=VR\%3Awt.doc.WTDocument\%3A4711&u8=1},
+}
+\DocumentReference{design}{
+  title = Software Detailed Design of setpoint_ctrl,
+  number = SDD-SPC-004, issue = 1.1, date = 2026-10-02,
+  classification = confidential,
+  url = {https://plm.example.com/windchill/app/#ptc1/tcomp/infoPage?oid=VR\%3Awt.doc.WTDocument\%3A4712&u8=1},
+}
+\DocumentReference{plan}{
+  id = SVP, title = Software Verification Plan,
+  number = SVP-PRJ-002, issue = 2.0, classification = internal,
+}
+\DocumentReference{misra}{
+  title = MISRA C:2012 Guidelines for the use of the C language in critical systems,
+  issue = 2019, scope = external, classification = public,
+}
+\DocumentReference{29119}{
+  title = ISO/IEC/IEEE 29119-3 -- Test documentation,
+  issue = 2021, scope = external,
+  url = {https://www.iso.org/standard/79429.html},
+}
+\DocumentReference{aspice}{
+  title = Automotive SPICE PAM -- SWE.4 Software Unit Verification,
+  issue = 4.0, scope = external,
+}
+\DocumentReference{26262}{
+  title = {ISO 26262-6 -- Road vehicles, Functional safety, Part 6: Clause 9, Software unit verification},
+  issue = 2018, scope = external,
+}
 
 % Stakeholders and use cases (optional; usually taken over from the SRS).
 % {use case}{actor, actor} -- actors are collected automatically.
