@@ -52,6 +52,7 @@ manuals/
 | `environment.tex` | 8 Tools and Environment: tools, classification, tool qualification |
 | `development.tex` | 9 Developer Manual: engineering rules, CI pipeline, Definition of Done, how-tos |
 | `opl.tex` | 10 Open Point List: top 5 (repeated), in progress, open, closed; top-5 points highlighted |
+| `introduction.tex` | A Document Locations: full URLs of the references (only if one has a `url`) |
 
 ## Build
 
@@ -68,11 +69,11 @@ latexmk -pdf sw_project_manual.tex          # the default manual (\LoadManual{sa
 
 ## Using it for a project
 
-Exactly as `sw-unit-test-spec` (README there, *Using it for a project*), with `manuals/` for `units/`, `new_manual.py` for `new_unit.py` and `\LoadManual` for `\LoadUnit`. Reference the project's unit test specs and component spec with `\Reference` and list them as `\WorkProduct`s.
+Exactly as `sw-unit-test-spec` (README there, *Using it for a project*), with `manuals/` for `units/`, `new_manual.py` for `new_unit.py` and `\LoadManual` for `\LoadUnit`. Reference the project's unit test specs and component spec with `\DocumentReference` and list them as `\WorkProduct`s.
 
 ## Writing content
 
-Replace the text inside `{…}`. Underscores need no escaping; escape only `\%` `\&` `\#` `\$` `\{ \}`. Anything left out shows as a grey `⟨placeholder⟩` or `none`. Values for your own text: `\TheProject`, `\TheComponent`, `\TheIntegrityLevel`. Cite a reference with `\DocRef{key}`.
+Replace the text inside `{…}`. Underscores need no escaping; escape only `\%` `\&` `\#` `\$` `\{ \}`. Anything left out shows as a grey `⟨placeholder⟩` or `none`. Values for your own text: `\TheProject`, `\TheComponent`, `\TheIntegrityLevel`. Cite a reference with `\DocRef{key}`, one of its attributes with `\DocRef[issue]{key}`.
 
 Roles, processes, milestones and work products are declared with an ID; tools with their name. Every other command refers to them by that ID or name:
 
@@ -140,7 +141,8 @@ The text commands `\Purpose`, `\Scope`, `\Communication`, `\ProcessReference`, `
 | introduction | `\Purpose{}` `\Scope{}` | text |
 | | `\ProjectObjective{text}` | objectives list |
 | | `\Deliverable{deliverable}{recipient}{milestone IDs}` | deliverables row |
-| | `\Reference{key}{internal/external}{document}{version}` | row `[Rn]`; cite with `\DocRef{key}` |
+| | `\DocumentReference{key}{id=, title=, number=, issue=, date=, scope=, url=, classification=}` | entry in *Internal* or *External documents* (`scope`, default internal), labelled `id` or `[Rn]`; title links to `url` (↗), full URL in appendix *Document Locations*. Required: `title`; internal also `number`, `issue`. Values with `,` or `=` in braces, `url` always. Cite with `\DocRef{key}`, one attribute with `\DocRef[attr]{key}`. Same as in `sw-unit-test-spec` (README there) |
+| | `\Reference{key}{internal/external}{document}{version}` | older form of `\DocumentReference` (document → title, version → issue) |
 | | `\Term{term}{definition}` | terms row |
 | organization | `\Role[reports to]{ID}{name}{responsibility}` | roles row, box in the organisation chart, RACI column |
 | | `\Member{name}{role IDs}{organisation / contact}` | team row, names in roles table and chart |
@@ -181,9 +183,10 @@ Consistency checks, shown in red in the PDF:
 - a risk without mitigation or owner
 - an open point with an unknown status, a top rank not 1–5, given twice or on a closed point, no responsible or due date (open, in progress), a date that is not YYYY-MM-DD, a due date before the as-of date (`\OpenPointExport`, else `\DocDate`)
 - a tool without classification when the integrity level is an ASIL
-- `\DocRef` to an unknown key, a missing figure or code file
+- `\DocRef` to an unknown key or attribute, a missing figure or code file
+- `\DocumentReference` with an unknown key, a scope other than internal/external, a classification outside the allowed set, a missing required attribute, a duplicate id, or never cited (also LaTeX warnings)
 
-LaTeX warnings: duplicate IDs (roles, processes, milestones, work products, risks, tools, open points), an unknown `[reports to]` role (drawn as a top role), an unknown process scope or risk level, an unknown reference type, a text command given twice.
+LaTeX warnings: duplicate IDs (roles, processes, milestones, work products, risks, tools, open points), an unknown `[reports to]` role (drawn as a top role), an unknown process scope or risk level, a text command given twice.
 
 ## Customizing
 
@@ -194,6 +197,8 @@ LaTeX warnings: duplicate IDs (roles, processes, milestones, work products, risk
 | `packages.tex` (root) | by `swpm.cls`, before `underscore` | `\usepackage` for all manuals (TeX Live 2022; others into `sty/`) |
 | `macros.tex` (root) | first when the manual is loaded | macros, colours, TikZ styles for all manuals |
 | `manuals/<manual>/macros.tex` | next, before `metadata.tex` | the manual's macros; `\renewcommand` overrides a root one |
+
+Settings for references, in either `macros.tex`: `\SetClassifications{…}` (allowed `classification` values; default public, internal, confidential, strictly confidential) and `\SetDocumentURLs{appendix|inline|none}` (where full URLs go; default appendix, needs `\SpecDocumentLocations` in the main file).
 
 `\newcommand` stops on a name the template already uses. Example: `manuals/sample/macros.tex` (`\Repo`, used in `development.tex`). Manuals made with an older template get the new skeleton files with `scripts/new_manual.py --add-missing --all` (existing files are not changed).
 

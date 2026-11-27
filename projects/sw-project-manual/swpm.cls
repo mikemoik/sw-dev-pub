@@ -301,45 +301,390 @@
 % =============================================================================
 %  Input commands: introduction  (introduction.tex)
 % =============================================================================
-% \Reference{key}{internal | external}{document}{version}
-%   numbered [R1], [R2], ... ; cite with \DocRef{key}
-\prop_new:N \g__swpm_refnum_prop
-\str_new:N \l__swpm_scope_str
-\tl_new:N \l__swpm_scope_tl
+% \DocumentReference{key}{id = .., title = .., number = .., issue = .., date = ..,
+%   scope = internal | external, url = .., classification = ..}
+%   Listed in two groups (internal, external), labelled with id or a running
+%   number [R1], [R2], ... (entries without id; internal first); cite with
+%   \DocRef{key}, one attribute with \DocRef[attr]{key}.
+%   Required: title; number and issue for internal documents.
+% \Reference{key}{internal | external}{document}{version}: older form
+%   (document -> title, version -> issue; no number required).
+% variants used below (generated here: prod L3 2022-02-24 lacks some)
+\cs_generate_variant:Nn \prop_gput:Nnn { cVv , NVV , NnV , NVn }
+\cs_generate_variant:Nn \prop_put:Nnn { NVn }
+\prg_generate_conditional_variant:Nnn \str_if_eq:nn { Vn } { p , T , F , TF }
+\prg_generate_conditional_variant:Nnn \tl_if_blank:n { e , v } { p , T , F , TF }
+\prg_generate_conditional_variant:Nnn \tl_if_empty:n { e } { p , T , F , TF }
+\seq_new:N \g__swpm_doc_seq                 % keys in declaration order
+\clist_const:Nn \c__swpm_doc_attrs_clist
+  { id, title, number, issue, date, scope, url, classification }
+\clist_map_inline:Nn \c__swpm_doc_attrs_clist
+  { \prop_new:c { g__swpm_doc_#1_prop } \tl_new:c { l__swpm_doc_#1_tl } }
+\prop_new:N \g__swpm_doc_note_prop          % key -> red notes (problems found)
+\prop_new:N \g__swpm_doc_label_prop         % key -> printed label (id or Rn)
+\prop_new:N \g__swpm_doc_cited_prop         % cited in this run
+\prop_new:N \g__swpm_doc_uncited_prop       % not cited in the previous run (aux)
+\bool_new:N \g__swpm_doc_dirty_bool         % labels must be recomputed
+\bool_new:N \l__swpm_doc_legacy_bool
+\tl_new:N \l__swpm_doc_note_tl
+\tl_new:N \l__swpm_doc_key_tl
+\str_new:N \l__swpm_doc_str
+\str_const:Nx \c__swpm_hash_hash_str { \c_hash_str \c_hash_str } % \tl_to_str doubles #
+\clist_new:N \g__swpm_classes_clist
+\clist_gset:Nn \g__swpm_classes_clist { public, internal, confidential, strictly~confidential }
+\NewDocumentCommand \SetClassifications { m } { \clist_gset:Nn \g__swpm_classes_clist {#1} }
+\tl_new:N \g__swpm_doc_urls_tl
+\tl_gset:Nn \g__swpm_doc_urls_tl { appendix }
+\NewDocumentCommand \SetDocumentURLs { m }
+  {
+    \str_case:nnTF {#1} { {appendix}{} {inline}{} {none}{} }
+      { \tl_gset:Nn \g__swpm_doc_urls_tl {#1} }
+      { \msg_warning:nnn { swpm } { bad-urls } {#1} }
+  }
+\msg_new:nnn { swpm } { bad-urls }
+  { \SetDocumentURLs{#1}:~use~appendix,~inline~or~none. }
+
+\keys_define:nn { swpm / docref }
+  {
+    id             .tl_set:N = \l__swpm_doc_id_tl ,
+    title          .tl_set:N = \l__swpm_doc_title_tl ,
+    number         .tl_set:N = \l__swpm_doc_number_tl ,
+    issue          .tl_set:N = \l__swpm_doc_issue_tl ,
+    date           .tl_set:N = \l__swpm_doc_date_tl ,
+    scope          .tl_set:N = \l__swpm_doc_scope_tl ,
+    url            .tl_set:N = \l__swpm_doc_url_tl ,
+    classification .tl_set:N = \l__swpm_doc_classification_tl ,
+    unknown .code:n =
+      {
+        \msg_warning:nnxx { swpm } { doc-key } { \l__swpm_doc_key_tl } { \l_keys_key_str }
+        \__swpm_doc_note:x { unknown~key~`\l_keys_key_str' }
+      } ,
+  }
+\cs_new_protected:Npn \__swpm_doc_note:n #1
+  {
+    \tl_if_empty:NF \l__swpm_doc_note_tl { \tl_put_right:Nn \l__swpm_doc_note_tl { ;~ } }
+    \tl_put_right:Nn \l__swpm_doc_note_tl {#1}
+  }
+\cs_generate_variant:Nn \__swpm_doc_note:n { x }
+\msg_new:nnn { swpm } { doc-key } { \DocumentReference{#1}:~unknown~key~`#2'. }
+\msg_new:nnn { swpm } { doc-dup } { \DocumentReference{#1}:~key~already~defined~(ignored). }
+\msg_new:nnn { swpm } { doc-missing } { \DocumentReference{#1}:~`#2'~is~required. }
+\msg_new:nnn { swpm } { bad-scope }
+  { \DocumentReference{#1}:~scope~`#2'~is~neither~`internal'~nor~`external'. }
+\msg_new:nnn { swpm } { doc-class }
+  { \DocumentReference{#1}:~classification~`#2'~is~not~one~of~`#3'~(\SetClassifications). }
+\msg_new:nnn { swpm } { doc-dup-id } { \DocumentReference{#1}:~id~`#2'~is~used~twice. }
+\msg_new:nnn { swpm } { doc-uncited } { \DocumentReference{#1}:~listed~but~never~cited~with~\DocRef. }
+\msg_new:nnn { swpm } { unknown-ref } { \DocRef{#1}:~no~\DocumentReference{#1}{..}~defined. }
+\msg_new:nnn { swpm } { doc-attr } { \DocRef[#1]{#2}:~no~attribute~`#1'. }
+
+\NewDocumentCommand \DocumentReference { m +m }
+  { \bool_set_false:N \l__swpm_doc_legacy_bool \__swpm_doc_add:nn {#1} {#2} }
 \NewDocumentCommand \Reference { m m +m m }
   {
-    \int_gincr:N \g__swpm_references_int
-    \prop_gput:Nnx \g__swpm_refnum_prop {#1} { \int_use:N \g__swpm_references_int }
-    \str_set:Nx \l__swpm_scope_str { \str_lowercase:n {#2} }
-    \str_case:VnF \l__swpm_scope_str
-      {
-        {internal} { \tl_set:Nn \l__swpm_scope_tl { internal } }
-        {int}      { \tl_set:Nn \l__swpm_scope_tl { internal } }
-        {i}        { \tl_set:Nn \l__swpm_scope_tl { internal } }
-        {external} { \tl_set:Nn \l__swpm_scope_tl { external } }
-        {ext}      { \tl_set:Nn \l__swpm_scope_tl { external } }
-        {e}        { \tl_set:Nn \l__swpm_scope_tl { external } }
-      }
-      {
-        \msg_warning:nnnn { swpm } { bad-scope } {#1} {#2}
-        \tl_set:Nn \l__swpm_scope_tl { \textcolor{warn}{#2} }
-      }
-    \tl_gput_right:Nx \g__swpm_references_tl
-      {
-        { [R\int_use:N \g__swpm_references_int] }
-        \exp_not:n { & #3 & } \exp_not:V \l__swpm_scope_tl \exp_not:n { & #4 \\ }
-      }
+    \bool_set_true:N \l__swpm_doc_legacy_bool
+    \__swpm_doc_add:nn {#1} { title = {#3} , issue = {#4} , scope = {#2} }
   }
-\cs_generate_variant:Nn \str_case:nnF { V }
-\msg_new:nnn { swpm } { bad-scope }
-  { \Reference{#1}:~'#2'~is~neither~'internal'~nor~'external'. }
-\NewDocumentCommand \DocRef { m }
+\cs_new_protected:Npn \__swpm_doc_add:nn #1#2
   {
-    \prop_get:NnNTF \g__swpm_refnum_prop {#1} \l_tmpa_tl
-      { [R\tl_use:N \l_tmpa_tl] }
-      { \textcolor{warn}{[?#1]} \msg_warning:nnn { swpm } { unknown-ref } {#1} }
+    \group_begin:
+    \tl_set:Nx \l__swpm_doc_key_tl { \tl_to_str:n {#1} }
+    \seq_if_in:NVTF \g__swpm_doc_seq \l__swpm_doc_key_tl
+      { \msg_warning:nnx { swpm } { doc-dup } { \l__swpm_doc_key_tl } }
+      {
+        \clist_map_inline:Nn \c__swpm_doc_attrs_clist { \tl_clear:c { l__swpm_doc_##1_tl } }
+        \tl_clear:N \l__swpm_doc_note_tl
+        \keys_set:nn { swpm / docref } {#2}
+        % scope: internal (default) or external, short forms allowed
+        \str_set:Nx \l__swpm_doc_str { \str_lowercase:f { \tl_to_str:N \l__swpm_doc_scope_tl } }
+        \str_case:VnF \l__swpm_doc_str
+          {
+            {} { \tl_set:Nn \l__swpm_doc_scope_tl { internal } }
+            {internal} { \tl_set:Nn \l__swpm_doc_scope_tl { internal } }
+            {int}      { \tl_set:Nn \l__swpm_doc_scope_tl { internal } }
+            {i}        { \tl_set:Nn \l__swpm_doc_scope_tl { internal } }
+            {external} { \tl_set:Nn \l__swpm_doc_scope_tl { external } }
+            {ext}      { \tl_set:Nn \l__swpm_doc_scope_tl { external } }
+            {e}        { \tl_set:Nn \l__swpm_doc_scope_tl { external } }
+          }
+          {
+            \msg_warning:nnxx { swpm } { bad-scope } { \l__swpm_doc_key_tl } { \l__swpm_doc_str }
+            \__swpm_doc_note:x { scope~`\l__swpm_doc_str' }
+            \tl_set:Nn \l__swpm_doc_scope_tl { internal }
+          }
+        % required keys
+        \__swpm_doc_require:n { title }
+        \str_if_eq:VnT \l__swpm_doc_scope_tl { internal }
+          {
+            \bool_if:NF \l__swpm_doc_legacy_bool { \__swpm_doc_require:n { number } }
+            \__swpm_doc_require:n { issue }
+          }
+        % classification from the allowed set (case-insensitive)
+        \tl_if_empty:NF \l__swpm_doc_classification_tl
+          {
+            \str_set:Nx \l__swpm_doc_str
+              { \str_lowercase:f { \tl_to_str:N \l__swpm_doc_classification_tl } }
+            \bool_set_false:N \l_tmpa_bool
+            \clist_map_inline:Nn \g__swpm_classes_clist
+              {
+                \str_if_eq:eeT { \str_lowercase:n {##1} } { \l__swpm_doc_str }
+                  { \bool_set_true:N \l_tmpa_bool }
+              }
+            \bool_if:NF \l_tmpa_bool
+              {
+                \msg_warning:nnxxx { swpm } { doc-class } { \l__swpm_doc_key_tl }
+                  { \l__swpm_doc_str } { \clist_use:Nn \g__swpm_classes_clist { ,~ } }
+                \tl_set:Nx \l__swpm_doc_classification_tl
+                  { \exp_not:N \textcolor{warn}{ \exp_not:V \l__swpm_doc_classification_tl } }
+              }
+          }
+        % url as a plain string: \% \# \& \_ ~ typed in the source become % # & _ ~
+        \tl_if_empty:NF \l__swpm_doc_url_tl
+          {
+            \str_set:Nx \l__swpm_doc_str { \tl_to_str:N \l__swpm_doc_url_tl }
+            \exp_args:NNVV \str_replace_all:Nnn \l__swpm_doc_str \c__swpm_hash_hash_str \c_hash_str
+            \exp_args:NNnV \str_replace_all:Nnn \l__swpm_doc_str { \% } \c_percent_str
+            \exp_args:NNnV \str_replace_all:Nnn \l__swpm_doc_str { \# } \c_hash_str
+            \exp_args:NNnV \str_replace_all:Nnn \l__swpm_doc_str { \& } \c_ampersand_str
+            \exp_args:NNnV \str_replace_all:Nnn \l__swpm_doc_str { \_ } \c_underscore_str
+            \str_remove_all:Nn \l__swpm_doc_str { ~ }
+            \tl_set_eq:NN \l__swpm_doc_url_tl \l__swpm_doc_str
+          }
+        \seq_gput_right:NV \g__swpm_doc_seq \l__swpm_doc_key_tl
+        \clist_map_inline:Nn \c__swpm_doc_attrs_clist
+          {
+            \prop_gput:cVv { g__swpm_doc_##1_prop }
+              \l__swpm_doc_key_tl { l__swpm_doc_##1_tl }
+          }
+        \prop_gput:NVV \g__swpm_doc_note_prop \l__swpm_doc_key_tl \l__swpm_doc_note_tl
+        \bool_gset_true:N \g__swpm_doc_dirty_bool
+      }
+    \group_end:
   }
-\msg_new:nnn { swpm } { unknown-ref } { \DocRef{#1}:~no~\Reference{#1}{..}{..}~defined. }
+\cs_new_protected:Npn \__swpm_doc_require:n #1
+  {
+    \tl_if_blank:vT { l__swpm_doc_#1_tl }
+      {
+        \msg_warning:nnxx { swpm } { doc-missing } { \l__swpm_doc_key_tl } {#1}
+        \__swpm_doc_note:n { #1~missing }
+      }
+  }
+
+% labels: own id, else R<n> counting entries without id, internal group first
+\cs_new_protected:Npn \__swpm_doc_labels:
+  {
+    \bool_if:NT \g__swpm_doc_dirty_bool
+      {
+        \bool_gset_false:N \g__swpm_doc_dirty_bool
+        \prop_gclear:N \g__swpm_doc_label_prop
+        \int_zero:N \l_tmpa_int
+        \prop_clear:N \l_tmpa_prop                % id -> key (duplicate check)
+        \clist_map_inline:nn { internal, external }
+          {
+            \seq_map_inline:Nn \g__swpm_doc_seq
+              {
+                \str_if_eq:eeT { \prop_item:Nn \g__swpm_doc_scope_prop {####1} } {##1}
+                  {
+                    \tl_set:Nx \l_tmpa_tl { \prop_item:Nn \g__swpm_doc_id_prop {####1} }
+                    \tl_if_blank:VTF \l_tmpa_tl
+                      {
+                        \int_incr:N \l_tmpa_int
+                        \prop_gput:Nnx \g__swpm_doc_label_prop {####1} { R \int_use:N \l_tmpa_int }
+                      }
+                      {
+                        \prop_if_in:NVT \l_tmpa_prop \l_tmpa_tl
+                          {
+                            \msg_warning:nnnV { swpm } { doc-dup-id } {####1} \l_tmpa_tl
+                            \tl_set:Nx \l_tmpa_tl
+                              { \exp_not:N \textcolor{warn}{ \exp_not:V \l_tmpa_tl } }
+                          }
+                        \prop_put:NVn \l_tmpa_prop \l_tmpa_tl {}
+                        \prop_gput:NnV \g__swpm_doc_label_prop {####1} \l_tmpa_tl
+                      }
+                  }
+              }
+          }
+      }
+  }
+\cs_generate_variant:Nn \msg_warning:nnnn { nnnV }
+
+\NewDocumentCommand \DocRef { o m }
+  {
+    \__swpm_doc_labels:
+    \tl_set:Nx \l__swpm_doc_key_tl { \tl_to_str:n {#2} }
+    \seq_if_in:NVTF \g__swpm_doc_seq \l__swpm_doc_key_tl
+      {
+        \prop_gput:NVn \g__swpm_doc_cited_prop \l__swpm_doc_key_tl {}
+        \IfNoValueTF {#1}
+          {
+            \hyperlink { swpm.doc. \l__swpm_doc_key_tl }
+              { [ \prop_item:NV \g__swpm_doc_label_prop \l__swpm_doc_key_tl ] }
+          }
+          {
+            \clist_if_in:NnTF \c__swpm_doc_attrs_clist {#1}
+              {
+                \str_if_eq:nnTF {#1} { url }
+                  { \__swpm_doc_url:V \l__swpm_doc_key_tl }
+                  { \prop_item:cV { g__swpm_doc_#1_prop } \l__swpm_doc_key_tl }
+              }
+              {
+                \textcolor{warn}{ [?#1] }
+                \msg_warning:nnnV { swpm } { doc-attr } {#1} \l__swpm_doc_key_tl
+              }
+          }
+      }
+      { \textcolor{warn}{[?#2]} \msg_warning:nnn { swpm } { unknown-ref } {#2} }
+  }
+\cs_generate_variant:Nn \prop_item:Nn { NV , cV }
+\cs_new_protected:Npn \__swpm_doc_url:n #1
+  { \exp_args:Nx \url { \prop_item:Nn \g__swpm_doc_url_prop {#1} } }
+\cs_generate_variant:Nn \__swpm_doc_url:n { V }
+
+% not cited: warning at the end; red mark in the list from the next run on
+\cs_new_protected:cpn { swpm@uncited } #1 { \prop_gput:Nnn \g__swpm_doc_uncited_prop {#1} {} }
+\AtEndDocument
+  {
+    \seq_map_inline:Nn \g__swpm_doc_seq
+      {
+        \prop_if_in:NnF \g__swpm_doc_cited_prop {#1}
+          {
+            \msg_warning:nnn { swpm } { doc-uncited } {#1}
+            \iow_now:Nn \@auxout { \swpm@uncited {#1} }
+          }
+      }
+  }
+
+% one list entry: label | title (link) \newline attributes \newline notes
+\seq_new:N \l__swpm_doc_parts_seq
+\cs_new_protected:Npn \__swpm_doc_entry:n #1
+  {
+    \seq_clear:N \l__swpm_doc_parts_seq
+    \__swpm_doc_part:nnn {#1} { number } { }
+    \__swpm_doc_part:nnn {#1} { issue } { Issue~ }
+    \__swpm_doc_part:nnn {#1} { date } { }
+    \__swpm_doc_part:nnn {#1} { classification } { }
+    \tl_set:Nx \l_tmpb_tl { \prop_item:Nn \g__swpm_doc_url_prop {#1} }
+    \tl_if_blank:eT { \prop_item:Nn \g__swpm_doc_title_prop {#1} }
+      { \prop_gput:Nnn \g__swpm_doc_title_prop {#1} { \textcolor{warn}{ \textit{ $\langle$title$\rangle$ } } } }
+    \tl_put_right:Nx \l__swpm_rows_tl
+      {
+        \exp_not:N \hypertarget { swpm.doc.#1 } { }
+        [ \exp_not:e { \prop_item:Nn \g__swpm_doc_label_prop {#1} } ]
+        &
+        \tl_if_blank:VTF \l_tmpb_tl
+          { \exp_not:e { \prop_item:Nn \g__swpm_doc_title_prop {#1} } }
+          {
+            \exp_not:N \href { \l_tmpb_tl }
+              {
+                \exp_not:e { \prop_item:Nn \g__swpm_doc_title_prop {#1} }
+                \exp_not:N \, \exp_not:N \textcolor{accent}
+                  { \exp_not:N \footnotesize \exp_not:N \ensuremath { \exp_not:N \nearrow } }
+              }
+          }
+        \seq_if_empty:NF \l__swpm_doc_parts_seq
+          {
+            \exp_not:N \newline
+            { \exp_not:N \small
+              \seq_use:Nn \l__swpm_doc_parts_seq
+                { \exp_not:n { \enspace\textperiodcentered\enspace } } }
+          }
+        \bool_lazy_and:nnT
+          { ! \tl_if_blank_p:V \l_tmpb_tl }
+          { \str_if_eq_p:Vn \g__swpm_doc_urls_tl { inline } }
+          { \exp_not:N \newline { \exp_not:N \small \exp_not:N \url { \l_tmpb_tl } } }
+        \tl_if_empty:eF { \prop_item:Nn \g__swpm_doc_note_prop {#1} }
+          {
+            \exp_not:N \newline
+            { \exp_not:N \small \exp_not:N \textcolor{warn}
+              { \exp_not:e { \prop_item:Nn \g__swpm_doc_note_prop {#1} } } }
+          }
+        \prop_if_in:NnT \g__swpm_doc_uncited_prop {#1}
+          {
+            \exp_not:N \newline
+            { \exp_not:N \small \exp_not:N \textcolor{warn} { not~cited~in~this~document } }
+          }
+        \exp_not:N \\
+      }
+  }
+\cs_new_protected:Npn \__swpm_doc_part:nnn #1#2#3
+  {
+    \tl_set:Nx \l_tmpa_tl { \prop_item:cn { g__swpm_doc_#2_prop } {#1} }
+    \tl_if_blank:VF \l_tmpa_tl
+      { \seq_put_right:Nx \l__swpm_doc_parts_seq { \exp_not:n {#3} \exp_not:V \l_tmpa_tl } }
+  }
+\cs_new_protected:Npn \__swpm_doc_list:
+  {
+    \__swpm_doc_labels:
+    \tl_clear:N \l__swpm_rows_tl
+    \clist_map_inline:nn { internal / Internal~documents , external / External~documents }
+      { \__swpm_doc_group:w ##1 \q_stop }
+    \tl_if_empty:NTF \l__swpm_rows_tl
+      { \ph{none} }
+      {
+        \begin{xltabular}{\linewidth}{@{}l Y@{}}
+          \toprule
+          \textbf{ID} & \textbf{Document} \\
+          \l__swpm_rows_tl
+          \bottomrule
+        \end{xltabular}
+      }
+  }
+\cs_new_protected:Npn \__swpm_doc_group:w #1 / #2 \q_stop
+  {
+    \bool_set_false:N \l_tmpa_bool
+    \seq_map_inline:Nn \g__swpm_doc_seq
+      {
+        \str_if_eq:eeT { \prop_item:Nn \g__swpm_doc_scope_prop {##1} } {#1}
+          {
+            \bool_if:NF \l_tmpa_bool
+              {
+                \bool_set_true:N \l_tmpa_bool
+                \tl_put_right:Nn \l__swpm_rows_tl
+                  { \midrule \multicolumn{2}{@{}l}{ \textcolor{accent}{ \textit{#2} } } \\ }
+              }
+            \__swpm_doc_entry:n {##1}
+          }
+      }
+  }
+
+% appendix: full addresses of the linked documents (\SetDocumentURLs{appendix})
+\NewDocumentCommand \SpecDocumentLocations {}
+  {
+    \__swpm_doc_labels:
+    \tl_clear:N \l__swpm_rows_tl
+    \str_if_eq:VnT \g__swpm_doc_urls_tl { appendix }
+      {
+        \clist_map_inline:nn { internal, external }
+          {
+            \seq_map_inline:Nn \g__swpm_doc_seq
+              {
+                \bool_lazy_and:nnT
+                  { \str_if_eq_p:ee { \prop_item:Nn \g__swpm_doc_scope_prop {####1} } {##1} }
+                  { ! \tl_if_blank_p:e { \prop_item:Nn \g__swpm_doc_url_prop {####1} } }
+                  {
+                    \tl_put_right:Nx \l__swpm_rows_tl
+                      {
+                        \exp_not:N \hyperlink { swpm.doc.####1 }
+                          { [ \exp_not:e { \prop_item:Nn \g__swpm_doc_label_prop {####1} } ] }
+                        & \exp_not:N \url { \prop_item:Nn \g__swpm_doc_url_prop {####1} } \exp_not:N \\
+                      }
+                  }
+              }
+          }
+      }
+    \tl_if_empty:NF \l__swpm_rows_tl
+      {
+        \appendix
+        \section{Document~Locations}
+        Full~addresses~of~the~linked~references,~for~printed~copies~and~copying.
+        \begin{xltabular}{\linewidth}{@{}l >{\raggedright\arraybackslash\small}X@{}}
+          \toprule
+          \textbf{ID} & \textbf{Location} \\ \midrule
+          \l__swpm_rows_tl
+          \bottomrule
+        \end{xltabular}
+      }
+  }
 
 % \Term{abbreviation}{definition}
 \NewDocumentCommand \Term { m +m }
@@ -1101,8 +1446,7 @@
       { \textbf{Deliverable} & \textbf{Recipient} & \textbf{Milestone} } \l__swpm_rows_tl
     \Needspace{6\baselineskip}
     \subsection{References}
-    \__swpm_list_table:nnnn { @{}l Y l l@{} } {4}
-      { \textbf{ID} & \textbf{Document} & \textbf{Type} & \textbf{Version} } { references }
+    \__swpm_doc_list:
     \Needspace{6\baselineskip}
     \subsection{Terms~and~Abbreviations}
     \__swpm_list_table:nnnn { @{}l Y@{} } {2}

@@ -50,7 +50,7 @@ The project's `macros.tex` (template root) and the manual's `manuals/<manual>/ma
 
 - **Values from `metadata.tex`:** `\TheProject` (project name), `\TheComponent` (component name, typewriter), `\TheIntegrityLevel`. Write `\TheComponent\ ` (with backslash-space) when a word follows.
 - **`\code{text}`:** an identifier, path or command in typewriter font, same as `\texttt{}`.
-- **`\DocRef{key}`:** cites a `\Reference` from `introduction.tex` as [Rn]. An unknown key prints in red.
+- **`\DocRef{key}`:** cites a `\DocumentReference` from `introduction.tex` as [Rn] (or its `id`). `\DocRef[issue]{key}` prints one attribute (`id`, `title`, `number`, `issue`, `date`, `scope`, `url`, `classification`). An unknown key prints in red.
 - **Text commands as environments:** `\Purpose`, `\Scope`, `\Communication`, `\ProcessReference`, `\BranchingModel`, `\ReleaseProcedure`, `\Escalation` and `\ToolQualification` can also be written as `\begin{Scope}` ... `\end{Scope}` (`\end{...}` on its own line). Use this form only when the text needs a table, a listing or `verbatim`; it takes any LaTeX.
 - **`FreeText` block:** `\begin{FreeText}` ... `\end{FreeText}` takes any LaTeX. It works in every content file and is printed at the end of that file's chapter (metadata: end of *Document Control*).
 - **Figures, code and data:** a manual's own `figures/`, `code/` and `data/` folders are searched first, then the shared ones at the template root. Use them inside free text: `\includegraphics[width=0.75\linewidth]{name}` in a `figure` environment, `\InputFigure[max width]{name}` for a figure file `figures/name.tex` (a specfig figure, see *Figures (specfig)*, file `<type>_<name>.tex`, or a bare `tikzpicture`), `\InputCode[fancyvrb options]{file}` to list `code/file` verbatim (e.g. a CI configuration). A missing file gives a warning and a red *missing* box.
@@ -165,7 +165,14 @@ Chapter 1: purpose, scope, project identification (from `metadata.tex`), objecti
 - **`\Scope{text}`:** what the project develops and delivers, and what it does not (other teams, basic software, the safety plan). Two short paragraphs: in scope, out of scope.
 - **`\ProjectObjective{text}`:** one per objective, measurable (date, capability level, number of open findings).
 - **`\Deliverable{deliverable}{recipient}{milestone IDs}`:** what goes to whom, and at which milestone of `lifecycle.tex`.
-- **`\Reference{key}{internal | external}{document}{version}`:** every document cited elsewhere with `\DocRef{key}`: offer, requirements, process handbook, specifications, standards.
+- **`\DocumentReference{key}{attribute = value, ...}`:** every document cited elsewhere with `\DocRef{key}`: offer, requirements, process handbook, specifications, standards; every listed document must be cited somewhere. Attributes, any order:
+  - `title` (always), `number` (document number, e.g. `SRS-SPC-001`) and `issue` (version or edition) — both required for internal documents, `date` (YYYY-MM-DD).
+  - `scope = internal` (default: the organisation's own documents) or `scope = external` (standards, guidelines, supplier documents).
+  - `classification`: `public`, `internal`, `confidential` or `strictly confidential` (unless the project set other values).
+  - `url`: only if the engineer gives one; always in braces, `%` written as `\%`: `url = {https://…}`.
+  - `id`: a short label printed instead of [R1], [R2], ... (e.g. `id = SVP`); leave it out unless asked.
+  - A value containing `,` or `=` goes in braces: `title = {ISO 26262-6 -- Clauses 7, 10}`.
+  - The older `\Reference{key}{internal|external}{document}{version}` still works; write new ones as `\DocumentReference`. Never invent document numbers, issues or URLs: ask for them.
 - **`\Term{term}{definition}`:** abbreviations used in the manual.
 
 ## Example
@@ -173,7 +180,11 @@ Chapter 1: purpose, scope, project identification (from `metadata.tex`), objecti
 ```latex
 \ProjectObjective{Release \TheComponent\ v2.0 for the start of production on 2027-09-24.}
 \Deliverable{Software release (binary, release note)}{Customer}{M3, M4}
-\Reference{process}{internal}{Company software process handbook, PH-SW-003}{4.1}
+\DocumentReference{process}{
+  title = Company software process handbook,
+  number = PH-SW-003, issue = 4.1, classification = internal,
+  url = {https://intranet.example.com/process/PH-SW-003},
+}
 \Term{SOP}{Start Of Production}
 ```
 
@@ -198,9 +209,20 @@ Chapter 1: purpose, scope, project identification (from `metadata.tex`), objecti
 % {deliverable}{recipient}{milestone ID}
 % \Deliverable{}{}{}
 
-% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
-% Cite them anywhere with \DocRef{key}.
-% \Reference{}{internal}{}{}
+% \DocumentReference{key}{attribute = value, ...} -- listed as internal and
+% external documents, labelled with id or [R1], [R2], ...; cite with \DocRef{key}
+% (one attribute: \DocRef[issue]{key}). Every listed document must be cited.
+% Attributes: id (label instead of R<n>), title, number (document number),
+% issue, date, scope (internal | external), url, classification (public,
+% internal, confidential, strictly confidential). Required: title; for internal
+% documents also number and issue. Values with , or = in braces, a url always
+% in braces, % in it as \%.
+% \DocumentReference{srs}{
+%   title = Software Requirements Specification,
+%   number = , issue = , date = ,
+%   classification = confidential,
+%   url = {},
+% }
 
 % {term}{definition}
 % \Term{}{}
@@ -727,7 +749,7 @@ gantt
 - **Workflows:** CR | Change request (SUP.10); PR | Problem report (SUP.9)
 - **Tools (name, version):** GCC | 14.2; Target compiler | 12.3; CMake | 3.30; GoogleTest | 1.15; gcov/lcov | 2.1; cppcheck | 2.16; clang-format | 19; GitLab CI | 17
 - **Risks:** RSK-01 | Basic software release of the platform team comes late; RSK-02 | Requirements change after M1; RSK-03 | Timing budget of 200 us not met on the target; RSK-04 | Only one tester in the project; RSK-05 | Static analysis tool licence expires during the project
-- **References (key for \DocRef, document):** offer | Project offer and statement of work, SOW-PRJ-0815; srs | Software Requirements Specification, SRS-SPC-001; swcs | Software Component Specification heater_ctrl, SWCS-HC-001; safety | Safety Plan heater_ctrl, SP-HC-001; process | Company software process handbook, PH-SW-003; aspice | Automotive SPICE PAM; misra | MISRA C:2012 (with Amendments 1--4)
+- **References (key for \DocRef, attributes):** offer | id = SOW, title = Project offer and statement of work, number = SOW...; srs | title = Software Requirements Specification, number = SRS-SPC-001,...; swcs | title = Software Component Specification heater_ctrl, number = SWCS...; safety | title = Safety Plan heater_ctrl, number = SP-HC-001, issue = 1.0, c...; process | title = Company software process handbook, number = PH-SW-003, issu...; aspice | title = Automotive SPICE PAM, issue = 4.0, scope = external, classi...; misra | title = {MISRA C:2012 (with Amendments 1--4)}, issue = 2023, scope...
 - **Open points (ID, topic, status):** OP-007 | NvM block layout for the calibration data not agreed with the platf... | in progress; OP-011 | Timing budget per task on the target not yet given by the system team | open; OP-004 | Static analysis rule set: deviations for the generated RTE code | in progress; OP-012 | HIL slot for the qualification test not reserved | open; OP-009 | Interface to the diagnostic event manager: event IDs missing in the... | in progress; OP-013 | Coding guideline for the MISRA C:2012 amendment 4 rules | open; OP-014 | Second tester for the component tests (RSK-04) | open; OP-015 | Template for the software unit test report | open; OP-001 | Repository and CI runner set up | closed; OP-002 | Project manual reviewed by QA | closed; OP-003 | Licence of the static analysis tool for the project | closed; OP-005 | Kick-off minutes sent to the customer | closed
 - **How-tos:** HT-SETUP | Set up the workspace; HT-CHANGE | Make a change; HT-RELEASE | Create a release
 
@@ -783,8 +805,8 @@ gantt
 
 \Scope{
   The series development of the software component \TheComponent\ (three
-  units) from the software requirements to the software release for the start
-  of production, for one ECU variant.
+  units) from the software requirements \DocRef{srs} to the software release for the start
+  of production, for one ECU variant, as agreed in \DocRef{offer}.
 
   Out of scope: system and hardware development, the basic software (NvM, Dem,
   IoHwAb, supplied by the platform team) and the functional safety plan, which
@@ -801,15 +823,51 @@ gantt
 \Deliverable{Software component specification \DocRef{swcs}}{Customer}{M2}
 \Deliverable{Test reports (unit, component, qualification)}{Customer, QA}{M4}
 
-% {key}{internal | external}{document}{version} -- numbered [R1], [R2], ...
-% in this order. Cite them anywhere with \DocRef{key}.
-\Reference{offer}{internal}{Project offer and statement of work, SOW-PRJ-0815}{1.2}
-\Reference{srs}{internal}{Software Requirements Specification, SRS-SPC-001}{1.3}
-\Reference{swcs}{internal}{Software Component Specification heater_ctrl, SWCS-HC-001}{0.2}
-\Reference{safety}{internal}{Safety Plan heater_ctrl, SP-HC-001}{1.0}
-\Reference{process}{internal}{Company software process handbook, PH-SW-003}{4.1}
-\Reference{aspice}{external}{Automotive SPICE PAM}{4.0}
-\Reference{misra}{external}{MISRA C:2012 (with Amendments 1--4)}{2023}
+% \DocumentReference{key}{attribute = value, ...} -- listed as internal and
+% external documents, labelled with id or [R1], [R2], ...; cite with \DocRef{key}
+% (one attribute: \DocRef[issue]{key}). Every listed document must be cited.
+% Attributes: id (label instead of R<n>), title, number (document number),
+% issue, date, scope (internal | external), url, classification (public,
+% internal, confidential, strictly confidential). Required: title; for internal
+% documents also number and issue. Values with , or = in braces, a url always
+% in braces, % in it as \%.
+\DocumentReference{offer}{
+  id = SOW, title = Project offer and statement of work,
+  number = SOW-PRJ-0815, issue = 1.2, date = 2026-03-02,
+  classification = strictly confidential,
+}
+\DocumentReference{srs}{
+  title = Software Requirements Specification,
+  number = SRS-SPC-001, issue = 1.3, date = 2026-09-14,
+  classification = confidential,
+  url = {https://plm.example.com/windchill/app/#ptc1/tcomp/infoPage?oid=VR\%3Awt.doc.WTDocument\%3A4711&u8=1},
+}
+\DocumentReference{swcs}{
+  title = Software Component Specification heater_ctrl,
+  number = SWCS-HC-001, issue = 0.2,
+  classification = internal,
+}
+\DocumentReference{safety}{
+  title = Safety Plan heater_ctrl,
+  number = SP-HC-001, issue = 1.0,
+  classification = confidential,
+}
+\DocumentReference{process}{
+  title = Company software process handbook,
+  number = PH-SW-003, issue = 4.1,
+  classification = internal,
+  url = {https://intranet.example.com/process/PH-SW-003},
+}
+\DocumentReference{aspice}{
+  title = Automotive SPICE PAM,
+  issue = 4.0, scope = external,
+  classification = public,
+  url = {https://vda-qmc.de/en/automotive-spice/},
+}
+\DocumentReference{misra}{
+  title = {MISRA C:2012 (with Amendments 1--4)},
+  issue = 2023, scope = external,
+}
 
 % {term}{definition}
 \Term{CR}{Change Request}

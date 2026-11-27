@@ -42,6 +42,7 @@ INDEX = {
     "Tool": ("Tools (name, version)", (0, 2)),
     "Risk": ("Risks", (0, 1)),
     "Reference": ("References (key for \\DocRef, document)", (0, 2)),
+    "DocumentReference": ("References (key for \\DocRef, attributes)", (0, 1)),
     "OpenPoint": ("Open points (ID, topic, status)", (0, 1, 2)),
     "begin:HowTo": ("How-tos", (0, 1)),
 }
